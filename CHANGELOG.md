@@ -8,6 +8,8 @@ API changes increment the minor version.
 
 ## [Unreleased]
 
+## [0.2.0] - 2026-06-19
+
 ### Added
 
 - Per-file coverage enforcement at 90% for statements, branches, functions, and lines.
