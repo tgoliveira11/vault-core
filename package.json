@@ -62,8 +62,10 @@
   "scripts": {
     "build": "tsc -p tsconfig.json",
     "typecheck": "tsc -p tsconfig.json --noEmit",
+    "lint": "echo 'Package lint: configure eslint in a future release'",
     "test": "vitest run",
     "test:watch": "vitest",
+    "audit:security": "npm audit --audit-level=high",
     "validate": "npm run typecheck && npm run test && npm run build",
     "prepublishOnly": "npm run validate",
     "prepare": "npm run build"
@@ -81,7 +83,6 @@
   },
   "dependencies": {
     "@scure/bip39": "^2.2.0",
-    "@tgoliveira/vault-core": "^0.1.1",
     "hash-wasm": "^4.12.0",
     "zod": "^4.4.3"
   },
