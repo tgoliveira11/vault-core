@@ -75,4 +75,4 @@ const { envelope } = await createPasswordEnvelope(
 - `./react` is optional and requires `react >= 18`
 - Vault password, recovery phrase, UVK, PRF output, and decrypted payload must stay client-side
 
-See `SECURITY.md`, `ARCHITECTURE.md`, and `MIGRATION_FROM_LIQSENSE.md`.
+See `SECURITY.md`, `ARCHITECTURE.md`, `MIGRATION_FROM_LIQSENSE.md`, and [`docs/ADOPTING_VAULT_CORE_IN_EXISTING_APPS.md`](docs/ADOPTING_VAULT_CORE_IN_EXISTING_APPS.md) for migrating other apps (including [letter-to-god](https://github.com/tgoliveira11/letter-to-god)).
