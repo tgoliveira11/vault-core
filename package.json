@@ -47,6 +47,8 @@
   "files": [
     "dist",
     "README.md",
+    "CHANGELOG.md",
+    "AGENTS.md",
     "LICENSE",
     "SECURITY.md",
     "ARCHITECTURE.md",
@@ -54,7 +56,8 @@
     "PASSWORD_ENVELOPES.md",
     "PASSKEY_PRF_ENVELOPES.md",
     "MIGRATION_FROM_LIQSENSE.md",
-    "API_REFERENCE.md"
+    "API_REFERENCE.md",
+    "docs"
   ],
   "publishConfig": {
     "access": "public"
@@ -64,9 +67,10 @@
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "lint": "echo 'Package lint: configure eslint in a future release'",
     "test": "vitest run",
+    "test:coverage": "vitest run --coverage",
     "test:watch": "vitest",
     "audit:security": "npm audit --audit-level=high",
-    "validate": "npm run typecheck && npm run test && npm run build",
+    "validate": "npm run typecheck && npm run test:coverage && npm run build",
     "prepublishOnly": "npm run validate",
     "prepare": "npm run build"
   },
@@ -92,6 +96,7 @@
     "@types/react": "^19",
     "@types/react-dom": "^19",
     "@vitejs/plugin-react": "^6.0.2",
+    "@vitest/coverage-v8": "^4.1.9",
     "jsdom": "^29.1.1",
     "react": "^19.2.4",
     "react-dom": "^19.2.4",

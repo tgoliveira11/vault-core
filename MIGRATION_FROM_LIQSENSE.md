@@ -17,11 +17,13 @@ export const LIQSENSE_PRF_SALT_PREFIX = "liqsense-passkey-prf-v1:";
 | --- | --- |
 | `generateUserVaultKey` | `createUserVaultKey` |
 | `wrapVaultKeyForPassword` | `createPasswordEnvelope` + profile |
-| `unwrapVaultKeyFromPassword` | `unlockWithPasswordEnvelope` |
+| `unwrapVaultKeyFromPassword` | `unlockWithPasswordEnvelope(password, envelope, expectedScope, profile)` |
 | `wrapVaultKeyForRecoveryPhrase` | `createRecoveryEnvelope` + profile |
 | `generateRecoveryPhrase` | `createRecoveryPhrase` |
 
 LiqSense keeps thin wrappers in `src/modules/vault/core/` binding `LIQSENSE_VAULT_PROFILE`.
+High-level decrypt and unlock calls must also bind the expected scope so authenticated AAD cannot be
+replayed under another user or resource.
 
 ## Local dev
 

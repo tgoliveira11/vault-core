@@ -3,6 +3,7 @@ import {
   configureVaultSession,
   lockVaultSession,
   registerVaultUnloadGuard,
+  registerVaultActivityGuard,
   touchVaultSession,
   type VaultSessionConfig,
 } from "../../browser.js";
@@ -11,10 +12,15 @@ import { useVaultUnlocked } from "./use-vault-unlocked.js";
 export type UseVaultSessionOptions = {
   sessionConfig?: VaultSessionConfig;
   registerUnloadGuard?: boolean;
+  registerActivityGuard?: boolean;
 };
 
 export function useVaultSession(options: UseVaultSessionOptions = {}) {
-  const { sessionConfig, registerUnloadGuard = true } = options;
+  const {
+    sessionConfig,
+    registerUnloadGuard = true,
+    registerActivityGuard = true,
+  } = options;
   const unlocked = useVaultUnlocked();
 
   useEffect(() => {
@@ -27,6 +33,11 @@ export function useVaultSession(options: UseVaultSessionOptions = {}) {
     if (!registerUnloadGuard) return;
     return registerVaultUnloadGuard();
   }, [registerUnloadGuard]);
+
+  useEffect(() => {
+    if (!registerActivityGuard) return;
+    return registerVaultActivityGuard();
+  }, [registerActivityGuard]);
 
   const lock = useCallback(() => {
     lockVaultSession();

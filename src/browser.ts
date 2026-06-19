@@ -43,35 +43,71 @@ function escapeHtml(value: string): string {
     .replace(/>/g, "&gt;");
 }
 
-export function assertNoDecryptedVaultInLocalStorage(storagePrefix: string): boolean {
-  if (typeof window === "undefined") return true;
+export type VaultStorageInspectionResult = "clear" | "found" | "unavailable";
 
-  for (let i = 0; i < localStorage.length; i++) {
-    const key = localStorage.key(i);
-    if (!key) continue;
-    if (key.startsWith(storagePrefix)) {
-      return false;
-    }
+export function inspectLocalStoragePrefix(
+  storagePrefix: string
+): VaultStorageInspectionResult {
+  if (typeof window === "undefined" || typeof localStorage === "undefined") {
+    return "unavailable";
   }
-  return true;
+
+  try {
+    for (let i = 0; i < localStorage.length; i++) {
+      const key = localStorage.key(i);
+      if (!key) continue;
+      if (key.startsWith(storagePrefix)) {
+        return "found";
+      }
+    }
+    return "clear";
+  } catch {
+    return "unavailable";
+  }
 }
 
-export async function assertNoDecryptedVaultInIndexedDB(storagePrefix: string): Promise<boolean> {
-  if (typeof window === "undefined" || typeof indexedDB === "undefined") return true;
+export async function inspectIndexedDBPrefix(
+  storagePrefix: string
+): Promise<VaultStorageInspectionResult> {
+  if (typeof window === "undefined" || typeof indexedDB === "undefined") {
+    return "unavailable";
+  }
 
   return new Promise((resolve) => {
-    const request = indexedDB.databases?.();
+    let request: Promise<IDBDatabaseInfo[]> | undefined;
+    try {
+      request = indexedDB.databases?.();
+    } catch {
+      resolve("unavailable");
+      return;
+    }
     if (!request) {
-      resolve(true);
+      resolve("unavailable");
       return;
     }
     void request
       .then((databases) => {
         const hasVaultDb = databases.some((db) => db.name?.startsWith(storagePrefix));
-        resolve(!hasVaultDb);
+        resolve(hasVaultDb ? "found" : "clear");
       })
-      .catch(() => resolve(true));
+      .catch(() => resolve("unavailable"));
   });
+}
+
+/**
+ * @deprecated This is a namespace-level, fail-closed check. Use inspectLocalStoragePrefix
+ * and handle all three result states explicitly.
+ */
+export function assertNoDecryptedVaultInLocalStorage(storagePrefix: string): boolean {
+  return inspectLocalStoragePrefix(storagePrefix) === "clear";
+}
+
+/**
+ * @deprecated This checks database names, not record contents. Use inspectIndexedDBPrefix
+ * and handle all three result states explicitly.
+ */
+export async function assertNoDecryptedVaultInIndexedDB(storagePrefix: string): Promise<boolean> {
+  return (await inspectIndexedDBPrefix(storagePrefix)) === "clear";
 }
 
 export function persistVaultRecordLocally(): never {
@@ -96,12 +132,10 @@ export {
   lockVaultSessionManually,
   resetVaultSessionLockState,
   registerVaultUnloadGuard,
+  registerVaultActivityGuard,
   getVaultAutoLockRemainingMs,
   getSessionVaultKey,
-  setSessionVaultKey,
-  lockVault,
   isVaultUnlocked,
-  clearVaultClientState,
   type VaultSessionConfig,
 } from "./session/auto-lock.js";
 

@@ -29,6 +29,26 @@ Build vault-core before consuming:
 cd ../vault-core && npm run validate
 ```
 
+## Testing
+
+```bash
+npm test
+npm run test:coverage
+```
+
+Coverage is enforced per production file at 90% for statements, branches, functions, and lines.
+`npm run validate` includes the coverage gate.
+
+## Documentation
+
+- [Complete implementation guide](docs/IMPLEMENTATION_GUIDE.md)
+- [Documentation index](docs/README.md)
+- [API reference](API_REFERENCE.md)
+- [Security model](SECURITY.md)
+- [Changelog](CHANGELOG.md)
+- [Release process](docs/RELEASING.md)
+- [Agent and contributor guide](AGENTS.md)
+
 ## Quick start
 
 ```ts
@@ -57,14 +77,33 @@ const { envelope } = await createPasswordEnvelope(
   scope,
   profile
 );
+
+const encryptedPayload = await encryptVaultPayload(
+  { version: 1, entries: [] },
+  vaultKey,
+  scope,
+  profile
+);
+
+const unlockedKey = await unlockWithPasswordEnvelope(
+  userVaultPassword,
+  envelope,
+  scope,
+  profile
+);
+
+const payload = await decryptVaultPayload(encryptedPayload, unlockedKey, scope, profile);
 ```
+
+High-level decrypt and unlock APIs require the expected scope and profile. This binds authenticated
+AAD to the user, resource, field, and application context expected by the caller.
 
 ## Exports
 
 | Entry | Purpose |
 | --- | --- |
 | `@tgoliveira/vault-core` | Core crypto, envelopes, payload, validation |
-| `@tgoliveira/vault-core/browser` | In-memory session, auto-lock, PRF salt, recovery kit DOM helpers |
+| `@tgoliveira/vault-core/browser` | In-memory session, activity-aware auto-lock, storage inspection, PRF salt, recovery kit DOM helpers |
 | `@tgoliveira/vault-core/testing` | Sentinels and plaintext scan helpers |
 | `@tgoliveira/vault-core/react` | Headless React session/status hooks (optional peer: `react`) |
 
@@ -74,5 +113,6 @@ const { envelope } = await createPasswordEnvelope(
 - Does **not** require React, Next.js, or product payload schemas on the default entry
 - `./react` is optional and requires `react >= 18`
 - Vault password, recovery phrase, UVK, PRF output, and decrypted payload must stay client-side
+- Persisted envelope schemas enforce method-specific KDF metadata at runtime
 
 See `SECURITY.md`, `ARCHITECTURE.md`, `MIGRATION_FROM_LIQSENSE.md`, and [`docs/ADOPTING_VAULT_CORE_IN_EXISTING_APPS.md`](docs/ADOPTING_VAULT_CORE_IN_EXISTING_APPS.md) for migrating other apps (including [letter-to-god](https://github.com/tgoliveira11/letter-to-god)).

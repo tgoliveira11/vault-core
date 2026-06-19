@@ -11,6 +11,7 @@ import {
   deriveVaultPasswordKey,
   deriveVaultPasswordKeyFromMetadata,
 } from "../kdf/argon2id.js";
+import { assertVaultKeyAad } from "../validation/aad-assert.js";
 
 type WrapScope = Pick<VaultAadScope, "userId" | "resourceId">;
 
@@ -56,11 +57,14 @@ export async function createPasswordEnvelope(
 
 export async function unlockWithPasswordEnvelope(
   vaultPassword: string,
-  envelope: PasswordEnvelope | { encryptedVaultKey: EncryptedVaultPayload; kdfMetadata: KdfMetadata }
+  envelope: PasswordEnvelope | { encryptedVaultKey: EncryptedVaultPayload; kdfMetadata: KdfMetadata },
+  expectedScope: WrapScope,
+  profile: VaultCryptoProfile
 ): Promise<CryptoKey> {
   if (envelope.kdfMetadata?.kdf !== "argon2id") {
     throw new Error("Vault password envelope requires Argon2id metadata");
   }
+  assertVaultKeyAad(expectedScope, envelope.encryptedVaultKey, profile);
   const derivedKey = await deriveVaultPasswordKeyFromMetadata(vaultPassword, envelope.kdfMetadata);
   return unwrapVaultKeyWithDerivedKey(envelope.encryptedVaultKey, derivedKey);
 }

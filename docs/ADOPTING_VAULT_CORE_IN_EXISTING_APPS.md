@@ -133,7 +133,7 @@ export const APP_VAULT_PROFILE: VaultCryptoProfile = {
 
 - **Profile preserves AAD compatibility** for *new* encryption using vault-core (`context` is embedded in the stored `aad` object).
 - **Do not change** profile strings after production data exists unless you have a deliberate breaking migration.
-- **Existing apps:** derive profile values from the current implementation. If legacy records have **no** `context` in stored `aad`, fixtures must prove vault-core can still **decrypt** them via `aadByteCandidates` (see §7).
+- **Existing apps:** derive profile values from the current implementation. If legacy records have **no** `context` in stored `aad`, use the low-level `decryptField` compatibility path in an explicit migration, validate all available AAD fields, and re-encrypt with the configured context. High-level decrypt and unlock APIs intentionally reject missing contexts.
 - **New apps:** pick stable, product-neutral strings before first production release.
 - **Passkey PRF salt prefix** (if used) is app-specific and lives beside the profile, e.g. `buildPrfSaltBytes("my-app-passkey-prf-v1:", userId)` from `@tgoliveira/vault-core/browser`.
 
@@ -146,14 +146,14 @@ Use the **actual** vault-core API (see `API_REFERENCE.md`). Deprecated aliases e
 | Local concept | `@tgoliveira/vault-core` replacement |
 | --- | --- |
 | `generateUserVaultKey` / `generateAesKey` for UVK | `createUserVaultKey()` |
-| `encryptField` for generic vault payload | `encryptVaultPayload` / `decryptVaultPayload` **or** exported `encryptField` / `decryptField` with profile |
+| `encryptField` for generic vault payload | `encryptVaultPayload(payload, key, scope, profile)` / `decryptVaultPayload(encrypted, key, expectedScope, profile)` **or** exported low-level `encryptField` / `decryptField` |
 | `wrapVaultKeyForPassword` | `createPasswordEnvelope(vaultKey, password, scope, profile)` |
-| `unwrapVaultKeyFromPassword` | `unlockWithPasswordEnvelope(password, envelope)` |
+| `unwrapVaultKeyFromPassword` | `unlockWithPasswordEnvelope(password, envelope, expectedScope, profile)` |
 | `generateRecoveryPhrase` | `createRecoveryPhrase({ wordCount: 12 \| 24 })` |
 | `wrapVaultKeyForRecoveryPhrase` | `createRecoveryEnvelope(vaultKey, phrase, scope, profile)` |
-| `unwrapVaultKeyFromRecoveryPhrase` | `unlockWithRecoveryEnvelope(phrase, envelope)` |
+| `unwrapVaultKeyFromRecoveryPhrase` | `unlockWithRecoveryEnvelope(phrase, envelope, expectedScope, profile)` |
 | `wrapVaultKeyForPasskey` | `createPasskeyPrfEnvelope(vaultKey, prfOutput, scope, profile)` |
-| `unwrapVaultKeyFromPasskey` | `unlockWithPasskeyPrfEnvelope(prfOutput, envelope)` |
+| `unwrapVaultKeyFromPasskey` | `unlockWithPasskeyPrfEnvelope(envelope, prfOutput, expectedScope, profile)` |
 | `extractPasskeyPrfOutput` | `@tgoliveira/vault-core/browser` (also re-exported from passkey module) |
 | Recovery kit text | `createRecoveryKitText` / `buildRecoveryKitContent` |
 | Plaintext guard | `assertNoVaultPlaintextFields`, `validateNoPlaintextLeak` |
@@ -165,7 +165,7 @@ Use the **actual** vault-core API (see `API_REFERENCE.md`). Deprecated aliases e
 | Import path | Use when |
 | --- | --- |
 | `@tgoliveira/vault-core` | Core crypto, envelopes, validation (safe for shared isomorphic code that does not touch `window`) |
-| `@tgoliveira/vault-core/browser` | Session, auto-lock, PRF salt, recovery kit DOM, localStorage/IDB guards |
+| `@tgoliveira/vault-core/browser` | Session, activity-aware auto-lock, PRF salt, recovery kit DOM, storage namespace inspection |
 | `@tgoliveira/vault-core/testing` | Test sentinels and plaintext scans |
 | `@tgoliveira/vault-core/react` | Optional React hooks (peer: `react >= 18`) |
 
@@ -567,7 +567,9 @@ Package: @tgoliveira/vault-core (NOT @tgoliveira/core-vault)
 ## Related reading
 
 - [`README.md`](../README.md) — install and exports
+- [`docs/IMPLEMENTATION_GUIDE.md`](IMPLEMENTATION_GUIDE.md) — complete greenfield and operational workflows
 - [`API_REFERENCE.md`](../API_REFERENCE.md) — function list
 - [`SECURITY.md`](../SECURITY.md) — threat model
 - [`ARCHITECTURE.md`](../ARCHITECTURE.md) — module layout
 - [`MIGRATION_FROM_LIQSENSE.md`](../MIGRATION_FROM_LIQSENSE.md) — first consumer reference migration
+- [`CHANGELOG.md`](../CHANGELOG.md) — versioned changes and upgrade impact

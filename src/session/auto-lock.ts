@@ -11,6 +11,7 @@ let inactivityTimer: ReturnType<typeof setTimeout> | null = null;
 let manuallyLocked = false;
 let lastActivityAt = 0;
 const listeners = new Set<() => void>();
+const DEFAULT_ACTIVITY_EVENTS = ["pointerdown", "keydown", "touchstart", "focus"] as const;
 
 export function configureVaultSession(config: VaultSessionConfig): void {
   sessionConfig = config;
@@ -98,6 +99,22 @@ export function registerVaultUnloadGuard(): () => void {
   return () => window.removeEventListener("pagehide", handler);
 }
 
+export function registerVaultActivityGuard(
+  events: readonly string[] = DEFAULT_ACTIVITY_EVENTS
+): () => void {
+  if (typeof window === "undefined") return () => undefined;
+
+  const handler = () => touchVaultSession();
+  for (const event of events) {
+    window.addEventListener(event, handler, { passive: true });
+  }
+  return () => {
+    for (const event of events) {
+      window.removeEventListener(event, handler);
+    }
+  };
+}
+
 export function getVaultAutoLockRemainingMs(): number | null {
   if (!isVaultUnlocked() || manuallyLocked || lastActivityAt === 0) return null;
   return Math.max(0, getAutoLockTimeoutMs() - (Date.now() - lastActivityAt));
@@ -105,8 +122,5 @@ export function getVaultAutoLockRemainingMs(): number | null {
 
 export {
   getSessionVaultKey,
-  setSessionVaultKey,
-  lockVault,
   isVaultUnlocked,
-  clearVaultClientState,
 } from "./memory-session.js";

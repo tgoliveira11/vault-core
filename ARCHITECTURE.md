@@ -13,6 +13,8 @@
 | Passkey PRF | PRF output → AES key | UVK |
 
 Envelope AAD field: `vault_key` with app `aadContextEnvelope`.
+Persisted envelopes are validated as a method-discriminated union, so password and recovery
+envelopes require Argon2id metadata while passkey PRF envelopes require `null` KDF metadata.
 
 ## Encrypted payload
 
@@ -30,3 +32,6 @@ Format: `enc-v1` / `AES-GCM` / `kdf-v1`.
 ```
 
 Apps own: persistence, routes, product UI, product payload schema, WebAuthn ceremony.
+
+Browser and React session layers keep the UVK in memory, renew auto-lock on activity, and clear it on
+lock or `pagehide`. Direct key mutation is not part of the public browser entry.

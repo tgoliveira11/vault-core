@@ -21,13 +21,30 @@ export const PLAINTEXT_FORBIDDEN_VAULT_FIELDS = [
 
 export type PlaintextForbiddenField = (typeof PLAINTEXT_FORBIDDEN_VAULT_FIELDS)[number];
 
+const FORBIDDEN_FIELD_SET = new Set<string>(PLAINTEXT_FORBIDDEN_VAULT_FIELDS);
+
 export function rejectVaultPlaintextFields(body: Record<string, unknown>): string | null {
-  for (const field of PLAINTEXT_FORBIDDEN_VAULT_FIELDS) {
-    if (field in body && body[field] !== undefined) {
-      return `Plaintext field '${field}' is not allowed`;
+  const visited = new WeakSet<object>();
+
+  function visit(value: unknown, path: string): string | null {
+    if (value === null || typeof value !== "object") return null;
+    if (visited.has(value)) return null;
+    visited.add(value);
+
+    for (const [field, nestedValue] of Object.entries(value)) {
+      const fieldPath = path ? `${path}.${field}` : field;
+      if (FORBIDDEN_FIELD_SET.has(field) && nestedValue !== undefined) {
+        return `Plaintext field '${field}' is not allowed at '${fieldPath}'`;
+      }
+
+      const nestedError = visit(nestedValue, fieldPath);
+      if (nestedError) return nestedError;
     }
+
+    return null;
   }
-  return null;
+
+  return visit(body, "");
 }
 
 export function assertNoVaultPlaintextFields(body: Record<string, unknown>): void {

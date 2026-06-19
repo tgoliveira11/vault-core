@@ -3,6 +3,7 @@ import type { VaultCryptoProfile, VaultAadScope } from "../profile.js";
 import { PasskeyPrfRequiredError, PasskeyUnlockError } from "../errors/vault-errors.js";
 import { encryptField, decryptField, exportAesKey, importAesKey } from "../crypto/aes-gcm.js";
 import { bytesToBase64Url, base64UrlToBytes, toBufferSource } from "../crypto/encoding.js";
+import { assertVaultKeyAad } from "../validation/aad-assert.js";
 
 interface PrfClientExtensionResults {
   prf?: {
@@ -76,11 +77,14 @@ export async function createPasskeyPrfEnvelope(
 
 export async function unwrapVaultKeyFromPasskey(
   encryptedVaultKey: EncryptedVaultPayload,
-  prfOutput: Uint8Array
+  prfOutput: Uint8Array,
+  expectedScope: WrapScope,
+  profile: VaultCryptoProfile
 ): Promise<CryptoKey> {
   if (prfOutput.byteLength < 32) {
     throw new Error("PRF output must be at least 32 bytes");
   }
+  assertVaultKeyAad(expectedScope, encryptedVaultKey, profile);
   const prfKey = await importPrfAsAesKey(prfOutput);
   const keyBytes = base64UrlToBytes(await decryptField(encryptedVaultKey, prfKey));
   return importAesKey(keyBytes);
@@ -89,6 +93,8 @@ export async function unwrapVaultKeyFromPasskey(
 export async function unlockWithPasskeyPrfEnvelope(
   envelope: PasskeyPrfEnvelope | { encryptedVaultKey: EncryptedVaultPayload },
   prfOutput: Uint8Array | null,
+  expectedScope: WrapScope,
+  profile: VaultCryptoProfile,
   options?: { prfRequired?: boolean }
 ): Promise<CryptoKey> {
   const prfRequired = options?.prfRequired ?? true;
@@ -106,7 +112,12 @@ export async function unlockWithPasskeyPrfEnvelope(
   }
 
   try {
-    return await unwrapVaultKeyFromPasskey(envelope.encryptedVaultKey, prfOutput);
+    return await unwrapVaultKeyFromPasskey(
+      envelope.encryptedVaultKey,
+      prfOutput,
+      expectedScope,
+      profile
+    );
   } catch {
     throw new PasskeyUnlockError(
       "Could not decrypt your vault with this passkey. Use your vault password or recovery phrase."
@@ -118,13 +129,15 @@ export async function unlockWithPasskeyPrfEnvelope(
 export async function unlockVaultFromPasskeyEnvelope(
   encryptedVaultKeyOrEnvelope: EncryptedVaultPayload | PasskeyPrfEnvelope,
   prfOutput: Uint8Array | null,
+  expectedScope: WrapScope,
+  profile: VaultCryptoProfile,
   options?: { prfRequired?: boolean }
 ): Promise<CryptoKey> {
   const envelope =
     "method" in encryptedVaultKeyOrEnvelope
       ? encryptedVaultKeyOrEnvelope
       : { encryptedVaultKey: encryptedVaultKeyOrEnvelope, method: "passkey_prf" as const, kdfMetadata: null };
-  return unlockWithPasskeyPrfEnvelope(envelope, prfOutput, options);
+  return unlockWithPasskeyPrfEnvelope(envelope, prfOutput, expectedScope, profile, options);
 }
 
 /** @deprecated Use createPasskeyPrfEnvelope */

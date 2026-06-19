@@ -252,7 +252,7 @@ type VaultCryptoProfile = {
 | `createUserVaultKey()` | 256-bit AES-GCM UVK generation | Web Crypto | Browser + Node 20+ | Yes |
 | `exportUserVaultKey` / `importUserVaultKey` | Testing, envelope wrap | Web Crypto | Browser + Node | Yes (advanced) |
 
-**Note:** Module-level session holder (`getSessionVaultKey`, `setSessionVaultKey`, `lockVault`) moves to `@tgoliveira/vault-core/browser`, not the default export, so Node consumers and tests do not inherit hidden global state.
+**Note:** The module-level session holder stays internal. `@tgoliveira/vault-core/browser` exposes read access plus lifecycle-aware `unlockVaultSession`, `lockVaultSession`, and activity guards, so consumers cannot bypass timers and subscriber notifications with direct key mutation.
 
 ---
 
@@ -329,7 +329,7 @@ Wordlist: **BIP39 English** via `@scure/bip39` (current behavior — do not chan
 | API | Why | Dependencies | Runtime | Public? |
 | --- | --- | --- | --- | --- |
 | `encryptVaultPayload<T>(payload, key, aadScope, profile)` | Generic JSON encryption | AES-GCM | Browser + Node | Yes |
-| `decryptVaultPayload<T>(encrypted, key)` | Generic JSON decryption | AES-GCM | Browser + Node | Yes |
+| `decryptVaultPayload<T>(encrypted, key, expectedScope, profile)` | Generic JSON decryption with expected AAD binding | AES-GCM | Browser + Node | Yes |
 | `encryptedPayloadSchema` (Zod) | Server/client contract | `zod` | Universal | Yes |
 | `ENCRYPTION_VERSION`, `ENCRYPTION_ALG` | `enc-v1`, `AES-GCM` | None | Universal | Yes |
 
@@ -437,7 +437,9 @@ export async function encryptVaultPayload<T>(
 
 export async function decryptVaultPayload<T>(
   encrypted: EncryptedVaultPayload,
-  vaultKey: CryptoKey
+  vaultKey: CryptoKey,
+  expectedScope: VaultAadScope,
+  profile: VaultCryptoProfile
 ): Promise<T>;
 ```
 
@@ -466,7 +468,9 @@ export async function createPasswordEnvelope(
 
 export async function unlockWithPasswordEnvelope(
   vaultPassword: string,
-  envelope: PasswordEnvelope
+  envelope: PasswordEnvelope,
+  expectedScope: VaultAadScope,
+  profile: VaultCryptoProfile
 ): Promise<CryptoKey>;
 
 export function createRecoveryPhrase(options: {
@@ -484,6 +488,8 @@ export async function createRecoveryEnvelope(
 export async function unlockWithRecoveryEnvelope(
   recoveryPhrase: string,
   envelope: RecoveryPhraseEnvelope,
+  expectedScope: VaultAadScope,
+  profile: VaultCryptoProfile,
   options?: { expectedWordCount?: RecoveryPhraseWordCount | null }
 ): Promise<CryptoKey>;
 
@@ -497,6 +503,8 @@ export async function createPasskeyPrfEnvelope(
 export async function unlockWithPasskeyPrfEnvelope(
   envelope: PasskeyPrfEnvelope,
   prfOutput: Uint8Array | null,
+  expectedScope: VaultAadScope,
+  profile: VaultCryptoProfile,
   options?: { prfRequired?: boolean }
 ): Promise<CryptoKey>;
 ```
@@ -555,11 +563,12 @@ export async function unlockLiqSenseVault(
   secret: string | Uint8Array,
   envelope: VaultEnvelope,
   encryptedBlob: EncryptedVaultPayload,
+  scope: VaultAadScope,
   profile: VaultCryptoProfile
 ): Promise<VaultUnlockResult<LiqSenseVaultPayloadV2>> {
-  const vaultKey = await unlockWithPasswordEnvelope(/* or other */);
+  const vaultKey = await unlockWithPasswordEnvelope(/* secret, envelope, scope, profile */);
   const payload = normalizeVaultPayload(
-    await decryptVaultPayload(encryptedBlob, vaultKey)
+    await decryptVaultPayload(encryptedBlob, vaultKey, scope, profile)
   );
   return { vaultKey, payload };
 }

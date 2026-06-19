@@ -6,7 +6,11 @@ import {
   toBufferSource,
   stringToBytes,
 } from "../crypto/encoding.js";
-import { DEFAULT_ARGON2ID_PARAMS } from "./params.js";
+import {
+  assertSafeArgon2idParams,
+  assertSafeArgon2idSalt,
+  DEFAULT_ARGON2ID_PARAMS,
+} from "./params.js";
 
 export { DEFAULT_ARGON2ID_PARAMS, type Argon2idParams } from "./params.js";
 
@@ -16,6 +20,8 @@ export function serializeArgon2idMetadata(
   salt: Uint8Array,
   params: Pick<typeof DEFAULT_ARGON2ID_PARAMS, "memory" | "iterations" | "parallelism"> = DEFAULT_ARGON2ID_PARAMS
 ): Argon2idKdfMetadata {
+  assertSafeArgon2idSalt(salt);
+  assertSafeArgon2idParams(params);
   return {
     kdf: "argon2id",
     version: "kdf-v1",
@@ -32,8 +38,14 @@ export function parseArgon2idMetadata(metadata: Argon2idKdfMetadata): {
   iterations: number;
   parallelism: number;
 } {
+  if (metadata.salt.length > 128) {
+    throw new Error("Argon2id salt encoding is too large");
+  }
+  assertSafeArgon2idParams(metadata);
+  const salt = base64UrlToBytes(metadata.salt);
+  assertSafeArgon2idSalt(salt);
   return {
-    salt: base64UrlToBytes(metadata.salt),
+    salt,
     memory: metadata.memory,
     iterations: metadata.iterations,
     parallelism: metadata.parallelism,
@@ -50,7 +62,12 @@ export async function deriveArgon2idAesKey(
     hashLength?: number;
   } = DEFAULT_ARGON2ID_PARAMS
 ): Promise<CryptoKey> {
+  assertSafeArgon2idParams(params);
+  assertSafeArgon2idSalt(salt);
   const hashLength = params.hashLength ?? DEFAULT_ARGON2ID_PARAMS.hashLength;
+  if (hashLength !== DEFAULT_ARGON2ID_PARAMS.hashLength) {
+    throw new Error(`Argon2id hash length must be ${DEFAULT_ARGON2ID_PARAMS.hashLength} bytes`);
+  }
   const hash = await argon2id({
     password: passwordBytes,
     salt,

@@ -17,6 +17,7 @@ import {
 import { DEFAULT_ARGON2ID_PARAMS } from "../kdf/params.js";
 import { RecoveryPhraseConfirmationError } from "../errors/vault-errors.js";
 import { encryptField, decryptField, exportAesKey, importAesKey } from "../crypto/aes-gcm.js";
+import { assertVaultKeyAad } from "../validation/aad-assert.js";
 
 export const RECOVERY_PHRASE_WORDLIST_SOURCE = "BIP39 English (BIP-0039)" as const;
 export const DEFAULT_RECOVERY_PHRASE_WORD_COUNT: RecoveryPhraseWordCount = 24;
@@ -131,18 +132,30 @@ export function pickRecoveryConfirmationIndices(
 
 export function assertRecoveryPhraseWordConfirmation(
   originalPhrase: string,
-  answers: Record<number, string>
+  answers: Record<number, string>,
+  requiredIndices?: readonly number[]
 ): void {
   const words = normalizeRecoveryPhrase(originalPhrase).split(" ");
   if (!validateRecoveryPhraseFormat(originalPhrase)) {
     throw new RecoveryPhraseConfirmationError("Recovery phrase is not valid");
   }
 
-  for (const [indexRaw, answer] of Object.entries(answers)) {
-    const index = Number.parseInt(indexRaw, 10);
+  const indices = requiredIndices ?? pickRecoveryConfirmationIndices(
+    words.length,
+    getRecoveryConfirmationPromptCount(words.length as RecoveryPhraseWordCount)
+  );
+  if (indices.length === 0 || new Set(indices).size !== indices.length) {
+    throw new RecoveryPhraseConfirmationError("Recovery confirmation indices are invalid");
+  }
+
+  for (const index of indices) {
+    if (!Number.isInteger(index) || index < 1 || index > words.length) {
+      throw new RecoveryPhraseConfirmationError("Recovery confirmation indices are invalid");
+    }
     const expected = words[index - 1];
-    const given = normalizeRecoveryPhrase(answer);
-    if (!expected || given !== expected) {
+    const answer = answers[index];
+    const given = typeof answer === "string" ? normalizeRecoveryPhrase(answer) : "";
+    if (given !== expected) {
       throw new RecoveryPhraseConfirmationError(
         `Word #${index} does not match your recovery phrase`
       );
@@ -226,6 +239,8 @@ export async function createRecoveryEnvelope(
 export async function unlockWithRecoveryEnvelope(
   recoveryPhrase: string,
   envelope: RecoveryPhraseEnvelope | { encryptedVaultKey: EncryptedVaultPayload; kdfMetadata: KdfMetadata },
+  expectedScope: WrapScope,
+  profile: VaultCryptoProfile,
   options?: { expectedWordCount?: RecoveryPhraseWordCount | null }
 ): Promise<CryptoKey> {
   if (options?.expectedWordCount != null) {
@@ -234,6 +249,7 @@ export async function unlockWithRecoveryEnvelope(
   if (envelope.kdfMetadata?.kdf !== "argon2id") {
     throw new Error("Recovery phrase envelope requires Argon2id metadata");
   }
+  assertVaultKeyAad(expectedScope, envelope.encryptedVaultKey, profile);
   const derivedKey = await deriveRecoveryPhraseKeyFromMetadata(recoveryPhrase, envelope.kdfMetadata);
   return unwrapVaultKeyWithDerivedKey(envelope.encryptedVaultKey, derivedKey);
 }

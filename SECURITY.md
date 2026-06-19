@@ -14,17 +14,37 @@ Vault unlock requires a separate vault password, recovery phrase, or passkey PRF
 - PRF output
 - Decrypted vault payload
 
-Use `assertNoVaultPlaintextFields()` on API request bodies.
+Use `assertNoVaultPlaintextFields()` on API request bodies. The guard recursively checks nested
+objects and arrays and safely handles cyclic in-memory objects.
 
 ## Client must never persist
 
 - Decrypted vault payload in localStorage or IndexedDB
 
-Browser session helpers clear UVK on lock and `pagehide`.
+Browser session helpers clear UVK on lock and `pagehide`. React session helpers also renew the
+inactivity timer on pointer, keyboard, touch, and focus activity by default. Public browser exports
+do not expose direct session-key setters; use `unlockVaultSession()` and `lockVaultSession()` so
+timers and subscribers remain consistent.
+
+`inspectLocalStoragePrefix()` and `inspectIndexedDBPrefix()` are namespace inspections, not content
+scanners. They return `"unavailable"` when inspection is blocked or unsupported. Treat that result
+as a failed security check. IndexedDB inspection checks database names and cannot prove that records
+inside an unrelated database contain no plaintext.
 
 ## Crypto constants (per app profile)
 
 Apps define `VaultCryptoProfile` with stable AAD contexts. Existing ciphertext breaks if contexts change.
+
+High-level decrypt and envelope-unlock APIs require the expected scope and profile. They reject a
+valid ciphertext when its authenticated AAD belongs to a different user, resource, field, or app
+context. Treat `decryptField()` as a low-level compatibility primitive: callers that use it directly
+must validate the expected AAD separately.
+
+## Untrusted persisted data
+
+Treat encrypted payloads, envelopes, AAD, and KDF metadata loaded from a server or local storage as
+untrusted. Argon2id metadata is bounded before derivation to prevent excessive client memory or CPU
+consumption. Do not bypass the high-level APIs or their runtime validation for persisted data.
 
 ## Logging
 
