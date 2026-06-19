@@ -1,0 +1,101 @@
+{
+  "name": "@tgoliveira/vault-core",
+  "version": "0.1.1",
+  "description": "Framework-independent vault crypto primitives with optional React session helpers",
+  "type": "module",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/tgoliveira11/vault-core.git"
+  },
+  "bugs": {
+    "url": "https://github.com/tgoliveira11/vault-core/issues"
+  },
+  "homepage": "https://github.com/tgoliveira11/vault-core#readme",
+  "keywords": [
+    "vault",
+    "encryption",
+    "aes-gcm",
+    "argon2id",
+    "recovery-phrase",
+    "bip39",
+    "passkey-prf",
+    "webcrypto",
+    "zero-knowledge",
+    "client-side-encryption"
+  ],
+  "license": "MIT",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    },
+    "./browser": {
+      "types": "./dist/browser.d.ts",
+      "import": "./dist/browser.js"
+    },
+    "./testing": {
+      "types": "./dist/testing.d.ts",
+      "import": "./dist/testing.js"
+    },
+    "./react": {
+      "types": "./dist/react/index.d.ts",
+      "import": "./dist/react/index.js"
+    }
+  },
+  "files": [
+    "dist",
+    "README.md",
+    "LICENSE",
+    "SECURITY.md",
+    "ARCHITECTURE.md",
+    "RECOVERY_PHRASE.md",
+    "PASSWORD_ENVELOPES.md",
+    "PASSKEY_PRF_ENVELOPES.md",
+    "MIGRATION_FROM_LIQSENSE.md",
+    "API_REFERENCE.md"
+  ],
+  "publishConfig": {
+    "access": "public"
+  },
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "validate": "npm run typecheck && npm run test && npm run build",
+    "prepublishOnly": "npm run validate",
+    "prepare": "npm run build"
+  },
+  "engines": {
+    "node": ">=20"
+  },
+  "peerDependencies": {
+    "react": ">=18"
+  },
+  "peerDependenciesMeta": {
+    "react": {
+      "optional": true
+    }
+  },
+  "dependencies": {
+    "@scure/bip39": "^2.2.0",
+    "@tgoliveira/vault-core": "^0.1.1",
+    "hash-wasm": "^4.12.0",
+    "zod": "^4.4.3"
+  },
+  "devDependencies": {
+    "@testing-library/react": "^16.3.2",
+    "@types/node": "^20",
+    "@types/react": "^19",
+    "@types/react-dom": "^19",
+    "@vitejs/plugin-react": "^6.0.2",
+    "jsdom": "^29.1.1",
+    "react": "^19.2.4",
+    "react-dom": "^19.2.4",
+    "typescript": "^5",
+    "vitest": "^4.1.9"
+  },
+  "private": false
+}
