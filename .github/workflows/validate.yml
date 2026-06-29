@@ -29,6 +29,9 @@ jobs:
       - name: Validate package
         run: npm run validate
 
+      - name: Verify crypto policy guard
+        run: npm run verify:crypto-policy
+
       - name: Verify package contents
         run: npm pack --dry-run
 

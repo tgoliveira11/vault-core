@@ -1,10 +1,23 @@
-export const DEFAULT_ARGON2ID_PARAMS = {
+/** Legacy Argon2id parameters (kdf-v1) — still used to unlock existing envelopes. */
+export const LEGACY_ARGON2ID_PARAMS = {
   memory: 65536,
   iterations: 3,
   parallelism: 1,
   hashLength: 32,
   saltLength: 16,
 } as const;
+
+/** Recommended Argon2id parameters (kdf-v2) for newly created envelopes. */
+export const RECOMMENDED_ARGON2ID_PARAMS = {
+  memory: 131072,
+  iterations: 4,
+  parallelism: 1,
+  hashLength: 32,
+  saltLength: 16,
+} as const;
+
+/** Default for new KDF operations — always the current recommended profile. */
+export const DEFAULT_ARGON2ID_PARAMS = RECOMMENDED_ARGON2ID_PARAMS;
 
 export const ARGON2ID_LIMITS = {
   memory: { min: 8192, max: 262144 },

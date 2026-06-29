@@ -105,7 +105,8 @@ AAD to the user, resource, field, and application context expected by the caller
 | `@tgoliveira/vault-core` | Core crypto, envelopes, payload, validation |
 | `@tgoliveira/vault-core/browser` | In-memory session, activity-aware auto-lock, storage inspection, PRF salt, recovery kit DOM helpers |
 | `@tgoliveira/vault-core/testing` | Sentinels and plaintext scan helpers |
-| `@tgoliveira/vault-core/react` | Headless React session/status hooks (optional peer: `react`) |
+| `@tgoliveira/vault-core/react` | Headless React session/status hooks and vault admin UI pages (optional peer: `react`) |
+| `@tgoliveira/vault-core/vault-admin.css` | Styles for vault admin pages |
 
 ## Boundaries
 
@@ -115,4 +116,4 @@ AAD to the user, resource, field, and application context expected by the caller
 - Vault password, recovery phrase, UVK, PRF output, and decrypted payload must stay client-side
 - Persisted envelope schemas enforce method-specific KDF metadata at runtime
 
-See `SECURITY.md`, `ARCHITECTURE.md`, `MIGRATION_FROM_LIQSENSE.md`, and [`docs/ADOPTING_VAULT_CORE_IN_EXISTING_APPS.md`](docs/ADOPTING_VAULT_CORE_IN_EXISTING_APPS.md) for migrating other apps (including [letter-to-god](https://github.com/tgoliveira11/letter-to-god)).
+See `SECURITY.md`, `ARCHITECTURE.md`, `MIGRATION_FROM_LIQSENSE.md`, [`docs/VAULT_ADMIN.md`](docs/VAULT_ADMIN.md), and [`docs/ADOPTING_VAULT_CORE_IN_EXISTING_APPS.md`](docs/ADOPTING_VAULT_CORE_IN_EXISTING_APPS.md) for migrating other apps (including [letter-to-god](https://github.com/tgoliveira11/letter-to-god)).

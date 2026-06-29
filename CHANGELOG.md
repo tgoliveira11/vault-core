@@ -8,6 +8,27 @@ API changes increment the minor version.
 
 ## [Unreleased]
 
+### Added
+
+- Vault password rotation via `rotateVaultPassword()` with current-password verification.
+- Recovery phrase rotation via `rotateRecoveryPhrase()` authorized by current vault password or passkey PRF.
+- Automatic legacy envelope upgrade helpers: `maybeUpgradePasswordEnvelopeAfterUnlock()` and
+  `maybeUpgradeRecoveryEnvelopeAfterUnlock()`.
+- Canonical crypto policy module (`VAULT_CRYPTO_POLICY`) with `kdf-v2` Argon2id parameters for new envelopes.
+- CI guard `npm run verify:crypto-policy` that fails when recommended algorithms or KDF strength regress.
+- Vault admin UI exported from `@tgoliveira/vault-core/react` (8 screens: panel, config, env template, crypto policy, profile, session, password policy, security).
+- `buildVaultAdminConfigFromEnv()`, `VAULT_ADMIN_ENV_CATALOG`, and `buildVaultEnvLocalTemplate()` for app-owned env mapping.
+- `@tgoliveira/vault-core/vault-admin.css` stylesheet for admin pages.
+
+### Changed
+
+- New password and recovery envelopes now use Argon2id `kdf-v2` (`memory: 131072`, `iterations: 4`).
+- Legacy `kdf-v1` envelopes (`memory: 65536`, `iterations: 3`) remain decryptable and upgrade on unlock.
+
+### Security
+
+- Documented that `@tgoliveira/vault-core` ships no email/SMTP flows or optional mail integrations.
+
 ## [0.2.0] - 2026-06-19
 
 ### Added

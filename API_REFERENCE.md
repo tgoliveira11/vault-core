@@ -49,7 +49,9 @@ caller separately validates expected AAD, such as a bounded legacy migration.
 
 | Export | Purpose |
 | --- | --- |
-| `DEFAULT_ARGON2ID_PARAMS` | Creation defaults |
+| `DEFAULT_ARGON2ID_PARAMS` | Recommended creation defaults (`kdf-v2`) |
+| `LEGACY_ARGON2ID_PARAMS` | Legacy `kdf-v1` parameters still used to unlock old envelopes |
+| `RECOMMENDED_ARGON2ID_PARAMS` | Current recommended Argon2id profile |
 | `ARGON2ID_LIMITS` | Accepted persisted resource bounds |
 | `assertSafeArgon2idParams(params)` | Validates memory, iteration, and parallelism bounds |
 | `assertSafeArgon2idSalt(salt)` | Validates salt size |
@@ -61,6 +63,25 @@ caller separately validates expected AAD, such as a bounded legacy migration.
 | `deriveVaultPasswordKeyFromMetadata(password, metadata)` | Password derivation from stored metadata |
 
 Applications normally use envelope APIs instead of direct derivation functions.
+
+### Crypto policy and rotation
+
+| Export | Purpose |
+| --- | --- |
+| `VAULT_CRYPTO_POLICY` | Canonical recommended encryption and KDF settings |
+| `RECOMMENDED_KDF_VERSION` / `LEGACY_KDF_VERSION` | Current and legacy KDF labels |
+| `isRecommendedArgon2idMetadata(metadata)` | Detects current-strength envelopes |
+| `isEnvelopeKdfUpgradeRecommended(metadata)` | True when unlock should re-wrap with `kdf-v2` |
+| `rotateVaultPassword(options)` | Changes vault password while keeping the same UVK |
+| `rotateRecoveryPhrase(options)` | Re-wraps UVK with a new BIP39 phrase after password or passkey authorization |
+| `maybeUpgradePasswordEnvelopeAfterUnlock(options)` | Returns a stronger password envelope after legacy unlock |
+| `maybeUpgradeRecoveryEnvelopeAfterUnlock(options)` | Returns a stronger recovery envelope after legacy unlock |
+| `assertVaultRotationAuthorized(...)` | Shared authorization gate for sensitive changes |
+| `userVaultKeysEqual(a, b)` | Constant-time UVK comparison |
+| `VaultAuthorizationError` / `VaultPasswordUnchangedError` | Rotation failures |
+
+Rotation helpers require the UVK to already be in memory. The app persists returned envelopes;
+encrypted payloads and unrelated envelopes stay unchanged unless the app chooses to replace them.
 
 ### Password envelopes
 
@@ -104,7 +125,7 @@ still return no PRF output. PRF output must remain client-only.
 | Export | Runtime contract |
 | --- | --- |
 | `encryptedPayloadSchema` | `enc-v1` AES-GCM payload with UUID AAD identifiers |
-| `argon2idKdfMetadataSchema` / `kdfMetadataSchema` | Bounded `kdf-v1` Argon2id metadata |
+| `argon2idKdfMetadataSchema` / `kdfMetadataSchema` | Bounded `kdf-v1` or `kdf-v2` Argon2id metadata |
 | `passwordEnvelopeSchema` | Password method plus required Argon2id metadata |
 | `recoveryPhraseEnvelopeSchema` | Recovery method plus required Argon2id metadata |
 | `passkeyPrfEnvelopeSchema` | Passkey PRF method plus null KDF metadata |
@@ -136,6 +157,8 @@ still required.
 - `PasskeyPrfRequiredError`
 - `PasskeyUnlockError`
 - `RecoveryPhraseConfirmationError`
+- `VaultAuthorizationError`
+- `VaultPasswordUnchangedError`
 - `VaultCoreError`
 
 ### Deprecated migration aliases
@@ -199,7 +222,35 @@ boolean aliases that fail closed.
 Provider and session hook guard options are `registerActivityGuard` and `registerUnloadGuard`, both
 defaulting to `true`.
 
-## Testing: `@tgoliveira/vault-core/testing`
+### Vault admin UI
+
+Import styles once: `@import "@tgoliveira/vault-core/vault-admin.css";`
+
+Pages (each accepts `config: VaultAdminConfig`, optional `paths`, `env`, `LinkComponent`):
+
+- `VaultAdminPanelPage` — hub
+- `VaultAdminConfigPage` — effective settings with source badges
+- `VaultAdminEnvTemplatePage` — `.env.local` template and catalog
+- `VaultAdminCryptoPolicyPage` — KDF and encryption policy
+- `VaultAdminProfilePage` — AAD contexts and PRF prefix
+- `VaultAdminSessionPage` — auto-lock settings
+- `VaultAdminPasswordPolicyPage` — `VAULT_PASSWORD_*` rules
+- `VaultAdminSecurityPage` — zero-knowledge boundaries
+
+Helpers:
+
+- `useVaultAdminPaths(config, paths?)`
+- `VaultAdminPageProps`, `VaultAdminLinkProps`
+
+See [`docs/VAULT_ADMIN.md`](docs/VAULT_ADMIN.md).
+
+## Admin config: `@tgoliveira/vault-core`
+
+- `buildVaultAdminConfigFromEnv(input)` — resolve config from app-owned env record (never reads `process.env` in-package)
+- `listVaultAdminConfigEntries(config, env?)`
+- `VAULT_ADMIN_ENV_CATALOG`, `buildVaultEnvLocalTemplate(productName?)`
+- `DEFAULT_VAULT_ADMIN_PATHS`, `resolveVaultAdminPaths(basePath?)`, `listVaultAdminScreens()`, `VAULT_ADMIN_SECTIONS`
+- Types: `VaultAdminConfig`, `VaultAdminConfigEntry`, `VaultAdminPaths`, etc.
 
 This entry exports the plaintext validation functions, forbidden field list, `ALL_SENTINELS`, and all
 named `SENTINEL_*` values. Use it in network, persistence, logging, and fixture tests. It does not

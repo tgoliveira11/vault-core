@@ -17,3 +17,5 @@ export {
   VaultSessionProvider,
   type VaultSessionProviderProps,
 } from "./session/vault-session-provider.js";
+
+export * from "./admin/index.js";

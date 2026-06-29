@@ -499,16 +499,59 @@ never log request bodies, and verify the authenticated account owns the AAD `use
 
 ## 15. Password and recovery rotation
 
-To change a vault password:
+Use the rotation helpers after the vault is explicitly unlocked and the UVK is in memory.
 
-1. Unlock the existing envelope and obtain the UVK in memory.
-2. Call `createPasswordEnvelope()` with the new password, same expected scope, and same profile.
-3. Atomically replace only the password envelope on the server.
-4. Keep the encrypted payload and other envelopes unchanged.
+### Change vault password
 
-To rotate a recovery phrase, generate a new phrase and recovery envelope around the same UVK. Require
-confirmation and replace the old recovery envelope atomically. Deleting an envelope is an application
-authorization decision.
+```ts
+import { rotateVaultPassword } from "@tgoliveira/vault-core";
+
+const { envelope } = await rotateVaultPassword({
+  vaultKey,
+  currentPassword,
+  newPassword,
+  currentEnvelope: passwordEnvelope,
+  scope: { userId, resourceId: userId },
+  profile: APP_VAULT_PROFILE,
+});
+```
+
+Persist the returned password envelope atomically. Encrypted payloads and other envelopes stay unchanged.
+
+### Rotate recovery phrase
+
+Authorization options:
+
+- current vault password (`authorization.kind === "password"`)
+- passkey PRF validation while the vault is unlocked (`authorization.kind === "passkey_prf"`)
+
+```ts
+import { rotateRecoveryPhrase } from "@tgoliveira/vault-core";
+
+const result = await rotateRecoveryPhrase({
+  vaultKey,
+  authorization: {
+    kind: "password",
+    currentPassword,
+    passwordEnvelope,
+  },
+  scope: { userId, resourceId: userId },
+  profile: APP_VAULT_PROFILE,
+  wordCount: 24,
+  recoveryKitProductName: "My App",
+});
+```
+
+Replace the recovery envelope atomically. Never send the recovery phrase to the server.
+
+### Automatic KDF upgrade on unlock
+
+Legacy envelopes labeled `kdf-v1` remain decryptable. After unlock, call:
+
+- `maybeUpgradePasswordEnvelopeAfterUnlock(...)`
+- `maybeUpgradeRecoveryEnvelopeAfterUnlock(...)`
+
+When `upgradedEnvelope` is non-null, persist it with the same password or recovery phrase. New envelopes use the current recommended policy (`kdf-v2`).
 
 ## 16. Error handling
 
