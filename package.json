@@ -1,6 +1,6 @@
 {
   "name": "@tgoliveira/vault-core",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "description": "Framework-independent vault crypto primitives with optional React session helpers",
   "type": "module",
   "repository": {

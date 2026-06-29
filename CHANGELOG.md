@@ -8,6 +8,8 @@ API changes increment the minor version.
 
 ## [Unreleased]
 
+## [0.3.0] - 2026-06-29
+
 ### Added
 
 - Vault password rotation via `rotateVaultPassword()` with current-password verification.
