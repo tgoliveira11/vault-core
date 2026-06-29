@@ -42,10 +42,12 @@
     "./react": {
       "types": "./dist/react/index.d.ts",
       "import": "./dist/react/index.js"
-    }
+    },
+    "./vault-admin.css": "./vault-admin.css"
   },
   "files": [
     "dist",
+    "vault-admin.css",
     "README.md",
     "CHANGELOG.md",
     "AGENTS.md",

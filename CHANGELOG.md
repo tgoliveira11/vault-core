@@ -16,6 +16,9 @@ API changes increment the minor version.
   `maybeUpgradeRecoveryEnvelopeAfterUnlock()`.
 - Canonical crypto policy module (`VAULT_CRYPTO_POLICY`) with `kdf-v2` Argon2id parameters for new envelopes.
 - CI guard `npm run verify:crypto-policy` that fails when recommended algorithms or KDF strength regress.
+- Vault admin UI exported from `@tgoliveira/vault-core/react` (8 screens: panel, config, env template, crypto policy, profile, session, password policy, security).
+- `buildVaultAdminConfigFromEnv()`, `VAULT_ADMIN_ENV_CATALOG`, and `buildVaultEnvLocalTemplate()` for app-owned env mapping.
+- `@tgoliveira/vault-core/vault-admin.css` stylesheet for admin pages.
 
 ### Changed
 

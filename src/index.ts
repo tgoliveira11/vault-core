@@ -48,3 +48,5 @@ export * from "./recovery/kit.js";
 export * from "./rotation/index.js";
 
 export type { VaultUnlockResult } from "./profile.js";
+
+export * from "./admin/index.js";

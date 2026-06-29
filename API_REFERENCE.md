@@ -222,7 +222,35 @@ boolean aliases that fail closed.
 Provider and session hook guard options are `registerActivityGuard` and `registerUnloadGuard`, both
 defaulting to `true`.
 
-## Testing: `@tgoliveira/vault-core/testing`
+### Vault admin UI
+
+Import styles once: `@import "@tgoliveira/vault-core/vault-admin.css";`
+
+Pages (each accepts `config: VaultAdminConfig`, optional `paths`, `env`, `LinkComponent`):
+
+- `VaultAdminPanelPage` — hub
+- `VaultAdminConfigPage` — effective settings with source badges
+- `VaultAdminEnvTemplatePage` — `.env.local` template and catalog
+- `VaultAdminCryptoPolicyPage` — KDF and encryption policy
+- `VaultAdminProfilePage` — AAD contexts and PRF prefix
+- `VaultAdminSessionPage` — auto-lock settings
+- `VaultAdminPasswordPolicyPage` — `VAULT_PASSWORD_*` rules
+- `VaultAdminSecurityPage` — zero-knowledge boundaries
+
+Helpers:
+
+- `useVaultAdminPaths(config, paths?)`
+- `VaultAdminPageProps`, `VaultAdminLinkProps`
+
+See [`docs/VAULT_ADMIN.md`](docs/VAULT_ADMIN.md).
+
+## Admin config: `@tgoliveira/vault-core`
+
+- `buildVaultAdminConfigFromEnv(input)` — resolve config from app-owned env record (never reads `process.env` in-package)
+- `listVaultAdminConfigEntries(config, env?)`
+- `VAULT_ADMIN_ENV_CATALOG`, `buildVaultEnvLocalTemplate(productName?)`
+- `DEFAULT_VAULT_ADMIN_PATHS`, `resolveVaultAdminPaths(basePath?)`, `listVaultAdminScreens()`, `VAULT_ADMIN_SECTIONS`
+- Types: `VaultAdminConfig`, `VaultAdminConfigEntry`, `VaultAdminPaths`, etc.
 
 This entry exports the plaintext validation functions, forbidden field list, `ALL_SENTINELS`, and all
 named `SENTINEL_*` values. Use it in network, persistence, logging, and fixture tests. It does not
