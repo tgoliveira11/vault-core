@@ -23,7 +23,7 @@ export type EncryptedPayload = EncryptedVaultPayload;
 
 export const argon2idKdfMetadataSchema = z.object({
   kdf: z.literal("argon2id"),
-  version: z.literal("kdf-v1"),
+  version: z.enum(["kdf-v1", "kdf-v2"]),
   salt: z.string().min(1).max(128),
   memory: z.number().int().min(ARGON2ID_LIMITS.memory.min).max(ARGON2ID_LIMITS.memory.max),
   iterations: z.number().int().min(ARGON2ID_LIMITS.iterations.min).max(ARGON2ID_LIMITS.iterations.max),

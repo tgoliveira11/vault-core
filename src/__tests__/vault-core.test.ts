@@ -378,8 +378,9 @@ describe("validation", () => {
     const metadata = serializeArgon2idMetadata(FIXTURE_ARGON2_SALT);
     const parsed = parseArgon2idMetadata(metadata);
     expect(parsed.salt).toEqual(FIXTURE_ARGON2_SALT);
-    expect(metadata.memory).toBe(65536);
-    expect(metadata.iterations).toBe(3);
+    expect(metadata.memory).toBe(131072);
+    expect(metadata.iterations).toBe(4);
+    expect(metadata.version).toBe("kdf-v2");
     expect(metadata.parallelism).toBe(1);
   });
 });

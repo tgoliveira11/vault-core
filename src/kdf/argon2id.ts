@@ -10,21 +10,32 @@ import {
   assertSafeArgon2idParams,
   assertSafeArgon2idSalt,
   DEFAULT_ARGON2ID_PARAMS,
+  RECOMMENDED_ARGON2ID_PARAMS,
 } from "./params.js";
+import {
+  LEGACY_KDF_VERSION,
+  RECOMMENDED_KDF_VERSION,
+} from "../crypto/policy.js";
 
-export { DEFAULT_ARGON2ID_PARAMS, type Argon2idParams } from "./params.js";
+export {
+  DEFAULT_ARGON2ID_PARAMS,
+  LEGACY_ARGON2ID_PARAMS,
+  RECOMMENDED_ARGON2ID_PARAMS,
+  type Argon2idParams,
+} from "./params.js";
 
 export type { Argon2idKdfMetadata };
 
 export function serializeArgon2idMetadata(
   salt: Uint8Array,
-  params: Pick<typeof DEFAULT_ARGON2ID_PARAMS, "memory" | "iterations" | "parallelism"> = DEFAULT_ARGON2ID_PARAMS
+  params: Pick<typeof DEFAULT_ARGON2ID_PARAMS, "memory" | "iterations" | "parallelism"> = RECOMMENDED_ARGON2ID_PARAMS,
+  version: typeof LEGACY_KDF_VERSION | typeof RECOMMENDED_KDF_VERSION = RECOMMENDED_KDF_VERSION
 ): Argon2idKdfMetadata {
   assertSafeArgon2idSalt(salt);
   assertSafeArgon2idParams(params);
   return {
     kdf: "argon2id",
-    version: "kdf-v1",
+    version,
     salt: bytesToBase64Url(salt),
     memory: params.memory,
     iterations: params.iterations,

@@ -4,6 +4,7 @@ export * from "./errors/vault-errors.js";
 
 export * from "./crypto/aes-gcm.js";
 export * from "./crypto/aad.js";
+export * from "./crypto/policy.js";
 export * from "./crypto/encoding.js";
 export * from "./crypto/random.js";
 export * from "./crypto/serialization.js";
@@ -43,5 +44,7 @@ export * from "./envelopes/recovery.js";
 export * from "./envelopes/passkey-prf.js";
 
 export * from "./recovery/kit.js";
+
+export * from "./rotation/index.js";
 
 export type { VaultUnlockResult } from "./profile.js";

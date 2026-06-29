@@ -70,7 +70,8 @@
     "test:coverage": "vitest run --coverage",
     "test:watch": "vitest",
     "audit:security": "npm audit --audit-level=high",
-    "validate": "npm run typecheck && npm run test:coverage && npm run build",
+    "verify:crypto-policy": "node scripts/verify-crypto-policy.mjs",
+    "validate": "npm run typecheck && npm run verify:crypto-policy && npm run test:coverage && npm run build",
     "prepublishOnly": "npm run validate",
     "prepare": "npm run build"
   },

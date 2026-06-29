@@ -20,7 +20,15 @@ envelopes require Argon2id metadata while passkey PRF envelopes require `null` K
 
 Generic JSON encrypted under UVK. AAD field: `vault_payload` with app `aadContextVault`.
 
-Format: `enc-v1` / `AES-GCM` / `kdf-v1`.
+Format: `enc-v1` / `AES-GCM` with Argon2id envelopes labeled `kdf-v1` (legacy) or `kdf-v2` (current).
+
+New envelopes use `kdf-v2` (`memory: 131072`, `iterations: 4`). Legacy `kdf-v1` envelopes remain
+decryptable and can be transparently upgraded after unlock via the rotation helpers.
+
+## Non-goals
+
+This package does not ship email, SMTP, or notification delivery. Consuming apps own all outbound mail
+integrations, similar to optional Outpost-style modules in `@tgoliveira/secure-auth`.
 
 ## Package layers
 
