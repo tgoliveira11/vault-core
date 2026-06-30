@@ -46,6 +46,15 @@ jobs:
       - name: Audit all dependencies for high and critical vulnerabilities
         run: npm run audit:security
 
+      - name: Changelog pre-flight (new release vs recovery)
+        id: preflight
+        env:
+          RELEASE_SPEC: ${{ inputs.version }}
+        run: |
+          node scripts/changelog-preflight.mjs | tee "$RUNNER_TEMP/changelog-preflight.json"
+          MODE=$(node -e "process.stdout.write(JSON.parse(require('node:fs').readFileSync(process.argv[1],'utf8')).mode)" "$RUNNER_TEMP/changelog-preflight.json")
+          echo "mode=$MODE" >> "$GITHUB_OUTPUT"
+
       - name: Prepare release version and changelog
         id: release
         env:
@@ -83,14 +92,15 @@ jobs:
           RECOVERY_MODE: ${{ steps.release.outputs.recovery }}
           ALREADY_PUBLISHED: ${{ steps.registry.outputs.published }}
         run: |
+          TAG="vault-core-v${RELEASE_VERSION}"
           if [ "$ALREADY_PUBLISHED" = "true" ] && [ "$RECOVERY_MODE" != "true" ]; then
             echo "npm version ${RELEASE_VERSION} already exists but this is a new release"
             exit 1
           fi
-          if git rev-parse "refs/tags/vault-core-v${RELEASE_VERSION}" >/dev/null 2>&1; then
+          if git rev-parse "refs/tags/${TAG}" >/dev/null 2>&1; then
             echo "tag_exists=true" >> "$GITHUB_OUTPUT"
             if [ "$ALREADY_PUBLISHED" != "true" ]; then
-              echo "Tag exists before npm publication; refusing an inconsistent release"
+              echo "Tag ${TAG} exists before npm publication; refusing an inconsistent release"
               exit 1
             fi
           else
@@ -119,25 +129,44 @@ jobs:
         env:
           RELEASE_VERSION: ${{ steps.release.outputs.version }}
         run: |
-          git tag -a "vault-core-v${RELEASE_VERSION}" -m "Release ${RELEASE_VERSION}"
-          git push origin "vault-core-v${RELEASE_VERSION}"
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          TAG="vault-core-v${RELEASE_VERSION}"
+          git tag -a "${TAG}" -m "Release ${RELEASE_VERSION}"
+          git push origin "${TAG}"
 
       - name: Create GitHub release notes
         env:
           GH_TOKEN: ${{ github.token }}
           RELEASE_VERSION: ${{ steps.release.outputs.version }}
         run: |
-          if ! gh release view "vault-core-v${RELEASE_VERSION}" >/dev/null 2>&1; then
-            gh release create "vault-core-v${RELEASE_VERSION}" \
+          TAG="vault-core-v${RELEASE_VERSION}"
+          if ! gh release view "${TAG}" >/dev/null 2>&1; then
+            gh release create "${TAG}" \
               --title "vault-core ${RELEASE_VERSION}" \
               --generate-notes
           fi
 
+      - name: Verify release invariant (registry, tag, GitHub Release)
+        env:
+          RELEASE_VERSION: ${{ steps.release.outputs.version }}
+        run: |
+          PACKAGE_NAME=$(node -p "require('./package.json').name")
+          TAG="vault-core-v${RELEASE_VERSION}"
+          npm view "${PACKAGE_NAME}@${RELEASE_VERSION}" version >/dev/null
+          git rev-parse "refs/tags/${TAG}" >/dev/null
+          gh release view "${TAG}" >/dev/null
+          echo "Release invariant satisfied for ${PACKAGE_NAME}@${RELEASE_VERSION}, tag ${TAG}"
+
       - name: Publish summary
         env:
           RELEASE_VERSION: ${{ steps.release.outputs.version }}
+          RELEASE_MODE: ${{ steps.preflight.outputs.mode }}
           ALREADY_PUBLISHED: ${{ steps.registry.outputs.published }}
         run: |
+          TAG="vault-core-v${RELEASE_VERSION}"
           echo "## vault-core ${RELEASE_VERSION}" >> "$GITHUB_STEP_SUMMARY"
+          echo "- Mode: ${RELEASE_MODE}" >> "$GITHUB_STEP_SUMMARY"
           echo "- npm publication already existed: ${ALREADY_PUBLISHED}" >> "$GITHUB_STEP_SUMMARY"
-          echo "- Git tag: vault-core-v${RELEASE_VERSION}" >> "$GITHUB_STEP_SUMMARY"
+          echo "- Git tag: ${TAG}" >> "$GITHUB_STEP_SUMMARY"
+          echo "- Invariant: npm ⟺ tag ⟺ GitHub Release" >> "$GITHUB_STEP_SUMMARY"

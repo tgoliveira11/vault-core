@@ -14,7 +14,11 @@ Use this page as the documentation router for `@tgoliveira/vault-core`.
 ## Maintainers and agents
 
 - [`../AGENTS.md`](../AGENTS.md): repository operating rules and definition of done.
-- [`RELEASING.md`](RELEASING.md): versioning, changelog, tag, validation, and publication procedure.
+- [`contributing.md`](contributing.md): branches, PRs, commits, changelog, pre-PR checklist.
+- [`publishing.md`](publishing.md): manual publish, release invariant, recovery mode.
+- [`repo-settings.md`](repo-settings.md): GitHub branch protection and `npmjs` environment.
+- [`CURRENT_PRODUCT_SURFACE.md`](CURRENT_PRODUCT_SURFACE.md): live inventory of exports and shipped features.
+- [`RELEASING.md`](RELEASING.md): redirect to `publishing.md`.
 - [`../CHANGELOG.md`](../CHANGELOG.md): released and unreleased consumer-visible changes.
 - [`../ARCHITECTURE.md`](../ARCHITECTURE.md): package layers and cryptographic data flow.
 
