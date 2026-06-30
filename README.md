@@ -39,6 +39,10 @@ npm run test:coverage
 Coverage is enforced per production file at 90% for statements, branches, functions, and lines.
 `npm run validate` includes the coverage gate.
 
+## Contributing
+
+See [CONTRIBUTING.md](CONTRIBUTING.md) and [docs/contributing.md](docs/contributing.md) for branch workflow, PRs, and release rules. Product surface: [docs/CURRENT_PRODUCT_SURFACE.md](docs/CURRENT_PRODUCT_SURFACE.md).
+
 ## Documentation
 
 - [Complete implementation guide](docs/IMPLEMENTATION_GUIDE.md)
@@ -46,7 +50,8 @@ Coverage is enforced per production file at 90% for statements, branches, functi
 - [API reference](API_REFERENCE.md)
 - [Security model](SECURITY.md)
 - [Changelog](CHANGELOG.md)
-- [Release process](docs/RELEASING.md)
+- [Publishing and releases](docs/publishing.md)
+- [Repository settings (GitHub)](docs/repo-settings.md)
 - [Agent and contributor guide](AGENTS.md)
 
 ## Quick start

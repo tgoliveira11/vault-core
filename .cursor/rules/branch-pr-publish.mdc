@@ -1,0 +1,47 @@
+---
+description: Branch-first workflow, PR discipline, manual-only publishing, and release invariants for vault-core.
+alwaysApply: true
+---
+
+# vault-core — branch, PR, and publish guardrails
+
+Read `docs/contributing.md`, `docs/publishing.md`, and `docs/CURRENT_PRODUCT_SURFACE.md` before substantive work.
+
+## Branches
+
+- Base branch: `main` only (no `develop`).
+- Create `feature/`, `fix/`, `docs/`, or `chore/` branches from updated `main` before substantive changes.
+- Never commit or push to `main` unless the user explicitly asks.
+- Never open, merge, approve, or push PRs unless the user explicitly asks.
+
+## Commits
+
+- Conventional Commits: `feat:`, `fix:`, `docs:`, `refactor:`, `test:`, `chore:`, `ci:` (optional scope).
+- Commit only when the user asks; otherwise leave work uncommitted or on a branch.
+- No destructive git commands unless explicitly requested.
+
+## Pre-PR / definition of done (code)
+
+1. Run `npm run validate`.
+2. Add/update tests for changed behavior.
+3. Update `CHANGELOG.md` → `[Unreleased]` for consumer-visible changes.
+4. Update `docs/CURRENT_PRODUCT_SURFACE.md` when exports, admin screens, or shipped/planned status changes.
+5. Confirm no secrets in staged files.
+
+Trivial docs-only changes may skip validate.
+
+## Publishing — manual only
+
+- **Never** run `npm publish` or dispatch `.github/workflows/publish-vault-core.yml` without explicit user approval.
+- **Never** bump `package.json` version or create release tags manually.
+- Release invariant: `@tgoliveira/vault-core@X.Y.Z` ⟺ tag `vault-core-vX.Y.Z` ⟺ GitHub Release `vault-core-vX.Y.Z`.
+- Empty `[Unreleased]` = recovery mode only (no version bump).
+
+Exception: `github-actions[bot]` may push release metadata to `main` via the publish workflow. Agents do not.
+
+## Repository parameters
+
+- Package: `@tgoliveira/vault-core`
+- Validate: `npm run validate`
+- Publish workflow: `.github/workflows/publish-vault-core.yml` (workflow_dispatch only)
+- OIDC environment: `npmjs`

@@ -9,11 +9,17 @@ can observe. Write `None` only after checking `SECURITY.md`.
 
 ## Checklist
 
+- [ ] Branch uses `feature/`, `fix/`, `docs/`, or `chore/` prefix.
 - [ ] Code, comments, errors, tests, and documentation are in English.
 - [ ] Public API and runtime schema changes have regression tests.
 - [ ] `CHANGELOG.md` includes the consumer-visible change under `Unreleased`.
+- [ ] `docs/CURRENT_PRODUCT_SURFACE.md` updated when exports, admin screens, or shipped/planned status changed.
 - [ ] Documentation examples and signatures match the implementation.
 - [ ] Breaking changes include an explicit migration path.
 - [ ] `npm run validate` passes without lowering coverage thresholds.
 - [ ] `npm pack --dry-run` includes all required runtime and documentation files.
+- [ ] No secrets (`.env`, credentials) in the diff.
 
+## Test plan
+
+- [ ] …
