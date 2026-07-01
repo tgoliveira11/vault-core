@@ -165,7 +165,7 @@ Use the **actual** vault-core API (see `API_REFERENCE.md`). Deprecated aliases e
 | Import path | Use when |
 | --- | --- |
 | `@tgoliveira/vault-core` | Core crypto, envelopes, validation (safe for shared isomorphic code that does not touch `window`) |
-| `@tgoliveira/vault-core/browser` | Session, activity-aware auto-lock, PRF salt, recovery kit DOM, storage namespace inspection |
+| `@tgoliveira/vault-core/browser` | Session, countdown auto-lock (optional activity renewal), PRF salt, recovery kit DOM, storage namespace inspection |
 | `@tgoliveira/vault-core/testing` | Test sentinels and plaintext scans |
 | `@tgoliveira/vault-core/react` | Optional React hooks (peer: `react >= 18`) |
 

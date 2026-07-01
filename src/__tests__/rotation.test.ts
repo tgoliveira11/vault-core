@@ -17,6 +17,7 @@ import {
   serializeArgon2idMetadata,
   deriveArgon2idAesKey,
   normalizeRecoveryPhrase,
+  userVaultKeysEqual,
 } from "../index.js";
 import {
   FIXTURE_ARGON2_SALT,
@@ -27,7 +28,7 @@ import {
   LIQSENSE_COMPAT_PROFILE,
   LIQSENSE_COMPAT_SCOPE,
 } from "../testing/fixtures/liqsense-compat.js";
-import { encryptField, exportAesKey } from "../crypto/aes-gcm.js";
+import { encryptField } from "../crypto/aes-gcm.js";
 import { bytesToBase64Url, stringToBytes } from "../crypto/encoding.js";
 
 async function createLegacyRecoveryEnvelope(
@@ -46,7 +47,7 @@ async function createLegacyRecoveryEnvelope(
   );
 
   const encryptedVaultKey = await encryptField(
-    bytesToBase64Url(await exportAesKey(vaultKey)),
+    bytesToBase64Url(FIXTURE_UVK_BYTES),
     derivedKey,
     { ...LIQSENSE_COMPAT_SCOPE, field: "vault_key" },
     LIQSENSE_COMPAT_PROFILE
@@ -76,7 +77,7 @@ async function createLegacyPasswordEnvelope(
   );
 
   const encryptedVaultKey = await encryptField(
-    bytesToBase64Url(await exportAesKey(vaultKey)),
+    bytesToBase64Url(FIXTURE_UVK_BYTES),
     derivedKey,
     { ...LIQSENSE_COMPAT_SCOPE, field: "vault_key" },
     LIQSENSE_COMPAT_PROFILE
@@ -91,7 +92,7 @@ async function createLegacyPasswordEnvelope(
 
 describe("vault password rotation", () => {
   it("rotates the vault password while keeping the same UVK", async () => {
-    const vaultKey = await importUserVaultKey(FIXTURE_UVK_BYTES);
+    const vaultKey = await importUserVaultKey(FIXTURE_UVK_BYTES, { extractable: true });
     const { envelope: currentEnvelope } = await createPasswordEnvelope(
       vaultKey,
       FIXTURE_VAULT_PASSWORD,
@@ -118,13 +119,11 @@ describe("vault password rotation", () => {
       LIQSENSE_COMPAT_SCOPE,
       LIQSENSE_COMPAT_PROFILE
     );
-    const originalRaw = await crypto.subtle.exportKey("raw", vaultKey);
-    const unlockedRaw = await crypto.subtle.exportKey("raw", unlocked);
-    expect(new Uint8Array(unlockedRaw)).toEqual(new Uint8Array(originalRaw));
+    expect(await userVaultKeysEqual(vaultKey, unlocked)).toBe(true);
   });
 
   it("rejects unchanged passwords", async () => {
-    const vaultKey = await importUserVaultKey(FIXTURE_UVK_BYTES);
+    const vaultKey = await importUserVaultKey(FIXTURE_UVK_BYTES, { extractable: true });
     const { envelope } = await createPasswordEnvelope(
       vaultKey,
       FIXTURE_VAULT_PASSWORD,
@@ -146,7 +145,7 @@ describe("vault password rotation", () => {
   });
 
   it("rejects rotation when the in-memory vault key does not match the envelope", async () => {
-    const vaultKey = await importUserVaultKey(FIXTURE_UVK_BYTES);
+    const vaultKey = await importUserVaultKey(FIXTURE_UVK_BYTES, { extractable: true });
     const otherKey = await createUserVaultKey();
     const { envelope } = await createPasswordEnvelope(
       vaultKey,
@@ -169,7 +168,7 @@ describe("vault password rotation", () => {
   });
 
   it("rejects wrong current password during rotation", async () => {
-    const vaultKey = await importUserVaultKey(FIXTURE_UVK_BYTES);
+    const vaultKey = await importUserVaultKey(FIXTURE_UVK_BYTES, { extractable: true });
     const { envelope } = await createPasswordEnvelope(
       vaultKey,
       FIXTURE_VAULT_PASSWORD,
@@ -191,7 +190,7 @@ describe("vault password rotation", () => {
   });
 
   it("skips upgrade when the password envelope is already recommended", async () => {
-    const vaultKey = await importUserVaultKey(FIXTURE_UVK_BYTES);
+    const vaultKey = await importUserVaultKey(FIXTURE_UVK_BYTES, { extractable: true });
     const { envelope } = await createPasswordEnvelope(
       vaultKey,
       FIXTURE_VAULT_PASSWORD,
@@ -213,7 +212,7 @@ describe("vault password rotation", () => {
   });
 
   it("upgrades legacy kdf-v1 envelopes after unlock", async () => {
-    const vaultKey = await importUserVaultKey(FIXTURE_UVK_BYTES);
+    const vaultKey = await importUserVaultKey(FIXTURE_UVK_BYTES, { extractable: true });
     const legacyEnvelope = await createLegacyPasswordEnvelope(
       vaultKey,
       FIXTURE_VAULT_PASSWORD
@@ -233,7 +232,7 @@ describe("vault password rotation", () => {
   });
 
   it("rejects legacy upgrade when the in-memory vault key does not match", async () => {
-    const vaultKey = await importUserVaultKey(FIXTURE_UVK_BYTES);
+    const vaultKey = await importUserVaultKey(FIXTURE_UVK_BYTES, { extractable: true });
     const otherKey = await createUserVaultKey();
     const legacyEnvelope = await createLegacyPasswordEnvelope(
       vaultKey,
@@ -254,7 +253,7 @@ describe("vault password rotation", () => {
 
 describe("recovery phrase rotation", () => {
   it("defaults to a 24-word recovery phrase when wordCount is omitted", async () => {
-    const vaultKey = await importUserVaultKey(FIXTURE_UVK_BYTES);
+    const vaultKey = await importUserVaultKey(FIXTURE_UVK_BYTES, { extractable: true });
     const { envelope: passwordEnvelope } = await createPasswordEnvelope(
       vaultKey,
       FIXTURE_VAULT_PASSWORD,
@@ -278,7 +277,7 @@ describe("recovery phrase rotation", () => {
   });
 
   it("rotates recovery phrase when authorized with the current vault password", async () => {
-    const vaultKey = await importUserVaultKey(FIXTURE_UVK_BYTES);
+    const vaultKey = await importUserVaultKey(FIXTURE_UVK_BYTES, { extractable: true });
     const { envelope: passwordEnvelope } = await createPasswordEnvelope(
       vaultKey,
       FIXTURE_VAULT_PASSWORD,
@@ -306,8 +305,35 @@ describe("recovery phrase rotation", () => {
     expect(result.envelope.kdfMetadata.version).toBe("kdf-v2");
   });
 
+  it("rotates recovery phrase when confirmation matches", async () => {
+    const vaultKey = await importUserVaultKey(FIXTURE_UVK_BYTES, { extractable: true });
+    const { envelope: passwordEnvelope } = await createPasswordEnvelope(
+      vaultKey,
+      FIXTURE_VAULT_PASSWORD,
+      LIQSENSE_COMPAT_SCOPE,
+      LIQSENSE_COMPAT_PROFILE,
+      FIXTURE_ARGON2_SALT
+    );
+
+    const result = await rotateRecoveryPhrase({
+      vaultKey,
+      authorization: {
+        kind: "password",
+        currentPassword: FIXTURE_VAULT_PASSWORD,
+        passwordEnvelope,
+      },
+      scope: LIQSENSE_COMPAT_SCOPE,
+      profile: LIQSENSE_COMPAT_PROFILE,
+      newRecoveryPhrase: FIXTURE_12_WORD_PHRASE,
+      wordCount: 12,
+      confirmNewRecoveryPhrase: FIXTURE_12_WORD_PHRASE,
+    });
+
+    expect(result.recoveryPhrase).toBe(FIXTURE_12_WORD_PHRASE);
+  });
+
   it("rotates recovery phrase when authorized with passkey PRF", async () => {
-    const vaultKey = await importUserVaultKey(FIXTURE_UVK_BYTES);
+    const vaultKey = await importUserVaultKey(FIXTURE_UVK_BYTES, { extractable: true });
     const passkeyEnvelope = await createPasskeyPrfEnvelope(
       vaultKey,
       FIXTURE_PRF_OUTPUT,
@@ -332,8 +358,36 @@ describe("recovery phrase rotation", () => {
     expect(result.envelope.kdfMetadata.version).toBe("kdf-v2");
   });
 
+  it("rotates recovery phrase when passkey PRF output is longer than 32 bytes", async () => {
+    const vaultKey = await importUserVaultKey(FIXTURE_UVK_BYTES, { extractable: true });
+    const longPrfOutput = new Uint8Array(48);
+    longPrfOutput.set(FIXTURE_PRF_OUTPUT);
+    const passkeyEnvelope = await createPasskeyPrfEnvelope(
+      vaultKey,
+      longPrfOutput,
+      LIQSENSE_COMPAT_SCOPE,
+      LIQSENSE_COMPAT_PROFILE
+    );
+
+    const result = await rotateRecoveryPhrase({
+      vaultKey,
+      authorization: {
+        kind: "passkey_prf",
+        prfOutput: longPrfOutput,
+        passkeyEnvelope,
+      },
+      scope: LIQSENSE_COMPAT_SCOPE,
+      profile: LIQSENSE_COMPAT_PROFILE,
+      newRecoveryPhrase: FIXTURE_12_WORD_PHRASE,
+      wordCount: 12,
+    });
+
+    expect(result.recoveryPhrase).toBe(FIXTURE_12_WORD_PHRASE);
+    expect(result.envelope.kdfMetadata.version).toBe("kdf-v2");
+  });
+
   it("requires recovery phrase confirmation when provided", async () => {
-    const vaultKey = await importUserVaultKey(FIXTURE_UVK_BYTES);
+    const vaultKey = await importUserVaultKey(FIXTURE_UVK_BYTES, { extractable: true });
     const { envelope: passwordEnvelope } = await createPasswordEnvelope(
       vaultKey,
       FIXTURE_VAULT_PASSWORD,
@@ -361,7 +415,7 @@ describe("recovery phrase rotation", () => {
   });
 
   it("rejects invalid recovery phrase input", async () => {
-    const vaultKey = await importUserVaultKey(FIXTURE_UVK_BYTES);
+    const vaultKey = await importUserVaultKey(FIXTURE_UVK_BYTES, { extractable: true });
     const { envelope: passwordEnvelope } = await createPasswordEnvelope(
       vaultKey,
       FIXTURE_VAULT_PASSWORD,
@@ -387,7 +441,7 @@ describe("recovery phrase rotation", () => {
   });
 
   it("rejects recovery phrase word-count mismatch", async () => {
-    const vaultKey = await importUserVaultKey(FIXTURE_UVK_BYTES);
+    const vaultKey = await importUserVaultKey(FIXTURE_UVK_BYTES, { extractable: true });
     const { envelope: passwordEnvelope } = await createPasswordEnvelope(
       vaultKey,
       FIXTURE_VAULT_PASSWORD,
@@ -413,7 +467,7 @@ describe("recovery phrase rotation", () => {
   });
 
   it("rejects recovery rotation when password authorization fails", async () => {
-    const vaultKey = await importUserVaultKey(FIXTURE_UVK_BYTES);
+    const vaultKey = await importUserVaultKey(FIXTURE_UVK_BYTES, { extractable: true });
     const { envelope: passwordEnvelope } = await createPasswordEnvelope(
       vaultKey,
       FIXTURE_VAULT_PASSWORD,
@@ -438,7 +492,7 @@ describe("recovery phrase rotation", () => {
   });
 
   it("skips recovery upgrade when the envelope is already recommended", async () => {
-    const vaultKey = await importUserVaultKey(FIXTURE_UVK_BYTES);
+    const vaultKey = await importUserVaultKey(FIXTURE_UVK_BYTES, { extractable: true });
     const { envelope } = await createRecoveryEnvelope(
       vaultKey,
       FIXTURE_12_WORD_PHRASE,
@@ -462,7 +516,7 @@ describe("recovery phrase rotation", () => {
   });
 
   it("upgrades legacy recovery envelopes after unlock", async () => {
-    const vaultKey = await importUserVaultKey(FIXTURE_UVK_BYTES);
+    const vaultKey = await importUserVaultKey(FIXTURE_UVK_BYTES, { extractable: true });
     const legacyEnvelope = await createLegacyRecoveryEnvelope(
       vaultKey,
       FIXTURE_12_WORD_PHRASE
@@ -482,8 +536,28 @@ describe("recovery phrase rotation", () => {
     expect(upgradedEnvelope?.kdfMetadata.version).toBe("kdf-v2");
   });
 
+  it("upgrades legacy recovery envelopes using public metadata word count", async () => {
+    const vaultKey = await importUserVaultKey(FIXTURE_UVK_BYTES, { extractable: true });
+    const legacyEnvelope = {
+      ...(await createLegacyRecoveryEnvelope(vaultKey, FIXTURE_12_WORD_PHRASE)),
+      publicMetadata: { phraseLength: 12 as const },
+    };
+
+    const { upgradedEnvelope, upgradeRecommended } =
+      await maybeUpgradeRecoveryEnvelopeAfterUnlock({
+        vaultKey,
+        recoveryPhrase: FIXTURE_12_WORD_PHRASE,
+        envelope: legacyEnvelope,
+        scope: LIQSENSE_COMPAT_SCOPE,
+        profile: LIQSENSE_COMPAT_PROFILE,
+      });
+
+    expect(upgradeRecommended).toBe(true);
+    expect(upgradedEnvelope?.publicMetadata?.phraseLength).toBe(12);
+  });
+
   it("upgrades legacy recovery envelopes without explicit expected word count", async () => {
-    const vaultKey = await importUserVaultKey(FIXTURE_UVK_BYTES);
+    const vaultKey = await importUserVaultKey(FIXTURE_UVK_BYTES, { extractable: true });
     const legacyEnvelope = {
       ...(await createLegacyRecoveryEnvelope(vaultKey, FIXTURE_12_WORD_PHRASE)),
       publicMetadata: undefined,
@@ -503,7 +577,7 @@ describe("recovery phrase rotation", () => {
   });
 
   it("rejects legacy recovery upgrade when the in-memory vault key does not match", async () => {
-    const vaultKey = await importUserVaultKey(FIXTURE_UVK_BYTES);
+    const vaultKey = await importUserVaultKey(FIXTURE_UVK_BYTES, { extractable: true });
     const otherKey = await createUserVaultKey();
     const legacyEnvelope = await createLegacyRecoveryEnvelope(
       vaultKey,
@@ -542,7 +616,7 @@ describe("vault rotation authorization", () => {
   });
 
   it("rejects passkey authorization when the in-memory vault key does not match", async () => {
-    const vaultKey = await importUserVaultKey(FIXTURE_UVK_BYTES);
+    const vaultKey = await importUserVaultKey(FIXTURE_UVK_BYTES, { extractable: true });
     const otherKey = await createUserVaultKey();
     const passkeyEnvelope = await createPasskeyPrfEnvelope(
       vaultKey,
@@ -567,7 +641,7 @@ describe("vault rotation authorization", () => {
   });
 
   it("rejects passkey authorization with invalid PRF output length", async () => {
-    const vaultKey = await importUserVaultKey(FIXTURE_UVK_BYTES);
+    const vaultKey = await importUserVaultKey(FIXTURE_UVK_BYTES, { extractable: true });
     const passkeyEnvelope = await createPasskeyPrfEnvelope(
       vaultKey,
       FIXTURE_PRF_OUTPUT,

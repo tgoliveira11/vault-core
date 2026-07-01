@@ -63,7 +63,7 @@ export function parseArgon2idMetadata(metadata: Argon2idKdfMetadata): {
   };
 }
 
-export async function deriveArgon2idAesKey(
+async function deriveArgon2idHash(
   passwordBytes: Uint8Array,
   salt: Uint8Array,
   params: {
@@ -71,8 +71,8 @@ export async function deriveArgon2idAesKey(
     iterations: number;
     parallelism: number;
     hashLength?: number;
-  } = DEFAULT_ARGON2ID_PARAMS
-): Promise<CryptoKey> {
+  }
+): Promise<Uint8Array> {
   assertSafeArgon2idParams(params);
   assertSafeArgon2idSalt(salt);
   const hashLength = params.hashLength ?? DEFAULT_ARGON2ID_PARAMS.hashLength;
@@ -88,14 +88,70 @@ export async function deriveArgon2idAesKey(
     hashLength,
     outputType: "binary",
   });
+  return new Uint8Array(hash);
+}
 
+export async function deriveArgon2idAesKey(
+  passwordBytes: Uint8Array,
+  salt: Uint8Array,
+  params: {
+    memory: number;
+    iterations: number;
+    parallelism: number;
+    hashLength?: number;
+  } = DEFAULT_ARGON2ID_PARAMS
+): Promise<CryptoKey> {
+  const hashBytes = await deriveArgon2idHash(passwordBytes, salt, params);
   return crypto.subtle.importKey(
     "raw",
-    toBufferSource(new Uint8Array(hash)),
+    toBufferSource(hashBytes),
     { name: "AES-GCM", length: 256 },
     false,
     ["encrypt", "decrypt"]
   );
+}
+
+export async function deriveArgon2idKeyPair(
+  passwordBytes: Uint8Array,
+  salt: Uint8Array,
+  params: {
+    memory: number;
+    iterations: number;
+    parallelism: number;
+    hashLength?: number;
+  } = DEFAULT_ARGON2ID_PARAMS
+): Promise<{ encryptionKey: CryptoKey; wrappingKey: CryptoKey }> {
+  const hashBytes = await deriveArgon2idHash(passwordBytes, salt, params);
+  const [encryptionKey, wrappingKey] = await Promise.all([
+    crypto.subtle.importKey(
+      "raw",
+      toBufferSource(hashBytes),
+      { name: "AES-GCM", length: 256 },
+      false,
+      ["encrypt", "decrypt"]
+    ),
+    crypto.subtle.importKey(
+      "raw",
+      toBufferSource(hashBytes),
+      { name: "AES-KW", length: 256 },
+      false,
+      ["wrapKey", "unwrapKey"]
+    ),
+  ]);
+  return { encryptionKey, wrappingKey };
+}
+
+export async function deriveArgon2idKeyPairFromMetadata(
+  passwordBytes: Uint8Array,
+  metadata: Argon2idKdfMetadata
+): Promise<{ encryptionKey: CryptoKey; wrappingKey: CryptoKey }> {
+  const { salt, memory, iterations, parallelism } = parseArgon2idMetadata(metadata);
+  return deriveArgon2idKeyPair(passwordBytes, salt, {
+    memory,
+    iterations,
+    parallelism,
+    hashLength: DEFAULT_ARGON2ID_PARAMS.hashLength,
+  });
 }
 
 export async function deriveArgon2idAesKeyFromMetadata(
@@ -114,15 +170,30 @@ export async function deriveArgon2idAesKeyFromMetadata(
 export async function deriveVaultPasswordKey(
   vaultPassword: string,
   salt?: Uint8Array
-): Promise<{ key: CryptoKey; metadata: Argon2idKdfMetadata }> {
+): Promise<{
+  key: CryptoKey;
+  wrappingKey: CryptoKey;
+  metadata: Argon2idKdfMetadata;
+}> {
   const saltBytes =
     salt ?? crypto.getRandomValues(new Uint8Array(DEFAULT_ARGON2ID_PARAMS.saltLength));
   const passwordBytes = stringToBytes(vaultPassword.normalize("NFKC"));
-  const key = await deriveArgon2idAesKey(passwordBytes, saltBytes);
+  const { encryptionKey, wrappingKey } = await deriveArgon2idKeyPair(passwordBytes, saltBytes);
   return {
-    key,
+    key: encryptionKey,
+    wrappingKey,
     metadata: serializeArgon2idMetadata(saltBytes),
   };
+}
+
+export async function deriveVaultPasswordKeyPairFromMetadata(
+  vaultPassword: string,
+  metadata: Argon2idKdfMetadata
+): Promise<{ encryptionKey: CryptoKey; wrappingKey: CryptoKey }> {
+  return deriveArgon2idKeyPairFromMetadata(
+    stringToBytes(vaultPassword.normalize("NFKC")),
+    metadata
+  );
 }
 
 export async function deriveVaultPasswordKeyFromMetadata(

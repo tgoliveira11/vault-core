@@ -41,5 +41,6 @@ integrations, similar to optional Outpost-style modules in `@tgoliveira/secure-a
 
 Apps own: persistence, routes, product UI, product payload schema, WebAuthn ceremony.
 
-Browser and React session layers keep the UVK in memory, renew auto-lock on activity, and clear it on
-lock or `pagehide`. Direct key mutation is not part of the public browser entry.
+Browser and React session layers keep the UVK in memory, run a countdown auto-lock timer, and clear it on
+lock or `pagehide`. Call `touchVaultSession()` or enable `registerVaultActivityGuard()` to renew the
+timer on user activity. Direct key mutation is not part of the public browser entry.

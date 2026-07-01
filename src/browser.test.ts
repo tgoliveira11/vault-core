@@ -8,6 +8,7 @@ import {
   configureVaultSession,
   createRecoveryKitDownload,
   getSessionVaultKey,
+  getVaultAutoLockMinutes,
   getVaultAutoLockRemainingMs,
   inspectIndexedDBPrefix,
   inspectLocalStoragePrefix,
@@ -22,10 +23,12 @@ import {
   resetVaultSessionLockState,
   scheduleVaultAutoLock,
   subscribeVaultSession,
+  suppressVaultActivity,
   touchVaultSession,
   unlockVaultSession,
 } from "./browser.js";
 import { createUserVaultKey } from "./index.js";
+import { createNonExtractableSessionVaultKey } from "./testing/session-vault-key.js";
 import {
   clearVaultClientState,
   getVaultLockState,
@@ -186,7 +189,7 @@ describe("vault session", () => {
   it("notifies subscribers and supports unsubscribe", async () => {
     const listener = vi.fn();
     const unsubscribe = subscribeVaultSession(listener);
-    unlockVaultSession(await createUserVaultKey());
+    await unlockVaultSession(await createNonExtractableSessionVaultKey());
     expect(listener).toHaveBeenCalledOnce();
     lockVaultSessionManually();
     expect(listener).toHaveBeenCalledTimes(2);
@@ -198,14 +201,14 @@ describe("vault session", () => {
   });
 
   it("auto-locks after inactivity and renews the timer on touch", async () => {
-    configureVaultSession({ autoLockMinutes: 0.001 });
-    unlockVaultSession(await createUserVaultKey());
-    expect(getVaultAutoLockRemainingMs()).toBe(60);
+    configureVaultSession({ autoLockMinutes: 1 });
+    await unlockVaultSession(await createNonExtractableSessionVaultKey());
+    expect(getVaultAutoLockRemainingMs()).toBe(60_000);
 
-    vi.advanceTimersByTime(30);
+    vi.advanceTimersByTime(30_000);
     touchVaultSession();
-    expect(getVaultAutoLockRemainingMs()).toBe(60);
-    vi.advanceTimersByTime(59);
+    expect(getVaultAutoLockRemainingMs()).toBe(60_000);
+    vi.advanceTimersByTime(59_999);
     expect(isVaultUnlocked()).toBe(true);
     vi.advanceTimersByTime(1);
     expect(isVaultUnlocked()).toBe(false);
@@ -215,14 +218,32 @@ describe("vault session", () => {
   it("uses resolved timeouts and falls back for invalid values", async () => {
     configureVaultSession({
       autoLockMinutes: 2,
-      resolveAutoLockMinutes: () => 0.002,
+      resolveAutoLockMinutes: () => 2,
     });
-    unlockVaultSession(await createUserVaultKey());
-    expect(getVaultAutoLockRemainingMs()).toBe(120);
+    await unlockVaultSession(await createNonExtractableSessionVaultKey());
+    expect(getVaultAutoLockRemainingMs()).toBe(2 * 60 * 1000);
 
     configureVaultSession({ autoLockMinutes: Number.NaN });
     touchVaultSession();
     expect(getVaultAutoLockRemainingMs()).toBe(15 * 60 * 1000);
+    expect(getVaultAutoLockMinutes()).toBe(15);
+  });
+
+  it("getVaultAutoLockMinutes reflects session config and clamps to admin ceiling", () => {
+    configureVaultSession({ autoLockMinutes: 5 });
+    expect(getVaultAutoLockMinutes()).toBe(5);
+    configureVaultSession({ autoLockMinutes: 30, resolveAutoLockMinutes: () => 7 });
+    expect(getVaultAutoLockMinutes()).toBe(7);
+    configureVaultSession({ autoLockMinutes: 30, resolveAutoLockMinutes: () => 120 });
+    expect(getVaultAutoLockMinutes()).toBe(30);
+    configureVaultSession({ autoLockMinutes: 2000 });
+    expect(getVaultAutoLockMinutes()).toBe(1440);
+  });
+
+  it("rejects extractable keys in unlockVaultSession", async () => {
+    await expect(unlockVaultSession(await createUserVaultKey())).rejects.toThrow(
+      /non-extractable/i
+    );
   });
 
   it("does not schedule or touch locked and manually locked sessions", async () => {
@@ -230,7 +251,7 @@ describe("vault session", () => {
     touchVaultSession();
     expect(getVaultAutoLockRemainingMs()).toBeNull();
 
-    unlockVaultSession(await createUserVaultKey());
+    await unlockVaultSession(await createNonExtractableSessionVaultKey());
     lockVaultSession();
     scheduleVaultAutoLock();
     touchVaultSession();
@@ -238,30 +259,69 @@ describe("vault session", () => {
   });
 
   it("locks on pagehide and removes the unload guard", async () => {
-    unlockVaultSession(await createUserVaultKey());
+    await unlockVaultSession(await createNonExtractableSessionVaultKey());
     const unregister = registerVaultUnloadGuard();
     window.dispatchEvent(new Event("pagehide"));
     expect(isVaultUnlocked()).toBe(false);
 
     resetVaultSessionLockState();
-    unlockVaultSession(await createUserVaultKey());
+    await unlockVaultSession(await createNonExtractableSessionVaultKey());
     unregister();
     window.dispatchEvent(new Event("pagehide"));
     expect(isVaultUnlocked()).toBe(true);
   });
 
-  it("renews inactivity on browser activity and removes the activity guard", async () => {
-    configureVaultSession({ autoLockMinutes: 0.001 });
-    unlockVaultSession(await createUserVaultKey());
-    const unregister = registerVaultActivityGuard(["keydown"]);
-    vi.advanceTimersByTime(30);
+  it("does not renew timer on browser activity without the activity guard", async () => {
+    configureVaultSession({ autoLockMinutes: 1 });
+    await unlockVaultSession(await createNonExtractableSessionVaultKey());
+    vi.advanceTimersByTime(30_000);
     window.dispatchEvent(new Event("keydown"));
-    expect(getVaultAutoLockRemainingMs()).toBe(60);
+    expect(getVaultAutoLockRemainingMs()).toBe(30_000);
+  });
+
+  it("renews inactivity on browser activity when the activity guard is registered", async () => {
+    configureVaultSession({ autoLockMinutes: 1 });
+    await unlockVaultSession(await createNonExtractableSessionVaultKey());
+    const unregister = registerVaultActivityGuard(["keydown"]);
+    vi.advanceTimersByTime(30_000);
+    window.dispatchEvent(new Event("keydown"));
+    expect(getVaultAutoLockRemainingMs()).toBe(60_000);
 
     unregister();
-    vi.advanceTimersByTime(30);
+    vi.advanceTimersByTime(30_000);
     window.dispatchEvent(new Event("keydown"));
-    expect(getVaultAutoLockRemainingMs()).toBe(30);
+    expect(getVaultAutoLockRemainingMs()).toBe(30_000);
+  });
+
+  it("ignores dock UI activity", async () => {
+    configureVaultSession({ autoLockMinutes: 1 });
+    await unlockVaultSession(await createNonExtractableSessionVaultKey());
+    const unregister = registerVaultActivityGuard(["keydown"]);
+    vi.advanceTimersByTime(30_000);
+
+    const dock = document.createElement("button");
+    dock.setAttribute("data-vault-dock-ignore-activity", "");
+    document.body.appendChild(dock);
+    dock.dispatchEvent(new KeyboardEvent("keydown", { bubbles: true }));
+    expect(getVaultAutoLockRemainingMs()).toBe(30_000);
+    unregister();
+    dock.remove();
+  });
+
+  it("suppressVaultActivity prevents activity touches", async () => {
+    configureVaultSession({ autoLockMinutes: 1 });
+    await unlockVaultSession(await createNonExtractableSessionVaultKey());
+    const unregister = registerVaultActivityGuard(["keydown"]);
+    vi.advanceTimersByTime(30_000);
+
+    suppressVaultActivity(500);
+    window.dispatchEvent(new Event("keydown"));
+    expect(getVaultAutoLockRemainingMs()).toBe(30_000);
+
+    vi.advanceTimersByTime(600);
+    window.dispatchEvent(new Event("keydown"));
+    expect(getVaultAutoLockRemainingMs()).toBe(60_000);
+    unregister();
   });
 
   it("returns a no-op unload guard outside the browser", () => {

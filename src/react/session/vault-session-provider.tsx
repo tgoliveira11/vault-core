@@ -17,7 +17,7 @@ export function VaultSessionProvider({
   children,
   sessionConfig,
   registerUnloadGuard = true,
-  registerActivityGuard = true,
+  registerActivityGuard = false,
 }: VaultSessionProviderProps) {
   useEffect(() => {
     if (sessionConfig) {

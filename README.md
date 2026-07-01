@@ -29,6 +29,14 @@ Build vault-core before consuming:
 cd ../vault-core && npm run validate
 ```
 
+Local consumer demo (not published to npm):
+
+```bash
+cd apps/consumer-demo && npm install && npm run dev
+```
+
+Open http://localhost:3013 — see [apps/consumer-demo/README.md](apps/consumer-demo/README.md).
+
 ## Testing
 
 ```bash
@@ -108,7 +116,7 @@ AAD to the user, resource, field, and application context expected by the caller
 | Entry | Purpose |
 | --- | --- |
 | `@tgoliveira/vault-core` | Core crypto, envelopes, payload, validation |
-| `@tgoliveira/vault-core/browser` | In-memory session, activity-aware auto-lock, storage inspection, PRF salt, recovery kit DOM helpers |
+| `@tgoliveira/vault-core/browser` | In-memory session, countdown auto-lock, storage inspection, PRF salt, recovery kit DOM helpers |
 | `@tgoliveira/vault-core/testing` | Sentinels and plaintext scan helpers |
 | `@tgoliveira/vault-core/react` | Headless React session/status hooks and vault admin UI pages (optional peer: `react`) |
 | `@tgoliveira/vault-core/vault-admin.css` | Styles for vault admin pages |

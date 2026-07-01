@@ -4,6 +4,8 @@ import {
   assertRecoveryPhraseConfirmation,
   createRecoveryEnvelope,
   createRecoveryPhrase,
+  deriveRecoveryPhraseKey,
+  deriveRecoveryPhraseKeyFromMetadata,
   getRecoveryPhraseWordCount,
   normalizeRecoveryPhrase,
   validateRecoveryPhraseFormat,
@@ -11,10 +13,18 @@ import {
 import { isEnvelopeKdfUpgradeRecommended } from "../crypto/policy.js";
 import { VaultAuthorizationError } from "../errors/vault-errors.js";
 import {
+  extractInnerVaultKeyBlob,
+  rewrapEncryptedVaultKeyForDerivedKeys,
+  rewrapInnerVaultKeyMaterialForDerivedKeys,
+} from "../crypto/vault-key-envelope.js";
+import { importAesKwKey } from "../crypto/user-vault-key-crypto.js";
+import { deriveVaultPasswordKeyPairFromMetadata } from "../kdf/argon2id.js";
+import {
   assertVaultRotationAuthorized,
   type VaultRotationAuthorization,
 } from "./authorization.js";
 import { unlockWithRecoveryEnvelope } from "../envelopes/recovery.js";
+import { toBufferSource, base64UrlToBytes } from "../crypto/encoding.js";
 import { userVaultKeysEqual } from "../keys/user-vault-key.js";
 import { createRecoveryKitText } from "../recovery/kit.js";
 
@@ -79,12 +89,58 @@ export async function rotateRecoveryPhrase(
     assertRecoveryPhraseConfirmation(normalized, confirmNewRecoveryPhrase);
   }
 
+  const {
+    wrappingKey: recoveryWrappingKey,
+    metadata: recoveryKdfMetadata,
+  } = await deriveRecoveryPhraseKey(normalized);
+  const recoverySalt = base64UrlToBytes(recoveryKdfMetadata.salt);
+
+  let innerVaultKeyBlob: Uint8Array;
+  if (authorization.kind === "password") {
+    const derivedKeys = await deriveVaultPasswordKeyPairFromMetadata(
+      authorization.currentPassword,
+      authorization.passwordEnvelope.kdfMetadata
+    );
+    const inner = await extractInnerVaultKeyBlob(
+      authorization.passwordEnvelope.encryptedVaultKey,
+      derivedKeys.encryptionKey
+    );
+    innerVaultKeyBlob = await rewrapInnerVaultKeyMaterialForDerivedKeys(
+      inner,
+      { wrappingKey: derivedKeys.wrappingKey },
+      { wrappingKey: recoveryWrappingKey },
+      vaultKey
+    );
+  } else {
+    const prfOutput = authorization.prfOutput;
+    const prfBytes = prfOutput.byteLength === 32 ? prfOutput : prfOutput.slice(0, 32);
+    const prfKey = await crypto.subtle.importKey(
+      "raw",
+      toBufferSource(prfBytes),
+      { name: "AES-GCM", length: 256 },
+      false,
+      ["encrypt", "decrypt"]
+    );
+    const inner = await extractInnerVaultKeyBlob(
+      authorization.passkeyEnvelope.encryptedVaultKey,
+      prfKey
+    );
+    innerVaultKeyBlob = await rewrapInnerVaultKeyMaterialForDerivedKeys(
+      inner,
+      { wrappingKey: await importAesKwKey(prfBytes) },
+      { wrappingKey: recoveryWrappingKey },
+      vaultKey
+    );
+  }
+
   const { envelope } = await createRecoveryEnvelope(
     vaultKey,
     normalized,
     scope,
     profile,
-    { phraseLength: wordCount }
+    { phraseLength: wordCount },
+    recoverySalt,
+    { innerVaultKeyBlob }
   );
 
   const recoveryKitText =
@@ -146,13 +202,28 @@ export async function maybeUpgradeRecoveryEnvelopeAfterUnlock(
     getRecoveryPhraseWordCount(recoveryPhrase) ??
     24;
 
-  const { envelope: upgradedEnvelope } = await createRecoveryEnvelope(
-    vaultKey,
+  const oldDerivedKeys = await deriveRecoveryPhraseKeyFromMetadata(
     recoveryPhrase,
+    envelope.kdfMetadata
+  );
+  const { key: newEncryptionKey, wrappingKey: newWrappingKey, metadata } =
+    await deriveRecoveryPhraseKey(recoveryPhrase);
+  const encryptedVaultKey = await rewrapEncryptedVaultKeyForDerivedKeys(
+    envelope.encryptedVaultKey,
+    oldDerivedKeys,
+    { encryptionKey: newEncryptionKey, wrappingKey: newWrappingKey },
+    vaultKey,
     scope,
-    profile,
-    { phraseLength: phraseLength as RecoveryPhraseWordCount }
+    profile
   );
 
-  return { upgradedEnvelope, upgradeRecommended: true };
+  return {
+    upgradedEnvelope: {
+      method: "recovery_phrase",
+      encryptedVaultKey,
+      kdfMetadata: metadata,
+      publicMetadata: { phraseLength: phraseLength as RecoveryPhraseWordCount },
+    },
+    upgradeRecommended: true,
+  };
 }

@@ -5,46 +5,40 @@ import type {
   PasswordEnvelope,
 } from "../validation/schemas.js";
 import type { VaultCryptoProfile, VaultAadScope } from "../profile.js";
-import { encryptField, decryptField, exportAesKey, importAesKey } from "../crypto/aes-gcm.js";
-import { bytesToBase64Url, base64UrlToBytes } from "../crypto/encoding.js";
+import type { WrapUserVaultKeyOptions } from "../crypto/vault-key-envelope.js";
+import {
+  unwrapUserVaultKeyWithDerivedKeys,
+  wrapUserVaultKeyWithDerivedKeys,
+} from "../crypto/vault-key-envelope.js";
 import {
   deriveVaultPasswordKey,
-  deriveVaultPasswordKeyFromMetadata,
+  deriveVaultPasswordKeyPairFromMetadata,
 } from "../kdf/argon2id.js";
 import { assertVaultKeyAad } from "../validation/aad-assert.js";
 
 type WrapScope = Pick<VaultAadScope, "userId" | "resourceId">;
 
-async function wrapVaultKeyWithDerivedKey(
-  vaultKey: CryptoKey,
-  derivedKey: CryptoKey,
-  scope: WrapScope,
-  profile: VaultCryptoProfile
-): Promise<EncryptedVaultPayload> {
-  return encryptField(bytesToBase64Url(await exportAesKey(vaultKey)), derivedKey, {
-    userId: scope.userId,
-    resourceId: scope.resourceId,
-    field: "vault_key",
-  }, profile);
-}
-
-async function unwrapVaultKeyWithDerivedKey(
-  encryptedVaultKey: EncryptedVaultPayload,
-  derivedKey: CryptoKey
-): Promise<CryptoKey> {
-  const keyBytes = base64UrlToBytes(await decryptField(encryptedVaultKey, derivedKey));
-  return importAesKey(keyBytes);
-}
+export type CreatePasswordEnvelopeOptions = WrapUserVaultKeyOptions;
 
 export async function createPasswordEnvelope(
   vaultKey: CryptoKey,
   vaultPassword: string,
   scope: WrapScope,
   profile: VaultCryptoProfile,
-  salt?: Uint8Array
+  salt?: Uint8Array,
+  options?: CreatePasswordEnvelopeOptions
 ): Promise<{ envelope: PasswordEnvelope; kdfMetadata: Argon2idKdfMetadata }> {
-  const { key: derivedKey, metadata } = await deriveVaultPasswordKey(vaultPassword, salt);
-  const encryptedVaultKey = await wrapVaultKeyWithDerivedKey(vaultKey, derivedKey, scope, profile);
+  const { key: encryptionKey, wrappingKey, metadata } = await deriveVaultPasswordKey(
+    vaultPassword,
+    salt
+  );
+  const encryptedVaultKey = await wrapUserVaultKeyWithDerivedKeys(
+    vaultKey,
+    { encryptionKey, wrappingKey },
+    scope,
+    profile,
+    options
+  );
   return {
     envelope: {
       method: "password",
@@ -65,8 +59,11 @@ export async function unlockWithPasswordEnvelope(
     throw new Error("Vault password envelope requires Argon2id metadata");
   }
   assertVaultKeyAad(expectedScope, envelope.encryptedVaultKey, profile);
-  const derivedKey = await deriveVaultPasswordKeyFromMetadata(vaultPassword, envelope.kdfMetadata);
-  return unwrapVaultKeyWithDerivedKey(envelope.encryptedVaultKey, derivedKey);
+  const derivedKeys = await deriveVaultPasswordKeyPairFromMetadata(
+    vaultPassword,
+    envelope.kdfMetadata
+  );
+  return unwrapUserVaultKeyWithDerivedKeys(envelope.encryptedVaultKey, derivedKeys);
 }
 
 /** @deprecated Use createPasswordEnvelope */

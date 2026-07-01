@@ -8,6 +8,161 @@ API changes increment the minor version.
 
 ## [Unreleased]
 
+### Security
+
+- `assertInnerVaultKeyBlobMatchesVaultKey()` validates reused `innerVaultKeyBlob` material during envelope wrap.
+- `decodeBoundedBase64Url()` and `VaultPayloadSizeError` bound IV/ciphertext size before AES-GCM decrypt.
+- `getVaultAutoLockMinutes()` clamps resolved values to the admin ceiling (1–1440 minutes).
+- `unlockVaultSession()` rejects extractable UVKs via `assertUserVaultKeyNonExtractable()`.
+- `deleteVaultAfterAuthorization()` documents caller authorization requirements and emits a one-time browser warning.
+- CI **`verify:public-exports`** guard fails when public entry points export `setSessionVaultKey`.
+
+### Changed
+
+- `unlockVaultSession()` is now async (non-extractable key assertion).
+- Encrypted payload schema enforces maximum base64url lengths on `iv` and `ciphertext`.
+- `rotateRecoveryPhrase()` reuses a single recovery KDF salt when re-wrapping inner vault-key material (fixes envelope consistency when inner blob validation is enforced).
+- Consumer demo: production CSP uses per-request nonces (no `unsafe-inline` on scripts); recovery KDF upgrade is rate-limited with `recovery_phrase` action.
+
+### Added
+
+- `decryptVaultPayloadWithSchema()` and `VaultPayloadValidationError` for runtime Zod validation of decrypted vault JSON.
+- `scripts/verify-public-exports.mjs` — public export guard (included in `npm run validate`).
+
+- Reference PostgreSQL schema for runtime admin config overrides:
+  `getVaultAdminConfigOverrideSchemaSql()`, `VAULT_ADMIN_CONFIG_OVERRIDES_TABLE`, and
+  `docs/schemas/vault_admin_config_overrides.sql` (for consuming-app migrations).
+- Reusable rate-limit primitives exported from `@tgoliveira/vault-core`:
+  `createFixedWindowRateLimiter()`, vault unlock failure limiter (`createVaultUnlockRateLimiter()`,
+  `assertVaultUnlockAllowed()`, `withVaultUnlockRateLimit()`), and vault HTTP API limiter
+  (`createVaultApiRateLimiter()`, `consumeVaultApiRateLimit()`, `buildVaultRateLimitHttpResponse()`).
+- `VaultRateLimitError` with `retryAfterMs` and `resetAtMs`.
+- `VaultKeyNotExtractableError` when `exportUserVaultKey()` is called on a non-extractable UVK.
+- `DEFAULT_RATE_LIMIT_MAX_BUCKETS` (10_000) and optional `maxBuckets` on `createFixedWindowRateLimiter()`.
+- `VaultAdminConfig.rateLimit` section and env keys `VAULT_UNLOCK_*` / `VAULT_API_RATE_LIMIT_*`
+  (overridable via admin panel).
+- Optional `unlockRateLimiter` and `rateLimitScopeKey` props on `VaultUnlockPanel` and
+  `VaultDockQuickUnlock`.
+- Runtime admin config overrides with resolution priority **admin → env → default**:
+  `applyVaultAdminOverrides()`, `validateVaultAdminOverride()`, `VAULT_OVERRIDABLE_CONFIG_KEYS`, and
+  `VAULT_CONFIG_KEY_DEFINITIONS`.
+- `buildVaultAdminConfigFromEnv()` accepts optional `adminOverrides` for consuming apps that persist
+  overrides in a database or other store.
+- Editable `VaultAdminConfigPage` when `configApiBase` is set (GET/POST/DELETE `{apiBase}/admin/config`).
+- Source badge `admin` on configuration entries overridden at runtime.
+- `configApiBase` and `adminOverrides` props on `VaultAdminPageProps`.
+- Vault password policy assessment helpers: `assessVaultPassword()`, `validateVaultPasswordAgainstPolicy()`,
+  `validateVaultPasswordSetup()`, and related requirement/strength utilities.
+- `VaultPasswordField` and `VaultPasswordSetupFields` exported from
+  `@tgoliveira/vault-core/react` (strength score, enforcement mode, requirement checklist).
+- `VaultPasswordField` awareness props for current-password fields:
+  `showRequirements={false}`, `showStrengthWhenEnforcementOff`, `strengthLabelPrefix`, `emptyStrengthHint`.
+- `VaultPasswordStrengthFeedback` — read-only strength display for an existing vault password
+  (awareness on settings / change-password flows; does not block submit).
+- Per-user auto-lock preference: `resolveVaultAutoLockMinutesPreference()`, localStorage helpers on
+  `@tgoliveira/vault-core/browser`; `VaultAutoLockPreferenceField`, `useVaultAutoLockPreference` on
+  `@tgoliveira/vault-core/react` (slider 1 min … admin max; priority user → admin → env → default).
+- Browser vault deletion helpers: `deleteVaultAfterAuthorization()` and
+  `deleteVaultWithPasswordAuthorization()` — apps pass a `purgePersistedVault` callback for
+  envelope/payload removal; vault-core clears in-memory session state.
+- `VaultStatusDock` and `VaultDockQuickUnlock` React components exported from
+  `@tgoliveira/vault-core/react` — header-attached vault lock/unlock UI with auto-lock countdown,
+  quick unlock slot, collapse preference, and `requestVaultDockExpand()` integration.
+- `VaultProtectedGate` React component — blur overlay on vault-protected pages while locked;
+  blocks interaction, keeps content mounted, expands the status dock on Enter, and redirects only
+  when the vault is not configured.
+- `VaultProtectedGate` `overlayClassName` and `overlayBackground` props — customize lock overlay
+  appearance via extra classes or the `--vc-vault-lock-overlay-color` CSS variable.
+- `VaultLockOverlayExclude` — marks layout chrome (navigation, header) that stays interactive above
+  the lock overlay; overlay panels are carved around registered exclusion regions.
+- `computeVaultLockOverlayPanels()`, `useVaultLockOverlayPanels()`, and
+  `VAULT_LOCK_OVERLAY_EXCLUDE_SELECTOR` for custom layouts.
+- `shouldVaultLockOverlayExpandDock()` helper for Enter-key dock expansion guards.
+- `VaultUnlockPanel` React component — full-page unlock UI with vault password, recovery phrase, and
+  optional passkey unlock (`autoFocusPassword` defaults to `true`; `autoStartPasskey` defaults to
+  `false` — passkey requires an explicit click on the full unlock page).
+- Return-path helpers: `VAULT_UNLOCK_RETURN_QUERY_PARAM` (`next`), `resolveVaultUnlockReturnPath()`,
+  `readVaultUnlockReturnPath()`, `buildVaultUnlockHref()`, and `useVaultUnlockPageNavigation()` for
+  post-unlock redirects.
+- `vc-vault-unlock-*` styles in `vault-admin.css` for the unlock page panel.
+- `suppressVaultActivity()` on `@tgoliveira/vault-core/browser` — prevents dock interactions from
+  resetting the inactivity timer; activity guard ignores `[data-vault-dock-ignore-activity]`.
+- `vc-status-dock-*` styles in `vault-admin.css` for the status dock.
+
+### Changed
+
+- `createUserVaultKey()` now generates an extractable AES-GCM UVK for the initial AES-KW envelope
+  wrap; keys restored via envelope unlock are **non-extractable**. Password, recovery, and passkey
+  envelopes wrap the UVK with AES-KW instead of exporting raw key material. Unlock still accepts
+  legacy envelopes whose inner payload is exactly 32 raw bytes. Re-wrap paths reuse the inner blob
+  so rotation never exports a session UVK.
+- `exportUserVaultKey()` throws `VaultKeyNotExtractableError` for non-extractable keys;
+  `userVaultKeysEqual()` falls back to an encrypt/decrypt probe when export is unavailable.
+- In-memory rate limiters prune expired buckets and evict the oldest bucket when `maxBuckets` is
+  exceeded (default 10_000 keys).
+- `VaultProtectedGate` lock overlay is rendered as one or more fixed panels that cover the viewport
+  except regions marked with `VaultLockOverlayExclude` (for example the app header / navigation).
+- `VaultProtectedGate` lock overlay is much heavier (24px blur, ~92% background opacity) so
+  underlying page content is barely visible (~5–10%) while locked.
+- `VaultStatusDock` locked collapsed handle reserves the same width as the unlocked handle (invisible
+  countdown slot and matching label width) so the dock does not resize when the vault locks.
+- `VaultStatusDock` keeps the collapsed locked handle visible on the full unlock page (no longer
+  hidden when `isFullUnlockPage` matches).
+- `VaultStatusDock` defaults `buildUnlockHref` to `buildVaultUnlockHref(unlockPath, returnPath)` when
+  the app does not supply a custom builder.
+- `VaultDockQuickUnlock` auto-focuses the vault password field, submits on Enter, and auto-starts
+  passkey unlock on mount when passkey is primary (`autoFocusPassword` / `autoStartPasskey` default
+  to `true`; passkey auto-start is best-effort — browsers may require a recent user gesture).
+- `VaultStatusDock` collapses the expanded unlocked panel when auto-lock fires or the session
+  becomes locked; locked handle copy is **Vault locked** (was **Vault closed**); `data-vault-state`
+  uses `locked` instead of `closed` when the vault is locked.
+- Vault auto-lock countdown no longer resets on pointer, keyboard, touch, or focus events by default.
+  Only explicit `touchVaultSession()` (the vault status dock **Stay unlocked** action) renews the timer.
+  Opt in to activity-based renewal with `registerVaultActivityGuard()` or
+  `registerActivityGuard` on `VaultSessionProvider` / `useVaultSession`.
+- `registerActivityGuard` on `VaultSessionProvider` and `useVaultSession` now defaults to `false`.
+- `listVaultAdminConfigEntries()` accepts optional `adminOverrides` and includes all env-catalog password
+  policy fields; each entry exposes `overridable`.
+- `VaultAdminEnvSource` now includes `"admin"`.
+
+### Security
+
+- `resolveVaultUnlockReturnPath()` rejects encoded open-redirect bypasses (`/%2F%2F…`), backslashes,
+  and scheme-like paths after bounded `decodeURIComponent` normalization.
+- `assertNoVaultPlaintextFields()` matches forbidden field names case-insensitively and blocks
+  `mnemonic`, `seed`, `seedPhrase`, `passphrase`, `privateKey`, and `secret`.
+- `aadContextVault` and `aadContextEnvelope` are no longer overridable via runtime admin panel
+  (deploy-time env / profile only).
+- [docs/CONSUMER_SECURITY_REQUIREMENTS.md](docs/CONSUMER_SECURITY_REQUIREMENTS.md) — mandatory
+  integration checklist for consuming applications and AI agents.
+
+### Changed
+
+- `VaultStatusDock` **Lock now** uses the same subtle button style as **Stay unlocked** in the
+  expanded open panel (was a text link).
+- Locked quick-unlock panel width matches the open expanded dock (`15rem`) so passkey/password
+  actions align with **Stay unlocked**.
+- `VaultDockQuickUnlock` unlock and passkey buttons use the same subtle dock action style as
+  **Stay unlocked** / **Lock now** in the expanded open panel (was accent primary).
+- Dock passkey unlock cancellation or failure redirects to the full unlock page with the current
+  return path (`redirectOnPasskeyUnlockFailure`, default `true`; `onNavigateToUnlock` for SPA apps).
+- Expanded vault dock stays open for clicks and focus inside the dock region (handle + panel); it
+  collapses on outside click or Escape only (handle no longer toggles closed while expanded).
+
+### Fixed
+
+- `VaultStatusDock` expanded panel stays open when interacting with password-manager autofill UI
+  (for example Enpass) rendered outside the dock DOM while the vault password field remains focused.
+- `VaultStatusDock` **Stay unlocked** label and circular countdown ring now use the active vault
+  session auto-lock minutes (`configureVaultSession` / `VaultSessionProvider`) when
+  `autoLockMinutes` is omitted, instead of always defaulting to 15 minutes.
+- `getVaultAutoLockMinutes()` exported from `@tgoliveira/vault-core/browser` for the resolved
+  session timeout.
+- `VaultStatusDock` keeps the collapsed locked handle visible while the quick-unlock panel is
+  expanded (password / passkey), matching unlocked expanded behavior.
+- `VaultStatusDock` keeps the collapsed handle (lock icon and auto-lock countdown) visible while the
+  unlocked expanded panel is open, instead of replacing it with the panel alone.
+
 ## [0.3.0] - 2026-06-29
 
 ### Added

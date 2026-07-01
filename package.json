@@ -73,7 +73,8 @@
     "test:watch": "vitest",
     "audit:security": "npm audit --audit-level=high",
     "verify:crypto-policy": "node scripts/verify-crypto-policy.mjs",
-    "validate": "npm run typecheck && npm run verify:crypto-policy && npm run test:coverage && npm run build",
+    "verify:public-exports": "node scripts/verify-public-exports.mjs",
+    "validate": "npm run typecheck && npm run verify:crypto-policy && node scripts/verify-public-exports.mjs && npm run test:coverage && npm run build && node scripts/verify-public-exports.mjs --dist",
     "prepublishOnly": "npm run validate",
     "prepare": "npm run build"
   },

@@ -1,6 +1,6 @@
 import type { VaultCryptoProfile } from "../profile.js";
 
-export type VaultAdminEnvSource = "env" | "default" | "profile";
+export type VaultAdminEnvSource = "admin" | "env" | "default" | "profile";
 
 export type VaultPasswordEnforcement = "off" | "warn" | "enforce";
 
@@ -22,6 +22,14 @@ export type VaultAdminSessionConfig = {
   autoLockMinutes: number;
 };
 
+export type VaultAdminRateLimitConfig = {
+  unlockMaxFailures: number;
+  unlockFailureWindowMinutes: number;
+  unlockLockoutMinutes: number;
+  apiMaxRequests: number;
+  apiWindowSeconds: number;
+};
+
 export type VaultAdminFeatureFlags = {
   adminEnabled: boolean;
   passkeyPrfUnlockEnabled: boolean;
@@ -35,6 +43,8 @@ export type VaultAdminConfigInput = {
   prfSaltPrefix?: string;
   productName?: string;
   defaultRecoveryWordCount?: 12 | 24;
+  /** Runtime admin overrides (highest priority). */
+  adminOverrides?: Record<string, unknown>;
 };
 
 export type VaultAdminConfig = {
@@ -46,6 +56,7 @@ export type VaultAdminConfig = {
   defaultRecoveryWordCount: 12 | 24;
   passwordPolicy: VaultAdminPasswordPolicy;
   session: VaultAdminSessionConfig;
+  rateLimit: VaultAdminRateLimitConfig;
   features: VaultAdminFeatureFlags;
 };
 
@@ -57,6 +68,7 @@ export type VaultAdminConfigEntry = {
   group: VaultAdminConfigGroup;
   value: string | number | boolean;
   source: VaultAdminEnvSource;
+  overridable?: boolean;
   sensitive?: boolean;
 };
 
@@ -65,6 +77,7 @@ export type VaultAdminConfigGroup =
   | "crypto_profile"
   | "session"
   | "password_policy"
+  | "rate_limit"
   | "features";
 
 export type VaultAdminPaths = {

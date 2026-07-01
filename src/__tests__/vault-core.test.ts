@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   createUserVaultKey,
   importUserVaultKey,
+  userVaultKeysEqual,
   encryptField,
   decryptField,
   createPasswordEnvelope,
@@ -12,6 +13,7 @@ import {
   unlockWithPasskeyPrfEnvelope,
   encryptVaultPayload,
   decryptVaultPayload,
+  decryptVaultPayloadWithSchema,
   createRecoveryPhrase,
   normalizeRecoveryPhrase,
   validateRecoveryPhraseFormat,
@@ -26,7 +28,9 @@ import {
   parseArgon2idMetadata,
   SENTINEL_VAULT_PASSWORD,
   SENTINEL_PRIVATE_LABEL,
+  VaultPayloadValidationError,
 } from "../index.js";
+import { z } from "zod";
 import {
   LIQSENSE_COMPAT_PROFILE,
   LIQSENSE_COMPAT_SCOPE,
@@ -118,7 +122,7 @@ describe("AES-GCM", () => {
 
 describe("password envelope", () => {
   it("creates and unlocks with fixed salt fixture", async () => {
-    const vaultKey = await importUserVaultKey(FIXTURE_UVK_BYTES);
+    const vaultKey = await importUserVaultKey(FIXTURE_UVK_BYTES, { extractable: true });
     const { envelope, kdfMetadata } = await createPasswordEnvelope(
       vaultKey,
       FIXTURE_VAULT_PASSWORD,
@@ -139,15 +143,13 @@ describe("password envelope", () => {
       LIQSENSE_COMPAT_SCOPE,
       LIQSENSE_COMPAT_PROFILE
     );
-    const originalRaw = await crypto.subtle.exportKey("raw", vaultKey);
-    const unwrappedRaw = await crypto.subtle.exportKey("raw", unwrapped);
-    expect(new Uint8Array(unwrappedRaw)).toEqual(new Uint8Array(originalRaw));
+    expect(await userVaultKeysEqual(vaultKey, unwrapped)).toBe(true);
   });
 });
 
 describe("recovery envelope", () => {
   it("creates and unlocks 12-word phrase with fixed salt", async () => {
-    const vaultKey = await importUserVaultKey(FIXTURE_UVK_BYTES);
+    const vaultKey = await importUserVaultKey(FIXTURE_UVK_BYTES, { extractable: true });
     const { envelope } = await createRecoveryEnvelope(
       vaultKey,
       FIXTURE_12_WORD_PHRASE,
@@ -163,13 +165,11 @@ describe("recovery envelope", () => {
       LIQSENSE_COMPAT_SCOPE,
       LIQSENSE_COMPAT_PROFILE
     );
-    const originalRaw = await crypto.subtle.exportKey("raw", vaultKey);
-    const unwrappedRaw = await crypto.subtle.exportKey("raw", unwrapped);
-    expect(new Uint8Array(unwrappedRaw)).toEqual(new Uint8Array(originalRaw));
+    expect(await userVaultKeysEqual(vaultKey, unwrapped)).toBe(true);
   });
 
   it("creates and unlocks 24-word phrase with fixed salt", async () => {
-    const vaultKey = await importUserVaultKey(FIXTURE_UVK_BYTES);
+    const vaultKey = await importUserVaultKey(FIXTURE_UVK_BYTES, { extractable: true });
     const { envelope } = await createRecoveryEnvelope(
       vaultKey,
       FIXTURE_24_WORD_PHRASE,
@@ -185,9 +185,7 @@ describe("recovery envelope", () => {
       LIQSENSE_COMPAT_SCOPE,
       LIQSENSE_COMPAT_PROFILE
     );
-    const originalRaw = await crypto.subtle.exportKey("raw", vaultKey);
-    const unwrappedRaw = await crypto.subtle.exportKey("raw", unwrapped);
-    expect(new Uint8Array(unwrappedRaw)).toEqual(new Uint8Array(originalRaw));
+    expect(await userVaultKeysEqual(vaultKey, unwrapped)).toBe(true);
   });
 });
 
@@ -223,7 +221,7 @@ describe("recovery phrase helpers", () => {
 
 describe("passkey PRF envelope", () => {
   it("creates and unlocks with fixture PRF output", async () => {
-    const vaultKey = await importUserVaultKey(FIXTURE_UVK_BYTES);
+    const vaultKey = await importUserVaultKey(FIXTURE_UVK_BYTES, { extractable: true });
     const envelope = await createPasskeyPrfEnvelope(
       vaultKey,
       FIXTURE_PRF_OUTPUT,
@@ -237,13 +235,11 @@ describe("passkey PRF envelope", () => {
       LIQSENSE_COMPAT_SCOPE,
       LIQSENSE_COMPAT_PROFILE
     );
-    const originalRaw = await crypto.subtle.exportKey("raw", vaultKey);
-    const unwrappedRaw = await crypto.subtle.exportKey("raw", unwrapped);
-    expect(new Uint8Array(unwrappedRaw)).toEqual(new Uint8Array(originalRaw));
+    expect(await userVaultKeysEqual(vaultKey, unwrapped)).toBe(true);
   });
 
   it("rejects PRF output shorter than 32 bytes", async () => {
-    const vaultKey = await importUserVaultKey(FIXTURE_UVK_BYTES);
+    const vaultKey = await importUserVaultKey(FIXTURE_UVK_BYTES, { extractable: true });
     await expect(
       createPasskeyPrfEnvelope(
         vaultKey,
@@ -257,7 +253,7 @@ describe("passkey PRF envelope", () => {
 
 describe("encrypted vault payload", () => {
   it("roundtrips generic JSON payload", async () => {
-    const vaultKey = await importUserVaultKey(FIXTURE_UVK_BYTES);
+    const vaultKey = await importUserVaultKey(FIXTURE_UVK_BYTES, { extractable: true });
     const encrypted = await encryptVaultPayload(
       FIXTURE_PAYLOAD_V1,
       vaultKey,
@@ -272,6 +268,52 @@ describe("encrypted vault payload", () => {
       LIQSENSE_COMPAT_PROFILE
     );
     expect(decrypted).toEqual(FIXTURE_PAYLOAD_V1);
+  });
+
+  it("decryptVaultPayloadWithSchema validates parsed JSON with Zod", async () => {
+    const vaultKey = await importUserVaultKey(FIXTURE_UVK_BYTES, { extractable: true });
+    const encrypted = await encryptVaultPayload(
+      FIXTURE_PAYLOAD_V1,
+      vaultKey,
+      LIQSENSE_COMPAT_SCOPE,
+      LIQSENSE_COMPAT_PROFILE
+    );
+    const schema = z
+      .object({
+        version: z.literal(1),
+        profile: z.object({ displayName: z.string() }),
+      })
+      .passthrough();
+
+    const decrypted = await decryptVaultPayloadWithSchema(
+      encrypted,
+      vaultKey,
+      LIQSENSE_COMPAT_SCOPE,
+      LIQSENSE_COMPAT_PROFILE,
+      schema
+    );
+    expect(decrypted).toEqual(FIXTURE_PAYLOAD_V1);
+  });
+
+  it("decryptVaultPayloadWithSchema rejects schema mismatch after decrypt", async () => {
+    const vaultKey = await importUserVaultKey(FIXTURE_UVK_BYTES, { extractable: true });
+    const encrypted = await encryptVaultPayload(
+      FIXTURE_PAYLOAD_V1,
+      vaultKey,
+      LIQSENSE_COMPAT_SCOPE,
+      LIQSENSE_COMPAT_PROFILE
+    );
+    const schema = z.object({ version: z.literal(999) });
+
+    await expect(
+      decryptVaultPayloadWithSchema(
+        encrypted,
+        vaultKey,
+        LIQSENSE_COMPAT_SCOPE,
+        LIQSENSE_COMPAT_PROFILE,
+        schema
+      )
+    ).rejects.toThrow(VaultPayloadValidationError);
   });
 
   it("does not leak sentinels outside ciphertext metadata", async () => {
@@ -292,7 +334,7 @@ describe("encrypted vault payload", () => {
   });
 
   it("rejects a valid payload when its AAD does not match the expected scope", async () => {
-    const vaultKey = await importUserVaultKey(FIXTURE_UVK_BYTES);
+    const vaultKey = await importUserVaultKey(FIXTURE_UVK_BYTES, { extractable: true });
     const encrypted = await encryptVaultPayload(
       FIXTURE_PAYLOAD_V1,
       vaultKey,
@@ -334,6 +376,8 @@ describe("validation", () => {
   it("rejects forbidden plaintext fields", () => {
     expect(() => assertNoVaultPlaintextFields({ vaultPassword: "x" })).toThrow();
     expect(() => assertNoVaultPlaintextFields({ recoveryPhrase: "words" })).toThrow();
+    expect(() => assertNoVaultPlaintextFields({ mnemonic: "words" })).toThrow();
+    expect(() => assertNoVaultPlaintextFields({ VaultPassword: "x" })).toThrow();
     expect(validateNoPlaintextLeak({ encryptedBlob: { iv: "x" } }).ok).toBe(true);
   });
 
@@ -348,7 +392,7 @@ describe("validation", () => {
   });
 
   it("rejects Argon2id metadata outside the safe resource limits", async () => {
-    const vaultKey = await importUserVaultKey(FIXTURE_UVK_BYTES);
+    const vaultKey = await importUserVaultKey(FIXTURE_UVK_BYTES, { extractable: true });
     const { envelope } = await createPasswordEnvelope(
       vaultKey,
       FIXTURE_VAULT_PASSWORD,
@@ -408,9 +452,8 @@ describe("LiqSense backwards compatibility fixtures", () => {
       LIQSENSE_COMPAT_PROFILE
     );
 
-    const originalRaw = await crypto.subtle.exportKey("raw", await importUserVaultKey(FIXTURE_UVK_BYTES));
-    const unwrappedRaw = await crypto.subtle.exportKey("raw", unwrapped);
-    expect(new Uint8Array(unwrappedRaw)).toEqual(new Uint8Array(originalRaw));
+    const originalKey = await importUserVaultKey(FIXTURE_UVK_BYTES, { extractable: true });
+    expect(await userVaultKeysEqual(originalKey, unwrapped)).toBe(true);
     expect(golden.kdfMetadata.salt).toBeTruthy();
     expect(golden.encryptedVaultKey.aad.context).toBe(
       LIQSENSE_COMPAT_PROFILE.aadContextEnvelope

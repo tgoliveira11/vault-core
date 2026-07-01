@@ -1,8 +1,11 @@
 import type { EncryptedVaultPayload, PasskeyPrfEnvelope } from "../validation/schemas.js";
 import type { VaultCryptoProfile, VaultAadScope } from "../profile.js";
 import { PasskeyPrfRequiredError, PasskeyUnlockError } from "../errors/vault-errors.js";
-import { encryptField, decryptField, exportAesKey, importAesKey } from "../crypto/aes-gcm.js";
-import { bytesToBase64Url, base64UrlToBytes, toBufferSource } from "../crypto/encoding.js";
+import { toBufferSource } from "../crypto/encoding.js";
+import {
+  unwrapUserVaultKeyWithPrfOutput,
+  wrapUserVaultKeyWithPrfOutput,
+} from "../crypto/vault-key-envelope.js";
 import { assertVaultKeyAad } from "../validation/aad-assert.js";
 
 interface PrfClientExtensionResults {
@@ -57,15 +60,12 @@ export async function createPasskeyPrfEnvelope(
     throw new Error("PRF output must be at least 32 bytes");
   }
   const prfKey = await importPrfAsAesKey(prfOutput);
-  const encryptedVaultKey = await encryptField(
-    bytesToBase64Url(await exportAesKey(vaultKey)),
-    prfKey,
-    {
-      userId: scope.userId,
-      resourceId: scope.resourceId,
-      field: "vault_key",
-    },
-    profile
+  const encryptedVaultKey = await wrapUserVaultKeyWithPrfOutput(
+    vaultKey,
+    prfOutput,
+    scope,
+    profile,
+    prfKey
   );
   return {
     method: "passkey_prf",
@@ -86,8 +86,7 @@ export async function unwrapVaultKeyFromPasskey(
   }
   assertVaultKeyAad(expectedScope, encryptedVaultKey, profile);
   const prfKey = await importPrfAsAesKey(prfOutput);
-  const keyBytes = base64UrlToBytes(await decryptField(encryptedVaultKey, prfKey));
-  return importAesKey(keyBytes);
+  return unwrapUserVaultKeyWithPrfOutput(encryptedVaultKey, prfOutput, prfKey);
 }
 
 export async function unlockWithPasskeyPrfEnvelope(

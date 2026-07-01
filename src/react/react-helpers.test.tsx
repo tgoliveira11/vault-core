@@ -11,7 +11,7 @@ import {
   resetVaultSessionLockState,
   unlockVaultSession,
 } from "../browser.js";
-import { createUserVaultKey } from "../index.js";
+import { createNonExtractableSessionVaultKey } from "../testing/session-vault-key.js";
 import { useVaultLockState, useVaultUnlocked } from "./session/use-vault-unlocked.js";
 import { useVaultSession } from "./session/use-vault-session.js";
 import { VaultSessionProvider } from "./session/vault-session-provider.js";
@@ -37,7 +37,7 @@ describe("React vault helpers", () => {
     const { result } = renderHook(() => useVaultLockState());
     expect(result.current).toBe("locked");
 
-    await act(async () => unlockVaultSession(await createUserVaultKey()));
+    await act(async () => unlockVaultSession(await createNonExtractableSessionVaultKey()));
     expect(result.current).toBe("unlocked");
   });
 
@@ -52,36 +52,75 @@ describe("React vault helpers", () => {
   it("configures, touches, and locks a session through the hook", async () => {
     const { result } = renderHook(() =>
       useVaultSession({
-        sessionConfig: { autoLockMinutes: 0.001 },
+        sessionConfig: { autoLockMinutes: 1 },
         registerUnloadGuard: false,
         registerActivityGuard: false,
       })
     );
-    await act(async () => unlockVaultSession(await createUserVaultKey()));
+    await act(async () => unlockVaultSession(await createNonExtractableSessionVaultKey()));
     expect(result.current.unlocked).toBe(true);
 
     act(() => result.current.touch());
-    expect(getVaultAutoLockRemainingMs()).toBe(60);
+    expect(getVaultAutoLockRemainingMs()).toBe(60_000);
     act(() => result.current.lock());
     expect(result.current.unlocked).toBe(false);
   });
 
+  it("registers the activity guard when opted in", async () => {
+    const { unmount } = renderHook(() =>
+      useVaultSession({ registerUnloadGuard: false, registerActivityGuard: true })
+    );
+    await act(async () => unlockVaultSession(await createNonExtractableSessionVaultKey()));
+    vi.advanceTimersByTime(30_000);
+    window.dispatchEvent(new Event("keydown"));
+    expect(getVaultAutoLockRemainingMs()).toBe(60_000);
+    unmount();
+  });
+
+  it("does not register the activity guard by default", async () => {
+    const { result, unmount } = renderHook(() =>
+      useVaultSession({ registerUnloadGuard: false })
+    );
+    await act(async () => unlockVaultSession(await createNonExtractableSessionVaultKey()));
+    vi.advanceTimersByTime(30_000);
+    window.dispatchEvent(new Event("keydown"));
+    expect(getVaultAutoLockRemainingMs()).toBe(30_000);
+
+    act(() => result.current.touch());
+    expect(getVaultAutoLockRemainingMs()).toBe(60_000);
+    unmount();
+  });
+
   it("uses default hook options and registers the pagehide guard", async () => {
     const { result, unmount } = renderHook(() => useVaultSession());
-    await act(async () => unlockVaultSession(await createUserVaultKey()));
+    await act(async () => unlockVaultSession(await createNonExtractableSessionVaultKey()));
     act(() => window.dispatchEvent(new Event("pagehide")));
     expect(result.current.unlocked).toBe(false);
 
     unmount();
-    await act(async () => unlockVaultSession(await createUserVaultKey()));
+    await act(async () => unlockVaultSession(await createNonExtractableSessionVaultKey()));
     act(() => window.dispatchEvent(new Event("pagehide")));
     expect(isVaultUnlocked()).toBe(true);
+  });
+
+  it("registers the activity guard on the provider when opted in", async () => {
+    const { unmount } = render(
+      <VaultSessionProvider registerUnloadGuard={false} registerActivityGuard>
+        <span>vault child</span>
+      </VaultSessionProvider>
+    );
+    expect(screen.getByText("vault child")).toBeTruthy();
+    await act(async () => unlockVaultSession(await createNonExtractableSessionVaultKey()));
+    vi.advanceTimersByTime(30_000);
+    window.dispatchEvent(new Event("keydown"));
+    expect(getVaultAutoLockRemainingMs()).toBe(60_000);
+    unmount();
   });
 
   it("renders provider children and applies session configuration", async () => {
     const { rerender, unmount } = render(
       <VaultSessionProvider
-        sessionConfig={{ autoLockMinutes: 0.002 }}
+        sessionConfig={{ autoLockMinutes: 2 }}
         registerUnloadGuard={false}
         registerActivityGuard={false}
       >
@@ -90,8 +129,8 @@ describe("React vault helpers", () => {
     );
     expect(screen.getByText("vault child")).toBeTruthy();
     await act(async () => undefined);
-    await act(async () => unlockVaultSession(await createUserVaultKey()));
-    expect(getVaultAutoLockRemainingMs()).toBe(120);
+    await act(async () => unlockVaultSession(await createNonExtractableSessionVaultKey()));
+    expect(getVaultAutoLockRemainingMs()).toBe(2 * 60 * 1000);
 
     rerender(
       <VaultSessionProvider registerUnloadGuard>
@@ -117,7 +156,7 @@ describe("React vault helpers", () => {
     rerender({ configured: false, prfSupported: true });
     expect(result.current).toBe("not_setup");
 
-    await act(async () => unlockVaultSession(await createUserVaultKey()));
+    await act(async () => unlockVaultSession(await createNonExtractableSessionVaultKey()));
     rerender({ configured: true, prfSupported: true });
     expect(result.current).toBe("unlocked");
   });

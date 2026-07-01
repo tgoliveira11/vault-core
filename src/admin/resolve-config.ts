@@ -1,5 +1,7 @@
 import { VAULT_CRYPTO_POLICY } from "../crypto/policy.js";
 import type { VaultCryptoProfile } from "../profile.js";
+import { VAULT_CONFIG_KEY_DEFINITIONS } from "./config-keys.js";
+import { applyVaultAdminOverrides } from "./config-overrides.js";
 import { readBoolEnv, readEnumEnv, readIntEnv, readStringEnv } from "./env-parse.js";
 import type {
   VaultAdminConfig,
@@ -16,6 +18,12 @@ const DEFAULT_CRYPTO_PROFILE: VaultCryptoProfile = {
 const DEFAULT_AUTO_LOCK_MINUTES = 15;
 const MIN_AUTO_LOCK_MINUTES = 1;
 const MAX_AUTO_LOCK_MINUTES = 24 * 60;
+
+const DEFAULT_UNLOCK_MAX_FAILURES = 5;
+const DEFAULT_UNLOCK_FAILURE_WINDOW_MINUTES = 15;
+const DEFAULT_UNLOCK_LOCKOUT_MINUTES = 30;
+const DEFAULT_API_MAX_REQUESTS = 120;
+const DEFAULT_API_WINDOW_SECONDS = 60;
 
 function readAutoLockMinutes(env: Record<string, string | undefined>): number {
   const raw =
@@ -79,7 +87,7 @@ export function buildVaultAdminConfigFromEnv(
     input.defaultRecoveryWordCount ??
     readRecoveryWordCount(env, 24);
 
-  return {
+  const baseConfig: VaultAdminConfig = {
     enabled: readBoolEnv(env, "VAULT_ADMIN_ENABLED", false),
     basePath: readStringEnv(env, "VAULT_ADMIN_PATH", "/admin/vault"),
     productName: input.productName ?? readStringEnv(env, "APP_NAME", "Vault App"),
@@ -110,6 +118,36 @@ export function buildVaultAdminConfigFromEnv(
     session: {
       autoLockMinutes: readAutoLockMinutes(env),
     },
+    rateLimit: {
+      unlockMaxFailures: readIntEnv(env, "VAULT_UNLOCK_MAX_FAILURES", DEFAULT_UNLOCK_MAX_FAILURES, {
+        min: 1,
+        max: 100,
+      }),
+      unlockFailureWindowMinutes: readIntEnv(
+        env,
+        "VAULT_UNLOCK_FAILURE_WINDOW_MINUTES",
+        DEFAULT_UNLOCK_FAILURE_WINDOW_MINUTES,
+        { min: 1, max: 24 * 60 }
+      ),
+      unlockLockoutMinutes: readIntEnv(
+        env,
+        "VAULT_UNLOCK_LOCKOUT_MINUTES",
+        DEFAULT_UNLOCK_LOCKOUT_MINUTES,
+        { min: 1, max: 24 * 60 }
+      ),
+      apiMaxRequests: readIntEnv(
+        env,
+        "VAULT_API_RATE_LIMIT_MAX_REQUESTS",
+        DEFAULT_API_MAX_REQUESTS,
+        { min: 1, max: 10_000 }
+      ),
+      apiWindowSeconds: readIntEnv(
+        env,
+        "VAULT_API_RATE_LIMIT_WINDOW_SECONDS",
+        DEFAULT_API_WINDOW_SECONDS,
+        { min: 1, max: 3600 }
+      ),
+    },
     features: {
       adminEnabled: readBoolEnv(env, "VAULT_ADMIN_ENABLED", false),
       passkeyPrfUnlockEnabled: readBoolEnv(env, "VAULT_PASSKEY_PRF_UNLOCK_ENABLED", true),
@@ -117,135 +155,97 @@ export function buildVaultAdminConfigFromEnv(
       recoveryPhrase24WordSupported: true,
     },
   };
+
+  return applyVaultAdminOverrides(baseConfig, input.adminOverrides);
 }
 
 /** Flat list of resolved configuration entries for admin display tables. */
 export function listVaultAdminConfigEntries(
   config: VaultAdminConfig,
-  env: Record<string, string | undefined> = {}
+  env: Record<string, string | undefined> = {},
+  adminOverrides: Record<string, unknown> = {}
 ): VaultAdminConfigEntry[] {
-  const sourceFor = (key: string, defaultValue: unknown): "env" | "default" =>
-    hasEnvValue(env, key) ? "env" : "default";
+  const envHasAutoLock =
+    hasEnvValue(env, "NEXT_PUBLIC_VAULT_AUTO_LOCK_MINUTES") ||
+    hasEnvValue(env, "VAULT_AUTO_LOCK_MINUTES");
 
-  return [
-    {
-      key: "enabled",
-      envVar: "VAULT_ADMIN_ENABLED",
-      label: "Vault admin enabled",
-      description: "Whether vault admin routes are enabled in the consuming app.",
-      group: "admin",
-      value: config.enabled,
-      source: sourceFor("VAULT_ADMIN_ENABLED", false),
-    },
-    {
-      key: "basePath",
-      envVar: "VAULT_ADMIN_PATH",
-      label: "Admin base path",
-      description: "Mount path for vault admin pages.",
-      group: "admin",
-      value: config.basePath,
-      source: sourceFor("VAULT_ADMIN_PATH", "/admin/vault"),
-    },
-    {
-      key: "aadContextVault",
-      envVar: "VAULT_AAD_CONTEXT_VAULT",
-      label: "Vault AAD context",
-      description: "Additional authenticated data context for vault payloads.",
-      group: "crypto_profile",
-      value: config.profile.aadContextVault,
-      source: hasEnvValue(env, "VAULT_AAD_CONTEXT_VAULT") ? "env" : "profile",
-    },
-    {
-      key: "aadContextEnvelope",
-      envVar: "VAULT_AAD_CONTEXT_ENVELOPE",
-      label: "Envelope AAD context",
-      description: "Additional authenticated data context for key envelopes.",
-      group: "crypto_profile",
-      value: config.profile.aadContextEnvelope,
-      source: hasEnvValue(env, "VAULT_AAD_CONTEXT_ENVELOPE") ? "env" : "profile",
-    },
-    {
-      key: "prfSaltPrefix",
-      envVar: "VAULT_PRF_SALT_PREFIX",
-      label: "PRF salt prefix",
-      description: "Passkey PRF salt prefix for vault unlock.",
-      group: "crypto_profile",
-      value: config.prfSaltPrefix,
-      source: sourceFor("VAULT_PRF_SALT_PREFIX", config.prfSaltPrefix),
-    },
-    {
-      key: "defaultRecoveryWordCount",
-      envVar: "VAULT_DEFAULT_RECOVERY_WORD_COUNT",
-      label: "Default recovery word count",
-      description: "Default BIP39 phrase length for new vaults.",
-      group: "crypto_profile",
-      value: config.defaultRecoveryWordCount,
-      source: sourceFor("VAULT_DEFAULT_RECOVERY_WORD_COUNT", config.defaultRecoveryWordCount),
-    },
-    {
-      key: "autoLockMinutes",
-      envVar: "NEXT_PUBLIC_VAULT_AUTO_LOCK_MINUTES",
-      label: "Auto-lock minutes",
-      description: "Inactivity duration before the vault locks.",
-      group: "session",
-      value: config.session.autoLockMinutes,
-      source:
-        hasEnvValue(env, "NEXT_PUBLIC_VAULT_AUTO_LOCK_MINUTES") ||
-        hasEnvValue(env, "VAULT_AUTO_LOCK_MINUTES")
-          ? "env"
-          : "default",
-    },
-    {
-      key: "passwordEnforcement",
-      envVar: "VAULT_PASSWORD_ENFORCEMENT",
-      label: "Password enforcement",
-      description: "Vault password policy enforcement mode.",
-      group: "password_policy",
-      value: config.passwordPolicy.enforcement,
-      source: sourceFor("VAULT_PASSWORD_ENFORCEMENT", "enforce"),
-    },
-    {
-      key: "passwordMinLength",
-      envVar: "VAULT_PASSWORD_MIN_LENGTH",
-      label: "Password min length",
-      description: "Minimum vault password length.",
-      group: "password_policy",
-      value: config.passwordPolicy.minLength,
-      source: sourceFor("VAULT_PASSWORD_MIN_LENGTH", 12),
-    },
-    {
-      key: "passwordMinScore",
-      envVar: "VAULT_PASSWORD_MIN_SCORE",
-      label: "Password min score",
-      description: "Minimum vault password strength score.",
-      group: "password_policy",
-      value: config.passwordPolicy.minScore,
-      source: sourceFor("VAULT_PASSWORD_MIN_SCORE", 2),
-    },
-    {
-      key: "passkeyPrfUnlockEnabled",
-      envVar: "VAULT_PASSKEY_PRF_UNLOCK_ENABLED",
-      label: "Passkey PRF unlock",
-      description: "Whether passkey PRF unlock is enabled.",
-      group: "features",
-      value: config.features.passkeyPrfUnlockEnabled,
-      source: sourceFor("VAULT_PASSKEY_PRF_UNLOCK_ENABLED", true),
-    },
-    {
-      key: "recommendedKdfVersion",
-      label: "Recommended KDF version",
-      description: "KDF version used for new envelopes and auto-upgrade targets.",
-      group: "crypto_profile",
-      value: VAULT_CRYPTO_POLICY.kdf.version,
-      source: "default",
-    },
-    {
-      key: "encryptionAlgorithm",
-      label: "Encryption algorithm",
-      description: "Symmetric encryption algorithm for vault payloads.",
-      group: "crypto_profile",
-      value: VAULT_CRYPTO_POLICY.encryption.alg,
-      source: "default",
-    },
-  ];
+  function sourceFor(key: string, envVar?: string): VaultAdminConfigEntry["source"] {
+    if (Object.prototype.hasOwnProperty.call(adminOverrides, key)) return "admin";
+    if (envVar === "NEXT_PUBLIC_VAULT_AUTO_LOCK_MINUTES" && envHasAutoLock) return "env";
+    if (envVar && hasEnvValue(env, envVar)) return "env";
+    if (
+      (key === "aadContextVault" || key === "aadContextEnvelope") &&
+      envVar &&
+      !hasEnvValue(env, envVar)
+    ) {
+      return "profile";
+    }
+    return "default";
+  }
+
+  function valueForKey(key: string): string | number | boolean {
+    switch (key) {
+      case "enabled":
+        return config.enabled;
+      case "basePath":
+        return config.basePath;
+      case "aadContextVault":
+        return config.profile.aadContextVault;
+      case "aadContextEnvelope":
+        return config.profile.aadContextEnvelope;
+      case "prfSaltPrefix":
+        return config.prfSaltPrefix;
+      case "defaultRecoveryWordCount":
+        return config.defaultRecoveryWordCount;
+      case "autoLockMinutes":
+        return config.session.autoLockMinutes;
+      case "passwordEnforcement":
+        return config.passwordPolicy.enforcement;
+      case "passwordMinLength":
+        return config.passwordPolicy.minLength;
+      case "passwordRequireUppercase":
+        return config.passwordPolicy.requireUppercase;
+      case "passwordRequireLowercase":
+        return config.passwordPolicy.requireLowercase;
+      case "passwordRequireNumber":
+        return config.passwordPolicy.requireNumber;
+      case "passwordRequireSymbol":
+        return config.passwordPolicy.requireSymbol;
+      case "passwordBlockCommonPasswords":
+        return config.passwordPolicy.blockCommonPasswords;
+      case "passwordMinScore":
+        return config.passwordPolicy.minScore;
+      case "passwordStrengthPosition":
+        return config.passwordPolicy.strengthPosition;
+      case "passkeyPrfUnlockEnabled":
+        return config.features.passkeyPrfUnlockEnabled;
+      case "unlockMaxFailures":
+        return config.rateLimit.unlockMaxFailures;
+      case "unlockFailureWindowMinutes":
+        return config.rateLimit.unlockFailureWindowMinutes;
+      case "unlockLockoutMinutes":
+        return config.rateLimit.unlockLockoutMinutes;
+      case "apiMaxRequests":
+        return config.rateLimit.apiMaxRequests;
+      case "apiWindowSeconds":
+        return config.rateLimit.apiWindowSeconds;
+      case "recommendedKdfVersion":
+        return VAULT_CRYPTO_POLICY.kdf.version;
+      case "encryptionAlgorithm":
+        return VAULT_CRYPTO_POLICY.encryption.alg;
+      default:
+        throw new Error(`Unknown vault admin config key: ${key}`);
+    }
+  }
+
+  return VAULT_CONFIG_KEY_DEFINITIONS.map((definition) => ({
+    key: definition.key,
+    envVar: definition.envVar,
+    label: definition.label,
+    description: definition.description,
+    group: definition.group,
+    value: valueForKey(definition.key),
+    source: sourceFor(definition.key, definition.envVar),
+    overridable: definition.overridable,
+  }));
 }

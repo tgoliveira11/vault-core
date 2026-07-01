@@ -28,6 +28,11 @@ The consuming application owns:
 
 Account login must never unlock the vault. Account password reset must never replace vault recovery.
 
+**Agents:** complete the mandatory checklist in
+[CONSUMER_SECURITY_REQUIREMENTS.md](./CONSUMER_SECURITY_REQUIREMENTS.md) before marking vault
+integration done (auth/RBAC on admin APIs, `withVaultUnlockRateLimit` on every unlock code path, CSP,
+`assertNoVaultPlaintextFields`, and programmatic unlock checks — not overlay-only UX).
+
 ## 2. Requirements and installation
 
 - Node.js 20 or newer for build, SSR, and tests.
@@ -258,6 +263,10 @@ export async function unlockWithPassword<T>(input: {
 }
 ```
 
+Prefer **`decryptVaultPayloadWithSchema()`** with an app-owned Zod schema when the payload shape
+is versioned or may have been tampered with after encryption. See
+[docs/CONSUMER_SECURITY_REQUIREMENTS.md](./CONSUMER_SECURITY_REQUIREMENTS.md#runtime-payload-schema-recommended).
+
 Do not expose whether a password failed during KDF derivation versus AES-GCM authentication. Present
 a generic unlock failure to the user. UI throttling can improve local UX but cannot prevent offline
 attacks against copied envelopes, so require a strong vault password and protect ciphertext access.
@@ -392,23 +401,26 @@ import {
 
 configureVaultSession({ autoLockMinutes: 15 });
 
-const removeActivityGuard = registerVaultActivityGuard();
 const removeUnloadGuard = registerVaultUnloadGuard();
 
-unlockVaultSession(vaultKey);
+await unlockVaultSession(vaultKey);
 const currentKey = getSessionVaultKey();
+
+// Optional: renew the countdown on pointer, keyboard, touch, and focus events.
+// const removeActivityGuard = registerVaultActivityGuard();
 
 // On explicit lock or logout:
 lockVaultSession();
 
 // On application teardown:
-removeActivityGuard();
+// removeActivityGuard?.();
 removeUnloadGuard();
 ```
 
 There is no public direct key setter. This ensures unlock, lock, timers, and subscribers remain in
-sync. Call `touchVaultSession()` manually only for meaningful activity not represented by the default
-pointer, keyboard, touch, or focus events.
+sync. By default the auto-lock countdown runs down until lock or an explicit `touchVaultSession()` call
+(for example the vault status dock **Stay unlocked** action). Opt in to activity-based renewal with
+`registerVaultActivityGuard()` when meaningful user activity should extend the session.
 
 ## 12. React session integration
 
@@ -422,7 +434,6 @@ export function AppProviders({ children }: { children: ReactNode }) {
   return (
     <VaultSessionProvider
       sessionConfig={{ autoLockMinutes: 15 }}
-      registerActivityGuard
       registerUnloadGuard
     >
       {children}
@@ -451,6 +462,96 @@ const status = useVaultClientStatus(serverStatus, browserSupportsPrf);
 Avoid mounting both `VaultSessionProvider` and a default `useVaultSession()` solely to register the
 same guards. When the provider owns guards, use the hook with guard registration disabled or call the
 browser lifecycle functions directly.
+
+### Vault protected pages
+
+Wrap vault-gated routes with `VaultProtectedGate` so locked sessions show a blur overlay while page
+content stays mounted. Customize overlay color with `overlayBackground` (sets
+`--vc-vault-lock-overlay-color`) or `overlayClassName`:
+
+```tsx
+import { VaultLockOverlayExclude, VaultProtectedGate } from "@tgoliveira/vault-core/react";
+
+<div>
+  <VaultLockOverlayExclude>
+    <AppHeader>
+      <VaultStatusDock {...dockProps} />
+    </AppHeader>
+  </VaultLockOverlayExclude>
+
+  <VaultProtectedGate
+    configured={vaultConfigured}
+    overlayBackground="color-mix(in srgb, var(--background) 92%, transparent)"
+  >
+    {protectedPageContent}
+  </VaultProtectedGate>
+</div>
+```
+
+`VaultLockOverlayExclude` is optional. When omitted, the overlay covers the full viewport while
+locked. When present, the overlay is carved around each excluded region so navigation, branding, and
+the status dock stay visible and clickable. Consumers may register multiple exclusions (for example
+header and a footer toolbar). You can also set `data-vault-lock-overlay-exclude="true"` on any
+element instead of the wrapper component.
+
+**Security:** The overlay is visual UX only — it blurs content and blocks pointer events in the DOM,
+but it is not a security boundary. Always check vault unlock status in application code before
+decrypting, persisting, or rendering secrets (`useVaultUnlocked()`, `useVaultSession()`, or
+equivalent). Mount `VaultStatusDock` inside an excluded header region for quick unlock while locked.
+
+### Vault unlock page
+
+Mount a dedicated unlock route (for example `/vault/unlock`) with `VaultUnlockPanel` for password,
+recovery phrase, and passkey unlock when configured:
+
+```tsx
+"use client";
+
+import { useRouter, useSearchParams } from "next/navigation";
+import {
+  VaultUnlockPanel,
+  buildVaultUnlockHref,
+  readVaultUnlockReturnPath,
+  useVaultUnlockPageNavigation,
+} from "@tgoliveira/vault-core/react";
+
+const UNLOCK_PATH = "/vault/unlock";
+
+export function VaultUnlockPage() {
+  const router = useRouter();
+  const searchParams = useSearchParams();
+  const returnPath = readVaultUnlockReturnPath(searchParams, { defaultPath: "/vault" });
+
+  useVaultUnlockPageNavigation({
+    configured: vaultConfigured,
+    returnPath,
+    setupPath: "/vault/setup",
+    onNavigate: (path) => router.replace(path),
+  });
+
+  return (
+    <VaultUnlockPanel
+      serverStatus={serverStatus}
+      prfSupported={browserSupportsPrf}
+      passkeyReady={passkeyReadyOnDevice}
+      onUnlockPassword={(password) => unlockWithPassword(password)}
+      onUnlockRecoveryPhrase={(phrase) => unlockWithRecovery(phrase)}
+      onUnlockPasskey={passkeyReadyOnDevice ? () => unlockWithPasskey() : undefined}
+    />
+  );
+}
+```
+
+Link to the unlock page from the status dock or protected gates:
+
+```tsx
+import { buildVaultUnlockHref } from "@tgoliveira/vault-core/react";
+
+const href = buildVaultUnlockHref(UNLOCK_PATH, pathname + search);
+```
+
+The default query parameter is `next` (`VAULT_UNLOCK_RETURN_QUERY_PARAM`). `resolveVaultUnlockReturnPath`
+rejects open redirects — only paths starting with `/` that are not protocol-relative (`//`) are kept.
 
 ## 13. Storage policy and inspection
 
@@ -496,6 +597,50 @@ export function parseVaultSetupRequest(body: unknown) {
 
 This guard is defense in depth, not a complete data-loss-prevention system. Use closed route schemas,
 never log request bodies, and verify the authenticated account owns the AAD `userId` and resource.
+
+### Rate limiting
+
+Use the in-memory limiters from `@tgoliveira/vault-core` to protect expensive unlock work and vault
+HTTP routes. Configure via `VaultAdminConfig.rateLimit` or the `VAULT_UNLOCK_*` and
+`VAULT_API_RATE_LIMIT_*` environment variables.
+
+**Unlock failures** (per scope + method: password, recovery phrase, or passkey PRF):
+
+```ts
+import {
+  createVaultUnlockRateLimiterFromAdminConfig,
+  withVaultUnlockRateLimit,
+} from "@tgoliveira/vault-core";
+
+const unlockLimiter = createVaultUnlockRateLimiterFromAdminConfig(adminConfig);
+
+await withVaultUnlockRateLimit(unlockLimiter, userId, "password", async () => {
+  return unlockVaultFromPasswordEnvelope({ password, envelope, profile });
+});
+```
+
+Pass `unlockRateLimiter` and `rateLimitScopeKey` to `VaultUnlockPanel` / `VaultDockQuickUnlock` for
+built-in assert/record behavior. **Also** wrap every direct call to envelope unlock APIs with
+`withVaultUnlockRateLimit()` — UI props alone are bypassable.
+
+**Vault HTTP APIs** (per namespace + client key, e.g. client IP):
+
+```ts
+import {
+  buildVaultRateLimitHttpResponse,
+  consumeVaultApiRateLimit,
+  createVaultApiRateLimiterFromAdminConfig,
+} from "@tgoliveira/vault-core";
+
+const apiLimiter = createVaultApiRateLimiterFromAdminConfig(adminConfig);
+const decision = consumeVaultApiRateLimit(apiLimiter, "vault-admin-config", clientIp);
+if (!decision.allowed) {
+  const limited = buildVaultRateLimitHttpResponse(decision);
+  return Response.json(limited.body, { status: limited.status, headers: limited.headers });
+}
+```
+
+Defaults: 5 failed unlocks / 15 minutes with a 30-minute lockout; 120 API requests / 60 seconds.
 
 ## 15. Password and recovery rotation
 
@@ -563,6 +708,7 @@ Expected domain errors include:
 - `RecoveryPhraseConfirmationError`
 - `VaultConflictError`
 - `VaultNotFoundError`
+- `VaultRateLimitError` — unlock or API rate limit exceeded (`retryAfterMs`, `resetAtMs`)
 
 Web Crypto, JSON parsing, Zod, and Argon2id validation may also throw standard errors. Convert detailed
 internal failures into generic user-facing unlock messages. Never include entered secrets, decrypted

@@ -1,4 +1,23 @@
 export {
+  VAULT_CONFIG_KEY_DEFINITIONS,
+  VAULT_OVERRIDABLE_CONFIG_KEYS,
+  getVaultConfigKeyDefinition,
+  isVaultOverridableConfigKey,
+  validateVaultAdminOverride,
+  type VaultConfigKeyDefinition,
+  type VaultOverridableConfigKey,
+} from "./config-keys.js";
+export {
+  applyVaultAdminOverrides,
+  type VaultAdminConfigOverrideRecord,
+} from "./config-overrides.js";
+export {
+  VAULT_ADMIN_CONFIG_OVERRIDES_TABLE,
+  getVaultAdminConfigOverrideSchemaSql,
+  type VaultAdminConfigOverrideRow,
+  type VaultAdminConfigOverrideSchemaSqlOptions,
+} from "./persistence-schema.js";
+export {
   VAULT_ADMIN_ENV_CATALOG,
   buildVaultEnvLocalTemplate,
   type VaultAdminEnvVarDefinition,
@@ -29,6 +48,7 @@ export type {
   VaultAdminFeatureFlags,
   VaultAdminPasswordPolicy,
   VaultAdminPaths,
+  VaultAdminRateLimitConfig,
   VaultAdminSection,
   VaultAdminSessionConfig,
   VaultPasswordEnforcement,

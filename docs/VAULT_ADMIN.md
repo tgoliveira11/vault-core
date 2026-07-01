@@ -89,3 +89,36 @@ Pass `LinkComponent={Link}` from `next/link` to avoid full page reloads:
 ```tsx
 <VaultAdminPanelPage config={config} LinkComponent={Link} />
 ```
+
+## Runtime overrides (editable config)
+
+To enable editing on `VaultAdminConfigPage`, the consuming app must:
+
+1. Implement `GET/POST/DELETE {configApiBase}/admin/config` (see consumer-demo
+   `src/app/api/vault/admin/config/route.ts`).
+2. Persist overrides in an app-owned database using the reference schema below.
+3. Pass `configApiBase` and load `adminOverrides` into `buildVaultAdminConfigFromEnv({ adminOverrides })`.
+
+### Reference PostgreSQL schema
+
+Shipped with the package:
+
+| Artifact | Location |
+| --- | --- |
+| SQL file | `docs/schemas/vault_admin_config_overrides.sql` (in npm tarball under `docs/`) |
+| Helper | `getVaultAdminConfigOverrideSchemaSql()` from `@tgoliveira/vault-core` |
+| Table constant | `VAULT_ADMIN_CONFIG_OVERRIDES_TABLE` |
+
+```ts
+import {
+  getVaultAdminConfigOverrideSchemaSql,
+  VAULT_ADMIN_CONFIG_OVERRIDES_TABLE,
+} from "@tgoliveira/vault-core";
+
+// Migration tool or bootstrap:
+await sql.unsafe(getVaultAdminConfigOverrideSchemaSql());
+```
+
+Default table columns: `key` (text PK), `value` (jsonb), `updated_at` (timestamptz).
+
+Without `configApiBase`, all admin screens remain read-only (env-resolved config).

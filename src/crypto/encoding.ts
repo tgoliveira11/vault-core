@@ -1,3 +1,5 @@
+import { VaultPayloadSizeError } from "../errors/vault-errors.js";
+
 export function bytesToBase64Url(bytes: Uint8Array): string {
   let binary = "";
   for (const byte of bytes) {
@@ -14,6 +16,38 @@ export function base64UrlToBytes(base64url: string): Uint8Array {
   for (let i = 0; i < binary.length; i++) {
     bytes[i] = binary.charCodeAt(i);
   }
+  return bytes;
+}
+
+function maxBase64UrlEncodedLength(maxBytes: number): number {
+  return Math.ceil(maxBytes / 3) * 4;
+}
+
+/**
+ * Decodes base64url after bounding encoded length and decoded byte count.
+ * @throws {import("../errors/vault-errors.js").VaultPayloadSizeError}
+ */
+export function decodeBoundedBase64Url(input: string, maxBytes: number): Uint8Array {
+  const maxEncodedLength = maxBase64UrlEncodedLength(maxBytes);
+  if (input.length > maxEncodedLength) {
+    throw new VaultPayloadSizeError(
+      `Base64url field exceeds maximum encoded length (${maxEncodedLength})`
+    );
+  }
+
+  let bytes: Uint8Array;
+  try {
+    bytes = base64UrlToBytes(input);
+  } catch {
+    throw new VaultPayloadSizeError("Invalid base64url field");
+  }
+
+  if (bytes.byteLength > maxBytes) {
+    throw new VaultPayloadSizeError(
+      `Decoded field exceeds maximum size (${maxBytes} bytes)`
+    );
+  }
+
   return bytes;
 }
 
