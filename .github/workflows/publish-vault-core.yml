@@ -21,6 +21,8 @@ jobs:
     if: github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
     environment: npmjs
+    env:
+      GH_TOKEN: ${{ github.token }}
 
     steps:
       - name: Checkout main with tags
@@ -137,7 +139,6 @@ jobs:
 
       - name: Create GitHub release notes
         env:
-          GH_TOKEN: ${{ github.token }}
           RELEASE_VERSION: ${{ steps.release.outputs.version }}
         run: |
           TAG="vault-core-v${RELEASE_VERSION}"
@@ -153,7 +154,19 @@ jobs:
         run: |
           PACKAGE_NAME=$(node -p "require('./package.json').name")
           TAG="vault-core-v${RELEASE_VERSION}"
-          npm view "${PACKAGE_NAME}@${RELEASE_VERSION}" version >/dev/null
+
+          for attempt in 1 2 3 4 5; do
+            if npm view "${PACKAGE_NAME}@${RELEASE_VERSION}" version >/dev/null 2>&1; then
+              break
+            fi
+            if [ "$attempt" -eq 5 ]; then
+              echo "npm registry does not yet expose ${PACKAGE_NAME}@${RELEASE_VERSION}"
+              exit 1
+            fi
+            echo "Waiting for npm registry propagation (attempt ${attempt}/5)..."
+            sleep 10
+          done
+
           git rev-parse "refs/tags/${TAG}" >/dev/null
           gh release view "${TAG}" >/dev/null
           echo "Release invariant satisfied for ${PACKAGE_NAME}@${RELEASE_VERSION}, tag ${TAG}"
