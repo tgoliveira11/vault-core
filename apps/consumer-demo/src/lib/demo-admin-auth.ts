@@ -1,5 +1,3 @@
-import { createHmac, timingSafeEqual } from "node:crypto";
-
 export const DEMO_ADMIN_COOKIE = "vault-demo-admin-session";
 
 export const DEMO_ADMIN_COOKIE_MAX_AGE_SECONDS = 60 * 60 * 8;
@@ -20,23 +18,51 @@ function getDemoAdminSessionSecret(): string {
   return secret;
 }
 
+function base64UrlEncode(bytes: Uint8Array): string {
+  let binary = "";
+  for (const byte of bytes) {
+    binary += String.fromCharCode(byte);
+  }
+  return btoa(binary).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
+}
+
+function timingSafeEqualStrings(a: string, b: string): boolean {
+  if (a.length !== b.length) return false;
+  let diff = 0;
+  for (let i = 0; i < a.length; i++) {
+    diff |= a.charCodeAt(i) ^ b.charCodeAt(i);
+  }
+  return diff === 0;
+}
+
+async function importDemoAdminHmacKey(secret: string): Promise<CryptoKey> {
+  return crypto.subtle.importKey(
+    "raw",
+    new TextEncoder().encode(secret),
+    { name: "HMAC", hash: "SHA-256" },
+    false,
+    ["sign"]
+  );
+}
+
 export function isDemoAdminEmailAuthorized(email: string): boolean {
   return email.trim().toLowerCase() === getDemoAdminEmail();
 }
 
-export function createDemoAdminSessionToken(email: string): string {
+export async function createDemoAdminSessionToken(email: string): Promise<string> {
   const normalized = email.trim().toLowerCase();
-  return createHmac("sha256", getDemoAdminSessionSecret()).update(normalized).digest("base64url");
+  const key = await importDemoAdminHmacKey(getDemoAdminSessionSecret());
+  const signature = await crypto.subtle.sign("HMAC", key, new TextEncoder().encode(normalized));
+  return base64UrlEncode(new Uint8Array(signature));
 }
 
-export function hasValidDemoAdminSession(cookieValue: string | undefined | null): boolean {
+export async function hasValidDemoAdminSession(
+  cookieValue: string | undefined | null
+): Promise<boolean> {
   if (!cookieValue) return false;
   try {
-    const expected = createDemoAdminSessionToken(getDemoAdminEmail());
-    const actual = Buffer.from(cookieValue);
-    const reference = Buffer.from(expected);
-    if (actual.length !== reference.length) return false;
-    return timingSafeEqual(actual, reference);
+    const expected = await createDemoAdminSessionToken(getDemoAdminEmail());
+    return timingSafeEqualStrings(cookieValue, expected);
   } catch {
     return false;
   }

@@ -38,6 +38,8 @@ Exported from main entry — app maps `process.env`; package never reads env dir
 
 - `buildVaultAdminConfigFromEnv`, `listVaultAdminConfigEntries`
 - `applyVaultAdminOverrides`, `validateVaultAdminOverride`, `VAULT_OVERRIDABLE_CONFIG_KEYS`, `VAULT_CONFIG_KEY_DEFINITIONS`
+- Persistence contract: `getVaultAdminConfigOverrideSchemaSql()`, `VAULT_ADMIN_CONFIG_OVERRIDES_TABLE`,
+  `docs/schemas/vault_admin_config_overrides.sql` (PostgreSQL reference for app-owned migrations)
 - Rate limiting: `createVaultUnlockRateLimiter()`, `createVaultApiRateLimiter()`, `VaultRateLimitError`, `withVaultUnlockRateLimit()`, `buildVaultRateLimitHttpResponse()`
 - `VAULT_ADMIN_ENV_CATALOG`, `buildVaultEnvLocalTemplate`
 - `resolveVaultAdminPaths`, `listVaultAdminScreens`, `DEFAULT_VAULT_ADMIN_PATHS`
@@ -67,6 +69,22 @@ decryption in admin pages.
 
 - `VaultSessionProvider`, `useVaultSession`, `useVaultUnlocked`, `useVaultLockState`
 - `resolveVaultClientStatus`, `useVaultClientStatus`
+- `VaultAutoLockPreferenceField`, `useVaultAutoLockPreference` — per-user auto-lock slider (1 min …
+  admin ceiling); priority **user → admin → env → default**
+- `VaultPasswordStrengthFeedback` — read-only current-password strength (settings / awareness)
+
+## Browser session preferences (shipped)
+
+Exported from `@tgoliveira/vault-core/browser`:
+
+| Export | Purpose |
+| --- | --- |
+| `resolveVaultAutoLockMinutesPreference` | Layered auto-lock resolution (user → admin → env → default) |
+| `readUserVaultAutoLockMinutes` / `writeUserVaultAutoLockMinutes` / `clearUserVaultAutoLockMinutes` | Persist user auto-lock minutes in `localStorage` |
+| `clampVaultAutoLockMinutes` / `VAULT_USER_AUTO_LOCK_MIN_MINUTES` | Clamp user choice to 1 … admin max |
+
+Wire `VaultSessionProvider` `sessionConfig.resolveAutoLockMinutes` to return the user preference
+when set (see consumer-demo `Providers`).
 
 ## Vault status dock (shipped)
 

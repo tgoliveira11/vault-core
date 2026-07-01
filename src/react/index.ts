@@ -18,6 +18,16 @@ export {
   type VaultSessionProviderProps,
 } from "./session/vault-session-provider.js";
 
+export {
+  VaultAutoLockPreferenceField,
+  type VaultAutoLockPreferenceFieldProps,
+} from "./session/vault-auto-lock-preference-field.js";
+
+export {
+  useVaultAutoLockPreference,
+  type UseVaultAutoLockPreferenceResult,
+} from "./session/use-vault-auto-lock-preference.js";
+
 export * from "./admin/index.js";
 export * from "./password/index.js";
 export * from "./protected-gate/index.js";

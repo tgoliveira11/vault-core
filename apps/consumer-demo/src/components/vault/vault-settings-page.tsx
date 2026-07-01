@@ -6,7 +6,12 @@ import { useCallback, useEffect, useState } from "react";
 import { assertRecoveryPhraseConfirmation } from "@tgoliveira/vault-core";
 import type { RecoveryPhraseWordCount, VaultAdminPasswordPolicy } from "@tgoliveira/vault-core";
 import { validateVaultPasswordSetup } from "@tgoliveira/vault-core";
-import { VaultPasswordSetupFields } from "@tgoliveira/vault-core/react";
+import {
+  VaultAutoLockPreferenceField,
+  VaultPasswordField,
+  VaultPasswordSetupFields,
+  useVaultAutoLockPreference,
+} from "@tgoliveira/vault-core/react";
 import { AppShell } from "@/components/app-shell";
 import { getDemoPasskeySupport } from "@/lib/vault-demo-passkey";
 import {
@@ -37,16 +42,19 @@ export function VaultSettingsPage({
   recoveryWordCount,
   passkeyPrfUnlockEnabled,
   passwordPolicy,
+  adminAutoLockMinutes,
 }: {
   recoveryWordCount: RecoveryPhraseWordCount;
   passkeyPrfUnlockEnabled: boolean;
   passwordPolicy: VaultAdminPasswordPolicy;
+  adminAutoLockMinutes: number;
 }) {
   return (
     <VaultSettingsContent
       recoveryWordCount={recoveryWordCount}
       passkeyPrfUnlockEnabled={passkeyPrfUnlockEnabled}
       passwordPolicy={passwordPolicy}
+      adminAutoLockMinutes={adminAutoLockMinutes}
     />
   );
 }
@@ -55,10 +63,12 @@ function VaultSettingsContent({
   recoveryWordCount,
   passkeyPrfUnlockEnabled,
   passwordPolicy,
+  adminAutoLockMinutes,
 }: {
   recoveryWordCount: RecoveryPhraseWordCount;
   passkeyPrfUnlockEnabled: boolean;
   passwordPolicy: VaultAdminPasswordPolicy;
+  adminAutoLockMinutes: number;
 }) {
   const router = useRouter();
   const [snapshot, setSnapshot] = useState<VaultSecuritySnapshot | null>(null);
@@ -135,6 +145,8 @@ function VaultSettingsContent({
               </li>
             </ul>
           </section>
+
+          <AutoLockSection adminAutoLockMinutes={adminAutoLockMinutes} />
 
           <PasswordChangeSection
             busy={busy}
@@ -253,16 +265,17 @@ function PasswordChangeSection({
       <p className="vc-admin-card-desc">
         Re-wraps the same UVK with a new password via <code>rotateVaultPassword()</code>.
       </p>
-      <label className="block text-sm">
-        <span className="mb-1 block font-medium">Current password</span>
-        <input
-          type="password"
-          className="vc-admin-input w-full"
-          value={currentPassword}
-          onChange={(event) => setCurrentPassword(event.target.value)}
-          autoComplete="current-password"
-        />
-      </label>
+      <VaultPasswordField
+        label="Current password"
+        value={currentPassword}
+        onChange={setCurrentPassword}
+        policy={passwordPolicy}
+        autoComplete="current-password"
+        showRequirements={false}
+        showStrengthWhenEnforcementOff
+        strengthLabelPrefix="Current password strength"
+        emptyStrengthHint="Enter your current password to see how strong it is."
+      />
       <VaultPasswordSetupFields
         password={newPassword}
         confirmation={confirmPassword}
@@ -286,6 +299,42 @@ function PasswordChangeSection({
       >
         Update vault password
       </button>
+    </section>
+  );
+}
+
+function AutoLockSection({ adminAutoLockMinutes }: { adminAutoLockMinutes: number }) {
+  const {
+    minutes,
+    setMinutes,
+    resetToAdminDefault,
+    adminMaxMinutes,
+    usingUserPreference,
+  } = useVaultAutoLockPreference(adminAutoLockMinutes);
+
+  return (
+    <section className="vc-admin-card space-y-3">
+      <h2 className="vc-admin-card-title">Auto-lock</h2>
+      <p className="vc-admin-card-desc">
+        Lock the vault after a period of inactivity. Your preference overrides the organization
+        default when set (priority: your choice → admin → environment → package default).
+      </p>
+      <VaultAutoLockPreferenceField
+        value={minutes}
+        onChange={setMinutes}
+        adminMaxMinutes={adminMaxMinutes}
+        adminDefaultMinutes={adminAutoLockMinutes}
+        usingUserPreference={usingUserPreference}
+      />
+      {usingUserPreference ? (
+        <button
+          type="button"
+          className="rounded-md border border-[var(--border)] px-4 py-2 text-sm"
+          onClick={resetToAdminDefault}
+        >
+          Use organization default ({adminAutoLockMinutes} min)
+        </button>
+      ) : null}
     </section>
   );
 }

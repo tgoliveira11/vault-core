@@ -128,6 +128,17 @@ export {
 } from "./session/vault-deletion.js";
 
 export {
+  clampVaultAutoLockMinutes,
+  clearUserVaultAutoLockMinutes,
+  DEFAULT_USER_VAULT_AUTO_LOCK_STORAGE_KEY,
+  readUserVaultAutoLockMinutes,
+  resolveVaultAutoLockMinutesPreference,
+  writeUserVaultAutoLockMinutes,
+  VAULT_USER_AUTO_LOCK_MIN_MINUTES,
+  type ResolveVaultAutoLockMinutesOptions,
+} from "./session/user-auto-lock-preference.js";
+
+export {
   configureVaultSession,
   subscribeVaultSession,
   isVaultManuallyLocked,

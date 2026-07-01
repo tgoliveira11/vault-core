@@ -9,6 +9,7 @@ export default async function VaultSettingsRoute() {
       recoveryWordCount={config.defaultRecoveryWordCount}
       passkeyPrfUnlockEnabled={config.features.passkeyPrfUnlockEnabled}
       passwordPolicy={config.passwordPolicy}
+      adminAutoLockMinutes={config.session.autoLockMinutes}
     />
   );
 }

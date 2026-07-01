@@ -74,6 +74,40 @@ describe("VaultPasswordField", () => {
     expect(screen.queryByText(/Strength:/)).toBeNull();
   });
 
+  it("shows current-password awareness strength even when enforcement is off", () => {
+    render(
+      <VaultPasswordField
+        label="Current password"
+        value="Riverstone-Kettle-2026!"
+        onChange={() => {}}
+        policy={{ ...policy, enforcement: "off" }}
+        showRequirements={false}
+        showStrengthWhenEnforcementOff
+        strengthLabelPrefix="Current password strength"
+        emptyStrengthHint="Enter your current password to see how strong it is."
+      />
+    );
+
+    expect(screen.getByText(/Current password strength:/)).toBeTruthy();
+    expect(screen.queryByText(/At least 12 characters/)).toBeNull();
+  });
+
+  it("shows empty strength hint for awareness fields", () => {
+    render(
+      <VaultPasswordField
+        label="Current password"
+        value=""
+        onChange={() => {}}
+        policy={policy}
+        showRequirements={false}
+        showStrengthWhenEnforcementOff
+        emptyStrengthHint="Enter your current password to see how strong it is."
+      />
+    );
+
+    expect(screen.getByText(/Enter your current password to see how strong it is/i)).toBeTruthy();
+  });
+
   it("reports validity changes", () => {
     const onValidityChange = vi.fn();
     const { rerender } = render(

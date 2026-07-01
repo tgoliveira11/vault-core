@@ -10,6 +10,9 @@ API changes increment the minor version.
 
 ### Added
 
+- Reference PostgreSQL schema for runtime admin config overrides:
+  `getVaultAdminConfigOverrideSchemaSql()`, `VAULT_ADMIN_CONFIG_OVERRIDES_TABLE`, and
+  `docs/schemas/vault_admin_config_overrides.sql` (for consuming-app migrations).
 - Reusable rate-limit primitives exported from `@tgoliveira/vault-core`:
   `createFixedWindowRateLimiter()`, vault unlock failure limiter (`createVaultUnlockRateLimiter()`,
   `assertVaultUnlockAllowed()`, `withVaultUnlockRateLimit()`), and vault HTTP API limiter
@@ -31,8 +34,15 @@ API changes increment the minor version.
 - `configApiBase` and `adminOverrides` props on `VaultAdminPageProps`.
 - Vault password policy assessment helpers: `assessVaultPassword()`, `validateVaultPasswordAgainstPolicy()`,
   `validateVaultPasswordSetup()`, and related requirement/strength utilities.
-- React components `VaultPasswordField` and `VaultPasswordSetupFields` exported from
+- `VaultPasswordField` and `VaultPasswordSetupFields` exported from
   `@tgoliveira/vault-core/react` (strength score, enforcement mode, requirement checklist).
+- `VaultPasswordField` awareness props for current-password fields:
+  `showRequirements={false}`, `showStrengthWhenEnforcementOff`, `strengthLabelPrefix`, `emptyStrengthHint`.
+- `VaultPasswordStrengthFeedback` — read-only strength display for an existing vault password
+  (awareness on settings / change-password flows; does not block submit).
+- Per-user auto-lock preference: `resolveVaultAutoLockMinutesPreference()`, localStorage helpers on
+  `@tgoliveira/vault-core/browser`; `VaultAutoLockPreferenceField`, `useVaultAutoLockPreference` on
+  `@tgoliveira/vault-core/react` (slider 1 min … admin max; priority user → admin → env → default).
 - Browser vault deletion helpers: `deleteVaultAfterAuthorization()` and
   `deleteVaultWithPasswordAuthorization()` — apps pass a `purgePersistedVault` callback for
   envelope/payload removal; vault-core clears in-memory session state.

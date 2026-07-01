@@ -31,6 +31,15 @@ Postgres listens on **host port 5437** (container 5432):
 Copy `.env.example` to `.env.local` (includes `DATABASE_URL`, `VAULT_ADMIN_ENABLED=true`, and
 `DEMO_ADMIN_EMAIL` for the mock admin gate).
 
+Apply the vault admin overrides schema (from `@tgoliveira/vault-core`):
+
+```bash
+npm run db:migrate
+```
+
+Reference SQL also ships at `docs/schemas/vault_admin_config_overrides.sql` in the vault-core repo
+(or `getVaultAdminConfigOverrideSchemaSql()` from the package).
+
 ## Run locally
 
 ```bash

@@ -193,6 +193,10 @@ New code should use the canonical APIs. Deprecated unlock aliases use the curren
 - `registerVaultActivityGuard(events?)` — opt-in; renews the countdown on pointer, keyboard, touch, and focus events
 - `registerVaultUnloadGuard()`
 - `resetVaultSessionLockState()`
+- Per-user auto-lock preference (localStorage): `readUserVaultAutoLockMinutes()`,
+  `writeUserVaultAutoLockMinutes()`, `clearUserVaultAutoLockMinutes()`,
+  `resolveVaultAutoLockMinutesPreference({ userMinutes, adminMinutes, envMinutes, defaultMinutes })`,
+  `clampVaultAutoLockMinutes()`, `VAULT_USER_AUTO_LOCK_MIN_MINUTES` (1)
 - `deleteVaultAfterAuthorization(options)` / `deleteVaultWithPasswordAuthorization(options)`
 - `VaultSessionConfig`
 
@@ -230,6 +234,12 @@ Provider and session hook guard options are `registerActivityGuard` (defaults to
 `registerUnloadGuard` (defaults to `true`). Set `registerActivityGuard` when the app should renew the
 auto-lock countdown on user activity; otherwise call `touchVaultSession()` explicitly (for example from
 the vault status dock **Stay unlocked** action).
+
+### Vault password and session preferences
+
+- `VaultPasswordStrengthFeedback` — read-only strength line for an existing password (settings flows)
+- `VaultAutoLockPreferenceField` — range slider for per-user auto-lock minutes (1 … admin max)
+- `useVaultAutoLockPreference(adminResolvedMinutes)` — read/write user preference and sync session
 
 ### Vault admin UI
 
@@ -344,6 +354,10 @@ paths, and empty values fall back to `defaultPath` (default `/`).
 ## Admin config: `@tgoliveira/vault-core`
 
 - `buildVaultAdminConfigFromEnv(input)` — resolve config from app-owned env record (never reads `process.env` in-package)
+- `getVaultAdminConfigOverrideSchemaSql(options?)` — PostgreSQL DDL for the runtime overrides table
+  (default table `vault_admin_config_overrides`: `key`, `value` jsonb, `updated_at`)
+- `VAULT_ADMIN_CONFIG_OVERRIDES_TABLE` — default table name constant
+- Reference SQL file: `docs/schemas/vault_admin_config_overrides.sql` (shipped in npm tarball)
 - `listVaultAdminConfigEntries(config, env?)`
 - `VAULT_ADMIN_ENV_CATALOG`, `buildVaultEnvLocalTemplate(productName?)`
 - `DEFAULT_VAULT_ADMIN_PATHS`, `resolveVaultAdminPaths(basePath?)`, `listVaultAdminScreens()`, `VAULT_ADMIN_SECTIONS`

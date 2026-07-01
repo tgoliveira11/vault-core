@@ -26,6 +26,14 @@ export type VaultPasswordFieldProps = {
   className?: string;
   onValidityChange?: (valid: boolean, result: VaultPasswordValidationResult) => void;
   showStrength?: boolean;
+  /** Shows the strength meter even when policy.enforcement is "off". */
+  showStrengthWhenEnforcementOff?: boolean;
+  /** Hides the requirement checklist (for current-password awareness fields). */
+  showRequirements?: boolean;
+  /** Prefix before the strength label (default: "Strength"). */
+  strengthLabelPrefix?: string;
+  /** Hint shown while the field is empty (awareness fields). */
+  emptyStrengthHint?: string;
   hint?: string;
 };
 
@@ -48,14 +56,22 @@ function VaultPasswordFeedback({
   policy,
   validation,
   showStrength,
+  showRequirements = true,
+  strengthLabelPrefix = "Strength",
+  emptyStrengthHint,
   hint,
 }: {
   policy: VaultAdminPasswordPolicy;
   validation: VaultPasswordValidationResult;
   showStrength: boolean;
+  showRequirements?: boolean;
+  strengthLabelPrefix?: string;
+  emptyStrengthHint?: string;
   hint?: string;
 }) {
-  const enforcementMessage = getVaultPasswordEnforcementMessage(policy);
+  const enforcementMessage = showRequirements
+    ? getVaultPasswordEnforcementMessage(policy)
+    : null;
   const staticRequirements = getVaultPasswordPolicyRequirements(policy);
   const requirements =
     validation.strength === "empty"
@@ -70,12 +86,15 @@ function VaultPasswordFeedback({
       {validation.strength === "empty" && hint ? (
         <p className="vc-password-feedback-hint">{hint}</p>
       ) : null}
+      {validation.strength === "empty" && emptyStrengthHint ? (
+        <p className="vc-password-feedback-hint">{emptyStrengthHint}</p>
+      ) : null}
       {showStrength && validation.strength !== "empty" ? (
         <p className={`vc-password-strength ${strengthClass(validation.strength)}`}>
-          Strength: {validation.strengthLabel} · score {validation.score}/4
+          {strengthLabelPrefix}: {validation.strengthLabel} · score {validation.score}/4
         </p>
       ) : null}
-      {requirements.length > 0 ? (
+      {showRequirements && requirements.length > 0 ? (
         <ul className="vc-password-requirements">
           {requirements.map((requirement) => (
             <li
@@ -113,21 +132,30 @@ export function VaultPasswordField({
   className,
   onValidityChange,
   showStrength = true,
+  showStrengthWhenEnforcementOff = false,
+  showRequirements = true,
+  strengthLabelPrefix = "Strength",
+  emptyStrengthHint,
   hint,
 }: VaultPasswordFieldProps) {
   const generatedId = useId();
   const fieldId = id ?? generatedId;
-  const showStrengthFeedback = showStrength && shouldShowVaultPasswordStrengthUi(policy);
+  const showStrengthFeedback =
+    showStrength &&
+    (showStrengthWhenEnforcementOff || shouldShowVaultPasswordStrengthUi(policy));
   const validation = useMemo(
     () => validateVaultPasswordAgainstPolicy(value, policy),
     [value, policy]
   );
-  const resolvedHint = hint ?? getVaultPasswordPolicyHint(policy);
+  const resolvedHint = hint ?? (showRequirements ? getVaultPasswordPolicyHint(policy) : undefined);
   const feedback = (
     <VaultPasswordFeedback
       policy={policy}
       validation={validation}
       showStrength={showStrengthFeedback}
+      showRequirements={showRequirements}
+      strengthLabelPrefix={strengthLabelPrefix}
+      emptyStrengthHint={emptyStrengthHint}
       hint={resolvedHint}
     />
   );

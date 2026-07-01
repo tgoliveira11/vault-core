@@ -12,6 +12,12 @@ export {
   type VaultAdminConfigOverrideRecord,
 } from "./config-overrides.js";
 export {
+  VAULT_ADMIN_CONFIG_OVERRIDES_TABLE,
+  getVaultAdminConfigOverrideSchemaSql,
+  type VaultAdminConfigOverrideRow,
+  type VaultAdminConfigOverrideSchemaSqlOptions,
+} from "./persistence-schema.js";
+export {
   VAULT_ADMIN_ENV_CATALOG,
   buildVaultEnvLocalTemplate,
   type VaultAdminEnvVarDefinition,
