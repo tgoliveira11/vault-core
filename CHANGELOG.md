@@ -8,6 +8,8 @@ API changes increment the minor version.
 
 ## [Unreleased]
 
+## [1.0.0] - 2026-07-01
+
 ### Security
 
 - `assertInnerVaultKeyBlobMatchesVaultKey()` validates reused `innerVaultKeyBlob` material during envelope wrap.
