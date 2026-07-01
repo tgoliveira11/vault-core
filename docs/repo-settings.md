@@ -48,27 +48,12 @@ Either:
 | --- | --- |
 | Environment name | `npmjs` |
 | Deployment branches | `main` only |
-| Required reviewers | Owner preference (default: none; current: `tgoliveira11`) |
+| Required reviewers | **None** — publish runs immediately on `workflow_dispatch` |
 
 ### Inspect environment
 
 ```bash
 gh api repos/tgoliveira11/vault-core/environments/npmjs
-```
-
-### Approve a pending deployment (when reviewers are configured)
-
-```bash
-RUN_ID=<workflow-run-id>
-ENV_ID=$(gh api repos/tgoliveira11/vault-core/environments/npmjs --jq .id)
-gh api --method POST "repos/tgoliveira11/vault-core/actions/runs/${RUN_ID}/pending_deployments" \
-  --input - <<EOF
-{
-  "environment_ids": [$ENV_ID],
-  "comment": "Approve npm publish",
-  "state": "approved"
-}
-EOF
 ```
 
 ### Restrict deployments to `main`
