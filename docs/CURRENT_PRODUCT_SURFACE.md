@@ -28,6 +28,7 @@ Last reviewed: **2026-07-01** (package version **0.3.0**, unreleased vault delet
 - Password rotation (`rotateVaultPassword`)
 - Recovery phrase rotation (`rotateRecoveryPhrase`)
 - Vault deletion after authorization (`deleteVaultAfterAuthorization`, `deleteVaultWithPasswordAuthorization` on browser entry)
+- Runtime vault payload validation (`decryptVaultPayloadWithSchema`, `VaultPayloadValidationError`)
 - Auto-upgrade legacy KDF on unlock
 - Plaintext rejection / sentinel validation
 - Canonical crypto policy (`VAULT_CRYPTO_POLICY`) + CI guard

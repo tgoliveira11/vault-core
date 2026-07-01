@@ -13,13 +13,32 @@ export type DeleteVaultAfterAuthorizationOptions = {
   purgePersistedVault: () => void | Promise<void>;
 };
 
+let deleteVaultAfterAuthorizationWarned = false;
+
+/** @internal Resets the one-time browser warning between tests. */
+export function resetDeleteVaultAfterAuthorizationWarningForTests(): void {
+  deleteVaultAfterAuthorizationWarned = false;
+}
+
 /**
  * Completes vault deletion after the caller has verified authorization.
  * Clears in-memory session state so the client returns to an unconfigured vault state.
+ *
+ * **Security:** The caller MUST verify authorization (vault password, recovery phrase, passkey,
+ * or equivalent) before invoking this helper. It performs no credential checks. Prefer
+ * {@link deleteVaultWithPasswordAuthorization} when the user supplies the current vault password.
  */
 export async function deleteVaultAfterAuthorization(
   options: DeleteVaultAfterAuthorizationOptions
 ): Promise<void> {
+  if (typeof window !== "undefined" && !deleteVaultAfterAuthorizationWarned) {
+    deleteVaultAfterAuthorizationWarned = true;
+    console.warn(
+      "[vault-core] deleteVaultAfterAuthorization() does not verify credentials. " +
+        "Confirm authorization in application code or use deleteVaultWithPasswordAuthorization()."
+    );
+  }
+
   await options.purgePersistedVault();
   lockVaultSession();
   resetVaultSessionLockState();

@@ -29,6 +29,7 @@ For complete workflows, use [`docs/IMPLEMENTATION_GUIDE.md`](docs/IMPLEMENTATION
 | `generateAesKey()`, `importAesKey()`, `exportAesKey()` | Low-level AES key primitives |
 | `encryptVaultPayload(payload, key, scope, profile)` | Serializes and encrypts generic JSON |
 | `decryptVaultPayload(encrypted, key, expectedScope, profile)` | Validates expected AAD, decrypts, and parses JSON |
+| `decryptVaultPayloadWithSchema(encrypted, key, expectedScope, profile, schema)` | Same as above, then validates parsed JSON with a Zod schema |
 | `encryptField(plaintext, key, aad, profile)` | Low-level string encryption |
 | `decryptField(encrypted, key)` | Low-level compatibility decrypt without expected-scope validation |
 | `canonicalAadString(aad)` | Produces canonical AAD JSON |
@@ -163,6 +164,8 @@ are still required.
 - `VaultPasswordUnchangedError`
 - `VaultRateLimitError`
 - `VaultKeyNotExtractableError`
+- `VaultPayloadSizeError` — IV/ciphertext exceeds bounded decode limits
+- `VaultPayloadValidationError` — decrypted vault JSON failed Zod schema validation
 - `VaultCoreError`
 
 ### Deprecated migration aliases
@@ -182,7 +185,7 @@ New code should use the canonical APIs. Deprecated unlock aliases use the curren
 ### Session lifecycle
 
 - `configureVaultSession(config)`
-- `unlockVaultSession(vaultKey)` / `lockVaultSession()`
+- `await unlockVaultSession(vaultKey)` / `lockVaultSession()` — session UVK must be **non-extractable** (keys from envelope unlock satisfy this; do not pass `createUserVaultKey()` output directly)
 - `lockVaultSessionManually()` / `isVaultManuallyLocked()`
 - `touchVaultSession()` / `scheduleVaultAutoLock()` / `clearVaultAutoLockTimer()`
 - `getVaultAutoLockRemainingMs()`
@@ -197,7 +200,7 @@ New code should use the canonical APIs. Deprecated unlock aliases use the curren
   `writeUserVaultAutoLockMinutes()`, `clearUserVaultAutoLockMinutes()`,
   `resolveVaultAutoLockMinutesPreference({ userMinutes, adminMinutes, envMinutes, defaultMinutes })`,
   `clampVaultAutoLockMinutes()`, `VAULT_USER_AUTO_LOCK_MIN_MINUTES` (1)
-- `deleteVaultAfterAuthorization(options)` / `deleteVaultWithPasswordAuthorization(options)`
+- `deleteVaultAfterAuthorization(options)` / `deleteVaultWithPasswordAuthorization(options)` — prefer password authorization; `deleteVaultAfterAuthorization` requires the caller to verify authorization first (emits a one-time browser warning)
 - `VaultSessionConfig`
 
 Direct session-key setters are intentionally not exported.

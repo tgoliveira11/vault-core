@@ -11,7 +11,7 @@ import {
   unlockVaultSession,
 } from "../../browser.js";
 import * as browser from "../../browser.js";
-import { createUserVaultKey } from "../../index.js";
+import { createNonExtractableSessionVaultKey } from "../../testing/session-vault-key.js";
 import {
   createVaultFullUnlockPageMatcher,
   VaultStatusDock,
@@ -151,7 +151,7 @@ describe("VaultStatusDock", () => {
   });
 
   it("shows unlocked handle when session is open", async () => {
-    await unlockVaultSession(await createUserVaultKey());
+    await unlockVaultSession(await createNonExtractableSessionVaultKey());
     renderDock();
     const handle = screen.getByTestId("vault-status-dock-handle");
     expect(handle.className).toContain("vc-status-dock-handle--open");
@@ -160,7 +160,7 @@ describe("VaultStatusDock", () => {
 
   it("expands unlocked panel with lock now and stay unlocked actions", async () => {
     await act(async () => {
-      await unlockVaultSession(await createUserVaultKey());
+      await unlockVaultSession(await createNonExtractableSessionVaultKey());
     });
     renderDock();
     fireEvent.click(screen.getByTestId("vault-status-dock-handle"));
@@ -176,7 +176,7 @@ describe("VaultStatusDock", () => {
   });
 
   it("keeps unlocked handle visible with countdown when expanded panel is open", async () => {
-    await unlockVaultSession(await createUserVaultKey());
+    await unlockVaultSession(await createNonExtractableSessionVaultKey());
     renderDock();
     fireEvent.click(screen.getByTestId("vault-status-dock-handle"));
     expect(screen.getByTestId("vault-status-dock")).toBeTruthy();
@@ -194,7 +194,7 @@ describe("VaultStatusDock", () => {
     fireEvent.click(screen.getByTestId("vault-status-dock-handle"));
     expect(screen.getByTestId("vault-status-dock")).toBeTruthy();
     await act(async () => {
-      await unlockVaultSession(await createUserVaultKey());
+      await unlockVaultSession(await createNonExtractableSessionVaultKey());
     });
     expect(screen.getByTestId("vault-status-dock-handle")).toBeTruthy();
     expect(screen.queryByTestId("vault-status-dock")).toBeNull();
@@ -231,7 +231,7 @@ describe("VaultStatusDock", () => {
 
   it("locks vault on lock now", async () => {
     await act(async () => {
-      await unlockVaultSession(await createUserVaultKey());
+      await unlockVaultSession(await createNonExtractableSessionVaultKey());
     });
     renderDock({ onLock: vi.fn() });
     fireEvent.click(screen.getByTestId("vault-status-dock-handle"));
@@ -254,7 +254,7 @@ describe("VaultStatusDock", () => {
     vi.useFakeTimers();
     const onStayUnlocked = vi.fn();
     await act(async () => {
-      await unlockVaultSession(await createUserVaultKey());
+      await unlockVaultSession(await createNonExtractableSessionVaultKey());
     });
     vi.advanceTimersByTime(30_000);
     expect(getVaultAutoLockRemainingMs()).toBe(14 * 60 * 1000 + 30_000);
@@ -269,7 +269,7 @@ describe("VaultStatusDock", () => {
 
   it("shows stay unlocked label with configured auto-lock minutes", async () => {
     await act(async () => {
-      await unlockVaultSession(await createUserVaultKey());
+      await unlockVaultSession(await createNonExtractableSessionVaultKey());
     });
     renderDock({ autoLockMinutes: 5 });
     fireEvent.click(screen.getByTestId("vault-status-dock-handle"));
@@ -279,7 +279,7 @@ describe("VaultStatusDock", () => {
   it("uses vault session auto-lock minutes when dock prop is omitted", async () => {
     configureVaultSession({ autoLockMinutes: 5 });
     await act(async () => {
-      await unlockVaultSession(await createUserVaultKey());
+      await unlockVaultSession(await createNonExtractableSessionVaultKey());
     });
     renderDock({ autoLockMinutes: undefined });
     fireEvent.click(screen.getByTestId("vault-status-dock-handle"));
@@ -289,7 +289,7 @@ describe("VaultStatusDock", () => {
   it("does not reset auto-lock countdown when expanding or collapsing the dock", async () => {
     vi.useFakeTimers();
     await act(async () => {
-      await unlockVaultSession(await createUserVaultKey());
+      await unlockVaultSession(await createNonExtractableSessionVaultKey());
     });
     vi.advanceTimersByTime(30_000);
     const remainingBefore = getVaultAutoLockRemainingMs();
@@ -347,7 +347,7 @@ describe("VaultStatusDock", () => {
 
   it("does not collapse when clicking inside the expanded dock", async () => {
     await act(async () => {
-      await unlockVaultSession(await createUserVaultKey());
+      await unlockVaultSession(await createNonExtractableSessionVaultKey());
     });
     renderDock();
     fireEvent.click(screen.getByTestId("vault-status-dock-handle"));
@@ -359,16 +359,16 @@ describe("VaultStatusDock", () => {
 
   it("collapses expanded unlocked panel when auto-lock fires", async () => {
     vi.useFakeTimers();
-    configureVaultSession({ autoLockMinutes: 0.001 });
+    configureVaultSession({ autoLockMinutes: 1 });
     await act(async () => {
-      await unlockVaultSession(await createUserVaultKey());
+      await unlockVaultSession(await createNonExtractableSessionVaultKey());
     });
     renderDock();
     fireEvent.click(screen.getByTestId("vault-status-dock-handle"));
     expect(screen.getByTestId("vault-status-dock")).toBeTruthy();
 
     await act(async () => {
-      vi.advanceTimersByTime(61);
+      vi.advanceTimersByTime(60_001);
     });
 
     expect(screen.queryByTestId("vault-status-dock")).toBeNull();

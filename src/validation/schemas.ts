@@ -1,5 +1,10 @@
 import { z } from "zod";
-import { ENCRYPTION_ALG, ENCRYPTION_VERSION } from "../constants.js";
+import {
+  ENCRYPTION_ALG,
+  ENCRYPTION_VERSION,
+  MAX_VAULT_CIPHERTEXT_BASE64URL_LENGTH,
+  MAX_VAULT_IV_BASE64URL_LENGTH,
+} from "../constants.js";
 import { ARGON2ID_LIMITS } from "../kdf/params.js";
 
 const aadFieldSchema = z.enum(["vault_key", "vault_payload", "vault_index"]);
@@ -7,8 +12,8 @@ const aadFieldSchema = z.enum(["vault_key", "vault_payload", "vault_index"]);
 export const encryptedPayloadSchema = z.object({
   version: z.literal(ENCRYPTION_VERSION),
   alg: z.literal(ENCRYPTION_ALG),
-  iv: z.string().min(1),
-  ciphertext: z.string().min(1),
+  iv: z.string().min(1).max(MAX_VAULT_IV_BASE64URL_LENGTH),
+  ciphertext: z.string().min(1).max(MAX_VAULT_CIPHERTEXT_BASE64URL_LENGTH),
   aad: z.object({
     userId: z.string().uuid(),
     resourceId: z.string().uuid(),

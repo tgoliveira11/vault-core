@@ -9,7 +9,7 @@ import {
   resetVaultSessionLockState,
   unlockVaultSession,
 } from "../../browser.js";
-import { createUserVaultKey } from "../../index.js";
+import { createNonExtractableSessionVaultKey } from "../../testing/session-vault-key.js";
 import {
   useVaultAutoLockCountdown,
   useVaultAutoLockFraction,
@@ -22,7 +22,7 @@ describe("useVaultAutoLockCountdown", () => {
     configureVaultSession({ autoLockMinutes: 15 });
     resetVaultSessionLockState();
     lockVaultSession();
-    await unlockVaultSession(await createUserVaultKey());
+    await unlockVaultSession(await createNonExtractableSessionVaultKey());
   });
 
   afterEach(() => {

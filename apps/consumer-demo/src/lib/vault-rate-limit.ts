@@ -4,6 +4,7 @@ import {
   createVaultUnlockRateLimiterFromAdminConfig,
 } from "@tgoliveira/vault-core";
 import { PRF_SALT_PREFIX, VAULT_PROFILE } from "@/lib/vault-profile";
+import { resolveDemoVaultApiClientKey } from "@/lib/demo-admin-auth";
 
 function buildDemoAdminConfig() {
   return buildVaultAdminConfigFromEnv({
@@ -32,11 +33,4 @@ export function getDemoVaultApiRateLimiter() {
   return apiRateLimiter;
 }
 
-export function resolveDemoVaultApiClientKey(request: Request): string {
-  const forwarded = request.headers.get("x-forwarded-for");
-  if (forwarded) {
-    const first = forwarded.split(",")[0]?.trim();
-    if (first) return first;
-  }
-  return "unknown";
-}
+export { resolveDemoVaultApiClientKey };

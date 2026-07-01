@@ -2,7 +2,7 @@
 import { renderHook, act } from "@testing-library/react";
 import { describe, expect, it } from "vitest";
 import { lockVaultSession, unlockVaultSession } from "../../browser.js";
-import { createUserVaultKey } from "../../index.js";
+import { createNonExtractableSessionVaultKey } from "../../testing/session-vault-key.js";
 import { useVaultUnlocked } from "./use-vault-unlocked.js";
 
 describe("useVaultUnlocked", () => {
@@ -11,9 +11,9 @@ describe("useVaultUnlocked", () => {
     const { result } = renderHook(() => useVaultUnlocked());
     expect(result.current).toBe(false);
 
-    const key = await createUserVaultKey();
+    const key = await createNonExtractableSessionVaultKey();
     await act(async () => {
-      unlockVaultSession(key);
+      await unlockVaultSession(key);
     });
     expect(result.current).toBe(true);
 

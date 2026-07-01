@@ -263,6 +263,10 @@ export async function unlockWithPassword<T>(input: {
 }
 ```
 
+Prefer **`decryptVaultPayloadWithSchema()`** with an app-owned Zod schema when the payload shape
+is versioned or may have been tampered with after encryption. See
+[docs/CONSUMER_SECURITY_REQUIREMENTS.md](./CONSUMER_SECURITY_REQUIREMENTS.md#runtime-payload-schema-recommended).
+
 Do not expose whether a password failed during KDF derivation versus AES-GCM authentication. Present
 a generic unlock failure to the user. UI throttling can improve local UX but cannot prevent offline
 attacks against copied envelopes, so require a strong vault password and protect ciphertext access.
@@ -399,7 +403,7 @@ configureVaultSession({ autoLockMinutes: 15 });
 
 const removeUnloadGuard = registerVaultUnloadGuard();
 
-unlockVaultSession(vaultKey);
+await unlockVaultSession(vaultKey);
 const currentKey = getSessionVaultKey();
 
 // Optional: renew the countdown on pointer, keyboard, touch, and focus events.

@@ -1,4 +1,4 @@
-import { VaultKeyNotExtractableError } from "../errors/vault-errors.js";
+import { VaultKeyNotExtractableError, VaultAuthorizationError } from "../errors/vault-errors.js";
 import { importUserVaultAesKey } from "../crypto/user-vault-key-crypto.js";
 
 export type UserVaultKey = CryptoKey;
@@ -33,6 +33,18 @@ export async function exportUserVaultKey(key: CryptoKey): Promise<Uint8Array> {
     if (errorName === "InvalidAccessError" || errorName === "InvalidAccessException") {
       throw new VaultKeyNotExtractableError();
     }
+    throw error;
+  }
+}
+
+/** Rejects extractable keys before they enter the in-memory vault session. */
+export async function assertUserVaultKeyNonExtractable(key: CryptoKey): Promise<void> {
+  try {
+    await exportUserVaultKey(key);
+    throw new VaultAuthorizationError("Session vault key must be non-extractable");
+  } catch (error) {
+    if (error instanceof VaultAuthorizationError) throw error;
+    if (error instanceof VaultKeyNotExtractableError) return;
     throw error;
   }
 }

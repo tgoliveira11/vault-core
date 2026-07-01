@@ -7,7 +7,7 @@ import {
   resetVaultSessionLockState,
   unlockVaultSession,
 } from "../../browser.js";
-import { createUserVaultKey } from "../../index.js";
+import { createNonExtractableSessionVaultKey } from "../../testing/session-vault-key.js";
 import { requestVaultDockExpand } from "../status-dock/events.js";
 import { VaultLockOverlayExclude } from "./vault-lock-overlay-exclude.js";
 import { VaultProtectedGate } from "./vault-protected-gate.js";
@@ -36,7 +36,7 @@ describe("VaultProtectedGate", () => {
   });
 
   it("renders children without overlay when unlocked", async () => {
-    await act(async () => unlockVaultSession(await createUserVaultKey()));
+    await act(async () => unlockVaultSession(await createNonExtractableSessionVaultKey()));
     render(
       <VaultProtectedGate configured>
         <p>Protected content</p>

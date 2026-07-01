@@ -2,25 +2,23 @@ import { NextResponse } from "next/server";
 import {
   DEMO_ADMIN_COOKIE,
   createDemoAdminSessionToken,
+  enforceDemoAuthRateLimit,
   getDemoAdminCookieOptions,
-  getDemoAdminEmail,
   isDemoAdminEmailAuthorized,
 } from "@/lib/demo-admin-auth";
 
 export async function POST(request: Request) {
   try {
+    const rateLimited = enforceDemoAuthRateLimit(request);
+    if (rateLimited) return rateLimited;
+
     const body = (await request.json()) as { email?: string };
     const email = body.email?.trim();
     if (!email) {
       return NextResponse.json({ error: "email is required" }, { status: 400 });
     }
     if (!isDemoAdminEmailAuthorized(email)) {
-      return NextResponse.json(
-        {
-          error: `Invalid demo admin credentials. Use DEMO_ADMIN_EMAIL (${getDemoAdminEmail()}).`,
-        },
-        { status: 401 }
-      );
+      return NextResponse.json({ error: "Invalid credentials" }, { status: 401 });
     }
 
     const response = NextResponse.json({ ok: true });

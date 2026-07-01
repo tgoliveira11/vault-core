@@ -19,12 +19,31 @@ export type WrapUserVaultKeyOptions = {
   innerVaultKeyBlob?: Uint8Array;
 };
 
+export async function assertInnerVaultKeyBlobMatchesVaultKey(
+  inner: Uint8Array,
+  vaultKey: CryptoKey,
+  wrappingKey: CryptoKey
+): Promise<void> {
+  const uvkFromInner = isLegacyRawVaultKeyMaterial(inner)
+    ? await importUserVaultAesKey(inner)
+    : await unwrapAesKey(inner, wrappingKey);
+
+  if (!(await userVaultKeysEqual(uvkFromInner, vaultKey))) {
+    throw new VaultAuthorizationError("Inner vault key blob does not match the session vault key");
+  }
+}
+
 async function materializeInnerVaultKeyBlob(
   vaultKey: CryptoKey,
   wrappingKey: CryptoKey,
   options?: WrapUserVaultKeyOptions
 ): Promise<Uint8Array> {
   if (options?.innerVaultKeyBlob) {
+    await assertInnerVaultKeyBlobMatchesVaultKey(
+      options.innerVaultKeyBlob,
+      vaultKey,
+      wrappingKey
+    );
     return options.innerVaultKeyBlob;
   }
 

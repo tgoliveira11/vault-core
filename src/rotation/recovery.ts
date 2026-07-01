@@ -24,7 +24,7 @@ import {
   type VaultRotationAuthorization,
 } from "./authorization.js";
 import { unlockWithRecoveryEnvelope } from "../envelopes/recovery.js";
-import { toBufferSource } from "../crypto/encoding.js";
+import { toBufferSource, base64UrlToBytes } from "../crypto/encoding.js";
 import { userVaultKeysEqual } from "../keys/user-vault-key.js";
 import { createRecoveryKitText } from "../recovery/kit.js";
 
@@ -89,6 +89,12 @@ export async function rotateRecoveryPhrase(
     assertRecoveryPhraseConfirmation(normalized, confirmNewRecoveryPhrase);
   }
 
+  const {
+    wrappingKey: recoveryWrappingKey,
+    metadata: recoveryKdfMetadata,
+  } = await deriveRecoveryPhraseKey(normalized);
+  const recoverySalt = base64UrlToBytes(recoveryKdfMetadata.salt);
+
   let innerVaultKeyBlob: Uint8Array;
   if (authorization.kind === "password") {
     const derivedKeys = await deriveVaultPasswordKeyPairFromMetadata(
@@ -99,11 +105,10 @@ export async function rotateRecoveryPhrase(
       authorization.passwordEnvelope.encryptedVaultKey,
       derivedKeys.encryptionKey
     );
-    const { wrappingKey } = await deriveRecoveryPhraseKey(normalized);
     innerVaultKeyBlob = await rewrapInnerVaultKeyMaterialForDerivedKeys(
       inner,
       { wrappingKey: derivedKeys.wrappingKey },
-      { wrappingKey },
+      { wrappingKey: recoveryWrappingKey },
       vaultKey
     );
   } else {
@@ -120,11 +125,10 @@ export async function rotateRecoveryPhrase(
       authorization.passkeyEnvelope.encryptedVaultKey,
       prfKey
     );
-    const { wrappingKey } = await deriveRecoveryPhraseKey(normalized);
     innerVaultKeyBlob = await rewrapInnerVaultKeyMaterialForDerivedKeys(
       inner,
       { wrappingKey: await importAesKwKey(prfBytes) },
-      { wrappingKey },
+      { wrappingKey: recoveryWrappingKey },
       vaultKey
     );
   }
@@ -135,7 +139,7 @@ export async function rotateRecoveryPhrase(
     scope,
     profile,
     { phraseLength: wordCount },
-    undefined,
+    recoverySalt,
     { innerVaultKeyBlob }
   );
 

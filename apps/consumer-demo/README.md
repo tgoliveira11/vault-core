@@ -80,8 +80,15 @@ configured email to `/api/demo/auth/login`. Set in `.env.local`:
 - `DEMO_ADMIN_EMAIL` — allowed admin email (mock credential)
 - `DEMO_ADMIN_SESSION_SECRET` — HMAC secret for the demo session cookie
 
-Unlock flows call `withVaultUnlockRateLimit()` in `vault-demo-crypto.ts` (not only in React UI).
-The app sends a demo Content-Security-Policy via `next.config.ts`.
+Unlock flows call `withVaultUnlockRateLimit()` in `vault-demo-crypto.ts` and password/recovery
+security flows in `vault-demo-security.ts` (not only in React UI).
+
+Production **Content-Security-Policy** uses per-request nonces via `src/middleware.ts` and
+`src/lib/content-security-policy.ts` (no `unsafe-inline` / `unsafe-eval` on scripts). Development
+keeps a relaxed CSP for Next.js dev tooling.
+
+Decrypted vault payloads use `decryptVaultPayloadWithSchema()` with `demoVaultPayloadSchema` in
+`vault-demo-crypto.ts`.
 
 See [docs/CONSUMER_SECURITY_REQUIREMENTS.md](../../docs/CONSUMER_SECURITY_REQUIREMENTS.md) for
 production integration requirements.

@@ -73,6 +73,20 @@ export class VaultKeyNotExtractableError extends Error {
   }
 }
 
+export class VaultPayloadSizeError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = "VaultPayloadSizeError";
+  }
+}
+
+export class VaultPayloadValidationError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = "VaultPayloadValidationError";
+  }
+}
+
 export type VaultCoreError =
   | VaultPlaintextRejectionError
   | VaultConflictError
@@ -83,4 +97,6 @@ export type VaultCoreError =
   | VaultAuthorizationError
   | VaultPasswordUnchangedError
   | VaultRateLimitError
-  | VaultKeyNotExtractableError;
+  | VaultKeyNotExtractableError
+  | VaultPayloadSizeError
+  | VaultPayloadValidationError;

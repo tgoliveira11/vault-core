@@ -8,7 +8,26 @@ API changes increment the minor version.
 
 ## [Unreleased]
 
+### Security
+
+- `assertInnerVaultKeyBlobMatchesVaultKey()` validates reused `innerVaultKeyBlob` material during envelope wrap.
+- `decodeBoundedBase64Url()` and `VaultPayloadSizeError` bound IV/ciphertext size before AES-GCM decrypt.
+- `getVaultAutoLockMinutes()` clamps resolved values to the admin ceiling (1–1440 minutes).
+- `unlockVaultSession()` rejects extractable UVKs via `assertUserVaultKeyNonExtractable()`.
+- `deleteVaultAfterAuthorization()` documents caller authorization requirements and emits a one-time browser warning.
+- CI **`verify:public-exports`** guard fails when public entry points export `setSessionVaultKey`.
+
+### Changed
+
+- `unlockVaultSession()` is now async (non-extractable key assertion).
+- Encrypted payload schema enforces maximum base64url lengths on `iv` and `ciphertext`.
+- `rotateRecoveryPhrase()` reuses a single recovery KDF salt when re-wrapping inner vault-key material (fixes envelope consistency when inner blob validation is enforced).
+- Consumer demo: production CSP uses per-request nonces (no `unsafe-inline` on scripts); recovery KDF upgrade is rate-limited with `recovery_phrase` action.
+
 ### Added
+
+- `decryptVaultPayloadWithSchema()` and `VaultPayloadValidationError` for runtime Zod validation of decrypted vault JSON.
+- `scripts/verify-public-exports.mjs` — public export guard (included in `npm run validate`).
 
 - Reference PostgreSQL schema for runtime admin config overrides:
   `getVaultAdminConfigOverrideSchemaSql()`, `VAULT_ADMIN_CONFIG_OVERRIDES_TABLE`, and

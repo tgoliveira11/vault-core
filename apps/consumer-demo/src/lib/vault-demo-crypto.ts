@@ -3,7 +3,7 @@ import {
   createRecoveryEnvelope,
   createRecoveryPhrase,
   createUserVaultKey,
-  decryptVaultPayload,
+  decryptVaultPayloadWithSchema,
   encryptVaultPayload,
   passkeyPrfEnvelopeSchema,
   passwordEnvelopeSchema,
@@ -15,6 +15,7 @@ import {
   withVaultUnlockRateLimit,
   type EncryptedVaultPayload,
 } from "@tgoliveira/vault-core";
+import { z } from "zod";
 import { unlockVaultSession, getSessionVaultKey } from "@tgoliveira/vault-core/browser";
 import { DEMO_USER_ID, VAULT_PROFILE, vaultScope } from "@/lib/vault-profile";
 import { authenticateDemoPasskey, loadPasskeyCredentialId } from "@/lib/vault-demo-passkey";
@@ -35,15 +36,19 @@ function runDemoUnlockAttempt<T>(
   );
 }
 
-export type DemoVaultPayload = {
-  version: 1;
-  notes: Array<{
-    id: string;
-    title: string;
-    body: string;
-    createdAt: string;
-  }>;
-};
+export type DemoVaultPayload = z.infer<typeof demoVaultPayloadSchema>;
+
+export const demoVaultPayloadSchema = z.object({
+  version: z.literal(1),
+  notes: z.array(
+    z.object({
+      id: z.string().uuid(),
+      title: z.string(),
+      body: z.string(),
+      createdAt: z.string().datetime(),
+    })
+  ),
+});
 
 const EMPTY_PAYLOAD: DemoVaultPayload = {
   version: 1,
@@ -89,7 +94,13 @@ export async function createDemoVault(input: {
   });
 
   saveVaultRecord(record);
-  unlockVaultSession(vaultKey);
+  const sessionKey = await unlockWithPasswordEnvelope(
+    input.vaultPassword,
+    passwordEnvelope,
+    scope,
+    VAULT_PROFILE
+  );
+  await unlockVaultSession(sessionKey);
 
   return { recoveryPhrase, record };
 }
@@ -110,14 +121,15 @@ export async function unlockDemoVault(vaultPassword: string): Promise<DemoVaultP
       VAULT_PROFILE
     );
 
-    const payload = await decryptVaultPayload<DemoVaultPayload>(
+    const payload = await decryptVaultPayloadWithSchema(
       record.encryptedBlob,
       vaultKey,
       scope,
-      VAULT_PROFILE
+      VAULT_PROFILE,
+      demoVaultPayloadSchema
     );
 
-    unlockVaultSession(vaultKey);
+    await unlockVaultSession(vaultKey);
     return payload;
   });
 }
@@ -140,14 +152,15 @@ export async function unlockDemoVaultWithRecoveryPhrase(
       VAULT_PROFILE
     );
 
-    const payload = await decryptVaultPayload<DemoVaultPayload>(
+    const payload = await decryptVaultPayloadWithSchema(
       record.encryptedBlob,
       vaultKey,
       scope,
-      VAULT_PROFILE
+      VAULT_PROFILE,
+      demoVaultPayloadSchema
     );
 
-    unlockVaultSession(vaultKey);
+    await unlockVaultSession(vaultKey);
     return payload;
   });
 }
@@ -174,14 +187,15 @@ export async function unlockDemoVaultWithPasskey(): Promise<DemoVaultPayload> {
       VAULT_PROFILE
     );
 
-    const payload = await decryptVaultPayload<DemoVaultPayload>(
+    const payload = await decryptVaultPayloadWithSchema(
       record.encryptedBlob,
       vaultKey,
       scope,
-      VAULT_PROFILE
+      VAULT_PROFILE,
+      demoVaultPayloadSchema
     );
 
-    unlockVaultSession(vaultKey);
+    await unlockVaultSession(vaultKey);
     return payload;
   });
 }
@@ -200,11 +214,12 @@ export async function loadDecryptedDemoPayload(): Promise<DemoVaultPayload | nul
   if (!vaultKey) return null;
 
   const scope = vaultScope(DEMO_USER_ID);
-  return decryptVaultPayload<DemoVaultPayload>(
+  return decryptVaultPayloadWithSchema(
     record.encryptedBlob,
     vaultKey,
     scope,
-    VAULT_PROFILE
+    VAULT_PROFILE,
+    demoVaultPayloadSchema
   );
 }
 

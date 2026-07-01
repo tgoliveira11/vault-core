@@ -14,6 +14,7 @@ import {
   userVaultKeysEqual,
   VaultAuthorizationError,
   VaultKeyNotExtractableError,
+  assertUserVaultKeyNonExtractable,
   exportUserVaultKey,
 } from "../index.js";
 import {
@@ -101,6 +102,37 @@ describe("non-extractable user vault key", () => {
       LIQSENSE_COMPAT_PROFILE
     );
     expect(await userVaultKeysEqual(vaultKey, unlocked)).toBe(true);
+  });
+
+  it("rejects re-wrap when inner blob does not match the vault key", async () => {
+    const vaultKey = await createUserVaultKey();
+    const otherKey = await createUserVaultKey();
+    const { envelope, kdfMetadata } = await createPasswordEnvelope(
+      vaultKey,
+      FIXTURE_VAULT_PASSWORD,
+      LIQSENSE_COMPAT_SCOPE,
+      LIQSENSE_COMPAT_PROFILE,
+      FIXTURE_ARGON2_SALT
+    );
+    const keys = await deriveVaultPasswordKeyPairFromMetadata(
+      FIXTURE_VAULT_PASSWORD,
+      kdfMetadata
+    );
+    const inner = await extractInnerVaultKeyBlob(
+      envelope.encryptedVaultKey,
+      keys.encryptionKey
+    );
+
+    await expect(
+      createPasswordEnvelope(
+        otherKey,
+        FIXTURE_VAULT_PASSWORD,
+        LIQSENSE_COMPAT_SCOPE,
+        LIQSENSE_COMPAT_PROFILE,
+        FIXTURE_ARGON2_SALT,
+        { innerVaultKeyBlob: inner }
+      )
+    ).rejects.toThrow(VaultAuthorizationError);
   });
 
   it("rejects re-wrap when the session key does not match", async () => {
@@ -219,6 +251,22 @@ describe("non-extractable user vault key", () => {
     const key = await createUserVaultKey();
     vi.spyOn(crypto.subtle, "exportKey").mockRejectedValueOnce("not-an-error");
     await expect(exportUserVaultKey(key)).rejects.toEqual("not-an-error");
+    vi.restoreAllMocks();
+  });
+
+  it("rejects extractable keys for session storage", async () => {
+    const extractable = await createUserVaultKey();
+    await expect(assertUserVaultKeyNonExtractable(extractable)).rejects.toThrow(
+      VaultAuthorizationError
+    );
+    const nonExtractable = await importUserVaultKey(FIXTURE_UVK_BYTES, { extractable: false });
+    await expect(assertUserVaultKeyNonExtractable(nonExtractable)).resolves.toBeUndefined();
+  });
+
+  it("rethrows unexpected errors from assertUserVaultKeyNonExtractable", async () => {
+    const key = await createUserVaultKey();
+    vi.spyOn(crypto.subtle, "exportKey").mockRejectedValueOnce(new Error("unexpected export failure"));
+    await expect(assertUserVaultKeyNonExtractable(key)).rejects.toThrow("unexpected export failure");
     vi.restoreAllMocks();
   });
 

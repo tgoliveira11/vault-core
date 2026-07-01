@@ -1,4 +1,9 @@
-import { DEFAULT_VAULT_AUTO_LOCK_MINUTES } from "../constants.js";
+import { DEFAULT_VAULT_AUTO_LOCK_MINUTES, MAX_VAULT_AUTO_LOCK_MINUTES } from "../constants.js";
+import { assertUserVaultKeyNonExtractable } from "../keys/user-vault-key.js";
+import {
+  clampVaultAutoLockMinutes,
+  VAULT_USER_AUTO_LOCK_MIN_MINUTES,
+} from "./user-auto-lock-preference.js";
 import { isVaultUnlocked, lockVault, setSessionVaultKey } from "./memory-session.js";
 
 export type VaultSessionConfig = {
@@ -25,14 +30,24 @@ function getAutoLockTimeoutMs(): number {
 
 /** Resolved vault auto-lock duration in minutes (session config, then package default). */
 export function getVaultAutoLockMinutes(): number {
-  const resolved = sessionConfig.resolveAutoLockMinutes?.();
-  const minutes =
-    resolved ??
+  const resolved =
+    sessionConfig.resolveAutoLockMinutes?.() ??
     sessionConfig.autoLockMinutes ??
     DEFAULT_VAULT_AUTO_LOCK_MINUTES;
-  return Number.isFinite(minutes) && minutes > 0
-    ? minutes
-    : DEFAULT_VAULT_AUTO_LOCK_MINUTES;
+  const rawAdminMinutes =
+    sessionConfig.autoLockMinutes ?? DEFAULT_VAULT_AUTO_LOCK_MINUTES;
+  const adminCeiling = clampVaultAutoLockMinutes(
+    Number.isFinite(rawAdminMinutes) && rawAdminMinutes > 0
+      ? rawAdminMinutes
+      : DEFAULT_VAULT_AUTO_LOCK_MINUTES,
+    { min: VAULT_USER_AUTO_LOCK_MIN_MINUTES, max: MAX_VAULT_AUTO_LOCK_MINUTES }
+  );
+  const minutes =
+    Number.isFinite(resolved) && resolved > 0 ? resolved : DEFAULT_VAULT_AUTO_LOCK_MINUTES;
+  return clampVaultAutoLockMinutes(minutes, {
+    min: VAULT_USER_AUTO_LOCK_MIN_MINUTES,
+    max: adminCeiling,
+  });
 }
 
 function notifyVaultSessionChange(): void {
@@ -72,7 +87,8 @@ export function touchVaultSession(): void {
   }
 }
 
-export function unlockVaultSession(vaultKey: CryptoKey): void {
+export async function unlockVaultSession(vaultKey: CryptoKey): Promise<void> {
+  await assertUserVaultKeyNonExtractable(vaultKey);
   manuallyLocked = false;
   setSessionVaultKey(vaultKey);
   scheduleVaultAutoLock();

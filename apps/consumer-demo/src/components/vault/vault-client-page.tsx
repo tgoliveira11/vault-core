@@ -15,7 +15,7 @@ export function VaultClientPage() {
 }
 
 function VaultClientContent() {
-  const { lock } = useVaultSession({
+  const { lock, unlocked } = useVaultSession({
     registerActivityGuard: false,
     registerUnloadGuard: false,
   });
@@ -40,8 +40,16 @@ function VaultClientContent() {
   }, []);
 
   useEffect(() => {
+    if (!unlocked) {
+      setPayload(null);
+      setTitle("");
+      setBody("");
+      setError("");
+      setLoading(false);
+      return;
+    }
     void refresh();
-  }, [refresh]);
+  }, [unlocked, refresh]);
 
   async function handleAddNote(event: React.FormEvent) {
     event.preventDefault();

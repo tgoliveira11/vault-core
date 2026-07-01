@@ -7,6 +7,7 @@ import {
 import {
   deleteVaultAfterAuthorization,
   deleteVaultWithPasswordAuthorization,
+  resetDeleteVaultAfterAuthorizationWarningForTests,
 } from "./vault-deletion.js";
 import {
   clearVaultAutoLockTimer,
@@ -23,6 +24,7 @@ import {
   LIQSENSE_COMPAT_PROFILE,
   LIQSENSE_COMPAT_SCOPE,
 } from "../testing/fixtures/liqsense-compat.js";
+import { createNonExtractableSessionVaultKey } from "../testing/session-vault-key.js";
 
 describe("vault deletion", () => {
   beforeEach(() => {
@@ -37,8 +39,8 @@ describe("vault deletion", () => {
   });
 
   it("purges persisted vault data and clears session state after authorization", async () => {
-    const vaultKey = await createUserVaultKey();
-    unlockVaultSession(vaultKey);
+    const vaultKey = await createNonExtractableSessionVaultKey();
+    await unlockVaultSession(vaultKey);
     const purge = vi.fn();
 
     await deleteVaultAfterAuthorization({ purgePersistedVault: purge });
@@ -58,7 +60,7 @@ describe("vault deletion", () => {
       LIQSENSE_COMPAT_PROFILE,
       FIXTURE_ARGON2_SALT
     );
-    unlockVaultSession(vaultKey);
+    await unlockVaultSession(await createNonExtractableSessionVaultKey());
     const purge = vi.fn();
 
     await deleteVaultWithPasswordAuthorization({
@@ -83,7 +85,7 @@ describe("vault deletion", () => {
       LIQSENSE_COMPAT_PROFILE,
       FIXTURE_ARGON2_SALT
     );
-    unlockVaultSession(vaultKey);
+    await unlockVaultSession(await createNonExtractableSessionVaultKey());
     const purge = vi.fn();
 
     await expect(
@@ -102,7 +104,7 @@ describe("vault deletion", () => {
 
   it("awaits async purge callbacks before clearing session state", async () => {
     const order: string[] = [];
-    unlockVaultSession(await createUserVaultKey());
+    await unlockVaultSession(await createNonExtractableSessionVaultKey());
 
     await deleteVaultAfterAuthorization({
       purgePersistedVault: async () => {
@@ -113,5 +115,15 @@ describe("vault deletion", () => {
     order.push("after");
     expect(order).toEqual(["purge", "after"]);
     expect(isVaultUnlocked()).toBe(false);
+  });
+
+  it("warns once in the browser when deleteVaultAfterAuthorization is called", async () => {
+    resetDeleteVaultAfterAuthorizationWarningForTests();
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => undefined);
+    await deleteVaultAfterAuthorization({ purgePersistedVault: () => undefined });
+    await deleteVaultAfterAuthorization({ purgePersistedVault: () => undefined });
+    expect(warn).toHaveBeenCalledOnce();
+    expect(warn.mock.calls[0]?.[0]).toMatch(/does not verify credentials/i);
+    warn.mockRestore();
   });
 });

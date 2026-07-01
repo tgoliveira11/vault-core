@@ -1,17 +1,17 @@
-import { ENCRYPTION_ALG, ENCRYPTION_VERSION } from "../constants.js";
+import { ENCRYPTION_ALG, ENCRYPTION_VERSION, MAX_VAULT_CIPHERTEXT_BYTES, MAX_VAULT_IV_BYTES } from "../constants.js";
 import type { VaultCryptoProfile, VaultAadScope } from "../profile.js";
 import { resolveAadContext } from "../profile.js";
 import type { EncryptedVaultPayload } from "../validation/schemas.js";
 import { canonicalAadString, aadByteCandidates } from "./aad.js";
 import {
   bytesToBase64Url,
-  base64UrlToBytes,
+  decodeBoundedBase64Url,
   stringToBytes,
   bytesToString,
   toBufferSource,
 } from "./encoding.js";
 
-const IV_LENGTH = 12;
+const IV_LENGTH = MAX_VAULT_IV_BYTES;
 
 export async function generateAesKey(): Promise<CryptoKey> {
   return crypto.subtle.generateKey({ name: ENCRYPTION_ALG, length: 256 }, true, [
@@ -73,8 +73,8 @@ export async function decryptField(
   payload: EncryptedVaultPayload,
   key: CryptoKey
 ): Promise<string> {
-  const iv = base64UrlToBytes(payload.iv);
-  const ciphertext = base64UrlToBytes(payload.ciphertext);
+  const iv = decodeBoundedBase64Url(payload.iv, MAX_VAULT_IV_BYTES);
+  const ciphertext = decodeBoundedBase64Url(payload.ciphertext, MAX_VAULT_CIPHERTEXT_BYTES);
   let lastError: unknown;
 
   for (const aadBytes of aadByteCandidates(payload.aad)) {

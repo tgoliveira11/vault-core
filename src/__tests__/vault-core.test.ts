@@ -13,6 +13,7 @@ import {
   unlockWithPasskeyPrfEnvelope,
   encryptVaultPayload,
   decryptVaultPayload,
+  decryptVaultPayloadWithSchema,
   createRecoveryPhrase,
   normalizeRecoveryPhrase,
   validateRecoveryPhraseFormat,
@@ -27,7 +28,9 @@ import {
   parseArgon2idMetadata,
   SENTINEL_VAULT_PASSWORD,
   SENTINEL_PRIVATE_LABEL,
+  VaultPayloadValidationError,
 } from "../index.js";
+import { z } from "zod";
 import {
   LIQSENSE_COMPAT_PROFILE,
   LIQSENSE_COMPAT_SCOPE,
@@ -265,6 +268,52 @@ describe("encrypted vault payload", () => {
       LIQSENSE_COMPAT_PROFILE
     );
     expect(decrypted).toEqual(FIXTURE_PAYLOAD_V1);
+  });
+
+  it("decryptVaultPayloadWithSchema validates parsed JSON with Zod", async () => {
+    const vaultKey = await importUserVaultKey(FIXTURE_UVK_BYTES, { extractable: true });
+    const encrypted = await encryptVaultPayload(
+      FIXTURE_PAYLOAD_V1,
+      vaultKey,
+      LIQSENSE_COMPAT_SCOPE,
+      LIQSENSE_COMPAT_PROFILE
+    );
+    const schema = z
+      .object({
+        version: z.literal(1),
+        profile: z.object({ displayName: z.string() }),
+      })
+      .passthrough();
+
+    const decrypted = await decryptVaultPayloadWithSchema(
+      encrypted,
+      vaultKey,
+      LIQSENSE_COMPAT_SCOPE,
+      LIQSENSE_COMPAT_PROFILE,
+      schema
+    );
+    expect(decrypted).toEqual(FIXTURE_PAYLOAD_V1);
+  });
+
+  it("decryptVaultPayloadWithSchema rejects schema mismatch after decrypt", async () => {
+    const vaultKey = await importUserVaultKey(FIXTURE_UVK_BYTES, { extractable: true });
+    const encrypted = await encryptVaultPayload(
+      FIXTURE_PAYLOAD_V1,
+      vaultKey,
+      LIQSENSE_COMPAT_SCOPE,
+      LIQSENSE_COMPAT_PROFILE
+    );
+    const schema = z.object({ version: z.literal(999) });
+
+    await expect(
+      decryptVaultPayloadWithSchema(
+        encrypted,
+        vaultKey,
+        LIQSENSE_COMPAT_SCOPE,
+        LIQSENSE_COMPAT_PROFILE,
+        schema
+      )
+    ).rejects.toThrow(VaultPayloadValidationError);
   });
 
   it("does not leak sentinels outside ciphertext metadata", async () => {
