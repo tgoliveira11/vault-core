@@ -8,7 +8,6 @@ import type { RecoveryPhraseWordCount, VaultAdminPasswordPolicy } from "@tgolive
 import { validateVaultPasswordSetup } from "@tgoliveira/vault-core";
 import { VaultPasswordSetupFields } from "@tgoliveira/vault-core/react";
 import { AppShell } from "@/components/app-shell";
-import { VaultUnlockedGate } from "@/components/vault/vault-unlocked-gate";
 import { getDemoPasskeySupport } from "@/lib/vault-demo-passkey";
 import {
   changeDemoVaultPassword,
@@ -44,13 +43,11 @@ export function VaultSettingsPage({
   passwordPolicy: VaultAdminPasswordPolicy;
 }) {
   return (
-    <VaultUnlockedGate redirectTo="/vault/unlock?next=/vault/settings">
-      <VaultSettingsContent
-        recoveryWordCount={recoveryWordCount}
-        passkeyPrfUnlockEnabled={passkeyPrfUnlockEnabled}
-        passwordPolicy={passwordPolicy}
-      />
-    </VaultUnlockedGate>
+    <VaultSettingsContent
+      recoveryWordCount={recoveryWordCount}
+      passkeyPrfUnlockEnabled={passkeyPrfUnlockEnabled}
+      passwordPolicy={passwordPolicy}
+    />
   );
 }
 
@@ -95,6 +92,7 @@ function VaultSettingsContent({
 
   return (
     <AppShell
+      vaultProtected
       title="Vault security"
       description="Change vault password, rotate recovery phrase, link passkey PRF unlock, and upgrade legacy KDF envelopes. Requires an unlocked vault session."
     >

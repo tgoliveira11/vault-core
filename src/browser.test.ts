@@ -8,6 +8,7 @@ import {
   configureVaultSession,
   createRecoveryKitDownload,
   getSessionVaultKey,
+  getVaultAutoLockMinutes,
   getVaultAutoLockRemainingMs,
   inspectIndexedDBPrefix,
   inspectLocalStoragePrefix,
@@ -22,6 +23,7 @@ import {
   resetVaultSessionLockState,
   scheduleVaultAutoLock,
   subscribeVaultSession,
+  suppressVaultActivity,
   touchVaultSession,
   unlockVaultSession,
 } from "./browser.js";
@@ -223,6 +225,14 @@ describe("vault session", () => {
     configureVaultSession({ autoLockMinutes: Number.NaN });
     touchVaultSession();
     expect(getVaultAutoLockRemainingMs()).toBe(15 * 60 * 1000);
+    expect(getVaultAutoLockMinutes()).toBe(15);
+  });
+
+  it("getVaultAutoLockMinutes reflects session config", () => {
+    configureVaultSession({ autoLockMinutes: 5 });
+    expect(getVaultAutoLockMinutes()).toBe(5);
+    configureVaultSession({ resolveAutoLockMinutes: () => 7 });
+    expect(getVaultAutoLockMinutes()).toBe(7);
   });
 
   it("does not schedule or touch locked and manually locked sessions", async () => {
@@ -250,7 +260,15 @@ describe("vault session", () => {
     expect(isVaultUnlocked()).toBe(true);
   });
 
-  it("renews inactivity on browser activity and removes the activity guard", async () => {
+  it("does not renew timer on browser activity without the activity guard", async () => {
+    configureVaultSession({ autoLockMinutes: 0.001 });
+    unlockVaultSession(await createUserVaultKey());
+    vi.advanceTimersByTime(30);
+    window.dispatchEvent(new Event("keydown"));
+    expect(getVaultAutoLockRemainingMs()).toBe(30);
+  });
+
+  it("renews inactivity on browser activity when the activity guard is registered", async () => {
     configureVaultSession({ autoLockMinutes: 0.001 });
     unlockVaultSession(await createUserVaultKey());
     const unregister = registerVaultActivityGuard(["keydown"]);
@@ -262,6 +280,37 @@ describe("vault session", () => {
     vi.advanceTimersByTime(30);
     window.dispatchEvent(new Event("keydown"));
     expect(getVaultAutoLockRemainingMs()).toBe(30);
+  });
+
+  it("ignores dock UI activity", async () => {
+    configureVaultSession({ autoLockMinutes: 1 });
+    unlockVaultSession(await createUserVaultKey());
+    const unregister = registerVaultActivityGuard(["keydown"]);
+    vi.advanceTimersByTime(30_000);
+
+    const dock = document.createElement("button");
+    dock.setAttribute("data-vault-dock-ignore-activity", "");
+    document.body.appendChild(dock);
+    dock.dispatchEvent(new KeyboardEvent("keydown", { bubbles: true }));
+    expect(getVaultAutoLockRemainingMs()).toBe(30_000);
+    unregister();
+    dock.remove();
+  });
+
+  it("suppressVaultActivity prevents activity touches", async () => {
+    configureVaultSession({ autoLockMinutes: 1 });
+    unlockVaultSession(await createUserVaultKey());
+    const unregister = registerVaultActivityGuard(["keydown"]);
+    vi.advanceTimersByTime(30_000);
+
+    suppressVaultActivity(500);
+    window.dispatchEvent(new Event("keydown"));
+    expect(getVaultAutoLockRemainingMs()).toBe(30_000);
+
+    vi.advanceTimersByTime(600);
+    window.dispatchEvent(new Event("keydown"));
+    expect(getVaultAutoLockRemainingMs()).toBe(60_000);
+    unregister();
   });
 
   it("returns a no-op unload guard outside the browser", () => {

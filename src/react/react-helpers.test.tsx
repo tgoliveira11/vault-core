@@ -66,6 +66,31 @@ describe("React vault helpers", () => {
     expect(result.current.unlocked).toBe(false);
   });
 
+  it("registers the activity guard when opted in", async () => {
+    const { unmount } = renderHook(() =>
+      useVaultSession({ registerUnloadGuard: false, registerActivityGuard: true })
+    );
+    await act(async () => unlockVaultSession(await createUserVaultKey()));
+    vi.advanceTimersByTime(30_000);
+    window.dispatchEvent(new Event("keydown"));
+    expect(getVaultAutoLockRemainingMs()).toBe(60_000);
+    unmount();
+  });
+
+  it("does not register the activity guard by default", async () => {
+    const { result, unmount } = renderHook(() =>
+      useVaultSession({ registerUnloadGuard: false })
+    );
+    await act(async () => unlockVaultSession(await createUserVaultKey()));
+    vi.advanceTimersByTime(30_000);
+    window.dispatchEvent(new Event("keydown"));
+    expect(getVaultAutoLockRemainingMs()).toBe(30_000);
+
+    act(() => result.current.touch());
+    expect(getVaultAutoLockRemainingMs()).toBe(60_000);
+    unmount();
+  });
+
   it("uses default hook options and registers the pagehide guard", async () => {
     const { result, unmount } = renderHook(() => useVaultSession());
     await act(async () => unlockVaultSession(await createUserVaultKey()));
@@ -76,6 +101,20 @@ describe("React vault helpers", () => {
     await act(async () => unlockVaultSession(await createUserVaultKey()));
     act(() => window.dispatchEvent(new Event("pagehide")));
     expect(isVaultUnlocked()).toBe(true);
+  });
+
+  it("registers the activity guard on the provider when opted in", async () => {
+    const { unmount } = render(
+      <VaultSessionProvider registerUnloadGuard={false} registerActivityGuard>
+        <span>vault child</span>
+      </VaultSessionProvider>
+    );
+    expect(screen.getByText("vault child")).toBeTruthy();
+    await act(async () => unlockVaultSession(await createUserVaultKey()));
+    vi.advanceTimersByTime(30_000);
+    window.dispatchEvent(new Event("keydown"));
+    expect(getVaultAutoLockRemainingMs()).toBe(60_000);
+    unmount();
   });
 
   it("renders provider children and applies session configuration", async () => {

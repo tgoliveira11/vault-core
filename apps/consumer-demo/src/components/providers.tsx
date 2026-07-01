@@ -11,11 +11,7 @@ export function Providers({
   autoLockMinutes: number;
 }) {
   return (
-    <VaultSessionProvider
-      sessionConfig={{ autoLockMinutes }}
-      registerActivityGuard
-      registerUnloadGuard
-    >
+    <VaultSessionProvider sessionConfig={{ autoLockMinutes }} registerUnloadGuard>
       {children}
     </VaultSessionProvider>
   );

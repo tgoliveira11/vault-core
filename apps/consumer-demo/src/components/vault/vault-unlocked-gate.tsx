@@ -1,40 +1,26 @@
 "use client";
 
-import { useRouter } from "next/navigation";
 import { useEffect, useState, type ReactNode } from "react";
-import { useVaultUnlocked } from "@tgoliveira/vault-core/react";
+import { useRouter } from "next/navigation";
+import { VaultProtectedGate } from "@tgoliveira/vault-core/react";
 import { isVaultConfigured } from "@/lib/vault-demo-store";
 
-export function VaultUnlockedGate({
-  children,
-  redirectTo = "/vault/unlock?next=/vault",
-}: {
-  children: ReactNode;
-  redirectTo?: string;
-}) {
-  const unlocked = useVaultUnlocked();
+export function VaultUnlockedGate({ children }: { children: ReactNode }) {
   const router = useRouter();
-  const [ready, setReady] = useState(false);
-  const [configured, setConfigured] = useState(false);
+  const [configured, setConfigured] = useState<boolean | null>(null);
 
   useEffect(() => {
-    const exists = isVaultConfigured();
-    setConfigured(exists);
-    setReady(true);
-    if (!exists) {
-      router.replace("/vault/setup");
-      return;
-    }
-    if (!unlocked) {
-      router.replace(redirectTo);
-    }
-  }, [unlocked, router, redirectTo]);
+    setConfigured(isVaultConfigured());
+  }, []);
 
-  if (!ready || !configured || !unlocked) {
-    return (
-      <p className="text-sm text-[var(--muted)]">Checking vault session…</p>
-    );
-  }
-
-  return children;
+  return (
+    <VaultProtectedGate
+      configured={configured}
+      redirectToSetup="/vault/setup"
+      onRedirectToSetup={(path) => router.replace(path)}
+      overlayBackground="color-mix(in srgb, var(--background) 92%, transparent)"
+    >
+      {children}
+    </VaultProtectedGate>
+  );
 }

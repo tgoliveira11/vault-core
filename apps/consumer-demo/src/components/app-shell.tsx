@@ -1,52 +1,37 @@
-import Link from "next/link";
+"use client";
 
-const NAV = [
-  { href: "/dashboard", label: "Dashboard" },
-  { href: "/vault/setup", label: "Vault setup" },
-  { href: "/vault", label: "My vault" },
-  { href: "/vault/settings", label: "Vault security" },
-  { href: "/admin/vault", label: "Vault admin" },
-] as const;
+import { AppHeader } from "@/components/app-header";
+import { VaultUnlockedGate } from "@/components/vault/vault-unlocked-gate";
+import { VaultLockOverlayExclude } from "@tgoliveira/vault-core/react";
 
 export function AppShell({
   title,
   description,
   children,
+  vaultProtected = false,
 }: {
   title: string;
   description?: string;
   children: React.ReactNode;
+  /** When true, wraps page content with the vault lock overlay instead of redirecting on lock. */
+  vaultProtected?: boolean;
 }) {
+  const main = (
+    <main className="mx-auto max-w-4xl px-4 py-8">
+      {description ? (
+        <p className="mb-6 text-sm text-[var(--muted)] leading-relaxed">{description}</p>
+      ) : null}
+      {children}
+    </main>
+  );
+
   return (
     <div className="min-h-screen bg-[var(--background)] text-[var(--foreground)]">
-      <header className="border-b border-[var(--border)] bg-[var(--card)]">
-        <div className="mx-auto flex max-w-4xl flex-wrap items-center justify-between gap-3 px-4 py-3">
-          <div>
-            <p className="text-xs font-semibold uppercase tracking-wider text-[var(--muted)]">
-              @tgoliveira/vault-core · consumer demo
-            </p>
-            <p className="text-sm font-medium">{title}</p>
-          </div>
-          <nav className="flex flex-wrap gap-2 text-sm">
-            {NAV.map((item) => (
-              <Link
-                key={item.href}
-                href={item.href}
-                className="rounded-md border border-[var(--border)] px-3 py-1.5 hover:bg-[var(--card-muted)]"
-              >
-                {item.label}
-              </Link>
-            ))}
-          </nav>
-        </div>
-      </header>
+      <VaultLockOverlayExclude>
+        <AppHeader title={title} />
+      </VaultLockOverlayExclude>
 
-      <main className="mx-auto max-w-4xl px-4 py-8">
-        {description ? (
-          <p className="mb-6 text-sm text-[var(--muted)] leading-relaxed">{description}</p>
-        ) : null}
-        {children}
-      </main>
+      {vaultProtected ? <VaultUnlockedGate>{main}</VaultUnlockedGate> : main}
     </div>
   );
 }

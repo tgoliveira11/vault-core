@@ -4,7 +4,6 @@ import Link from "next/link";
 import { useCallback, useEffect, useState } from "react";
 import { useVaultSession } from "@tgoliveira/vault-core/react";
 import { AppShell } from "@/components/app-shell";
-import { VaultUnlockedGate } from "@/components/vault/vault-unlocked-gate";
 import {
   loadDecryptedDemoPayload,
   saveDemoPayload,
@@ -12,11 +11,7 @@ import {
 } from "@/lib/vault-demo-crypto";
 
 export function VaultClientPage() {
-  return (
-    <VaultUnlockedGate>
-      <VaultClientContent />
-    </VaultUnlockedGate>
-  );
+  return <VaultClientContent />;
 }
 
 function VaultClientContent() {
@@ -79,6 +74,7 @@ function VaultClientContent() {
 
   return (
     <AppShell
+      vaultProtected
       title="My vault"
       description="Client-only encrypted notes demo. This page is reachable only while the vault session is unlocked."
     >

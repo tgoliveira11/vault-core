@@ -19,7 +19,7 @@ export function useVaultSession(options: UseVaultSessionOptions = {}) {
   const {
     sessionConfig,
     registerUnloadGuard = true,
-    registerActivityGuard = true,
+    registerActivityGuard = false,
   } = options;
   const unlocked = useVaultUnlocked();
 

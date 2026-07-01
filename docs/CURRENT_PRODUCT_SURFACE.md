@@ -12,7 +12,7 @@ Last reviewed: **2026-07-01** (package version **0.3.0**, unreleased vault delet
 | `@tgoliveira/vault-core/browser` | Shipped | Session lifecycle, auto-lock, storage inspection, PRF salt, recovery kit DOM |
 | `@tgoliveira/vault-core/react` | Shipped | Session provider/hooks, client status, **vault admin UI pages** |
 | `@tgoliveira/vault-core/testing` | Shipped | Plaintext sentinels and leak-detection helpers |
-| `@tgoliveira/vault-core/vault-admin.css` | Shipped | Styles for vault admin pages |
+| `@tgoliveira/vault-core/vault-admin.css` | Shipped | Styles for vault admin pages and vault status dock |
 
 ## Core capabilities (shipped)
 
@@ -62,6 +62,62 @@ decryption in admin pages.
 - `VaultSessionProvider`, `useVaultSession`, `useVaultUnlocked`, `useVaultLockState`
 - `resolveVaultClientStatus`, `useVaultClientStatus`
 
+## Vault status dock (shipped)
+
+Exported from `@tgoliveira/vault-core/react` (styles: `vc-status-dock-*` in `vault-admin.css`):
+
+| Export | Purpose |
+| --- | --- |
+| `VaultStatusDock` | Header-attached collapsible lock/unlock handle and expanded panel |
+| `VaultDockQuickUnlock` | Compact password or passkey primary unlock for the dock (auto-focus password, Enter submit, passkey auto-start) |
+| `requestVaultDockExpand` / `subscribeVaultDockExpand` | Programmatic expand from locked-content gates |
+| `useVaultAutoLockCountdown` / `useVaultAutoLockFraction` | Live auto-lock countdown and ring fraction |
+| `resolveVaultDockPasskeyAvailability` | Passkey PRF quick-unlock eligibility |
+| Copy/preference helpers | `getVaultStatusDockExpandedCopy`, collapse `localStorage` preference |
+
+Apps inject routes (`unlockPath`, `buildUnlockHref`, `LinkComponent`), server status snapshot,
+`renderQuickUnlock`, and unlock handlers — no product auth or note payloads in the package.
+
+## Vault protected gate (shipped)
+
+Exported from `@tgoliveira/vault-core/react` (styles: `vc-vault-protected-gate*` / `vc-vault-lock-overlay`
+in `vault-admin.css`):
+
+| Export | Purpose |
+| --- | --- |
+| `VaultProtectedGate` | Blur overlay on protected pages while locked; blocks interaction; Enter expands dock |
+| `VaultLockOverlayExclude` | Marks header/nav chrome that stays above the overlay while locked |
+| `shouldVaultLockOverlayExpandDock` | Enter-key guard (skips editable fields) |
+| `computeVaultLockOverlayPanels` | Viewport overlay geometry minus exclusion holes |
+| `useVaultLockOverlayPanels` | Hook that tracks exclusion rects for overlay panels |
+| `VAULT_LOCK_OVERLAY_EXCLUDE_SELECTOR` | Query selector for registered exclusion regions |
+
+Props: `configured?`, `redirectToSetup?`, `onRedirectToSetup?`, `onExpandDock?`, `loadingFallback?`,
+`overlayClassName?`, `overlayBackground?` (sets `--vc-vault-lock-overlay-color`).
+Redirect applies only when the vault is not configured — not when locked. Wrap app chrome in
+`VaultLockOverlayExclude` (sibling above the gate); mount `VaultStatusDock` inside that excluded header.
+
+**Security:** The overlay is visual UX only (blur + pointer blocking). Apps must check vault unlock
+status in code (`useVaultUnlocked()`, session APIs) before decrypting or exposing secrets — do not
+treat the overlay as a security boundary.
+
+## Vault unlock page (shipped)
+
+Exported from `@tgoliveira/vault-core/react` (styles: `vc-vault-unlock-*` in `vault-admin.css`):
+
+| Export | Purpose |
+| --- | --- |
+| `VaultUnlockPanel` | Full-page unlock UI — password tab, recovery phrase tab, optional passkey button (explicit click; no auto-start by default) |
+| `readVaultUnlockReturnPath` / `resolveVaultUnlockReturnPath` | Sanitize caller return paths from URL search params |
+| `buildVaultUnlockHref` | Build unlock route href preserving return path (`next` query param by default) |
+| `VAULT_UNLOCK_RETURN_QUERY_PARAM` | Default query key (`next`) |
+| `useVaultUnlockPageNavigation` | Redirect to setup when unconfigured; redirect to return path after unlock |
+
+Apps mount `VaultUnlockPanel` on a dedicated unlock route, wire crypto handlers
+(`onUnlockPassword`, `onUnlockRecoveryPhrase`, optional `onUnlockPasskey`), and pass
+`serverStatus` / `prfSupported` for passkey eligibility. Return URLs must be same-origin relative
+paths only (`/vault`, not `//evil` or `https://…`).
+
 ## Published npm tarball includes
 
 `dist/`, `vault-admin.css`, `README.md`, `CHANGELOG.md`, `AGENTS.md`, `LICENSE`, security/architecture docs, `API_REFERENCE.md`, `docs/`
@@ -77,4 +133,5 @@ decryption in admin pages.
 
 ## Planned / not yet shipped
 
-- Consumer demo: vault setup and unlock flows (custom app UI — not exported as pages from vault-core)
+- Consumer demo: vault setup and unlock flows (custom app UI — not exported as pages from vault-core;
+  demo uses `VaultUnlockPanel` at `/vault/unlock` with `next` return-path support)

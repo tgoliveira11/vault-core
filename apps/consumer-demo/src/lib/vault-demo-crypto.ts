@@ -5,10 +5,12 @@ import {
   createUserVaultKey,
   decryptVaultPayload,
   encryptVaultPayload,
-  passwordEnvelopeSchema,
   passkeyPrfEnvelopeSchema,
+  passwordEnvelopeSchema,
+  recoveryPhraseEnvelopeSchema,
   unlockWithPasswordEnvelope,
   unlockWithPasskeyPrfEnvelope,
+  unlockWithRecoveryEnvelope,
   vaultSetupEnvelopeFieldsSchema,
   type EncryptedVaultPayload,
 } from "@tgoliveira/vault-core";
@@ -86,6 +88,34 @@ export async function unlockDemoVault(vaultPassword: string): Promise<DemoVaultP
   const envelope = passwordEnvelopeSchema.parse(record.passwordEnvelope);
   const vaultKey = await unlockWithPasswordEnvelope(
     vaultPassword,
+    envelope,
+    scope,
+    VAULT_PROFILE
+  );
+
+  const payload = await decryptVaultPayload<DemoVaultPayload>(
+    record.encryptedBlob,
+    vaultKey,
+    scope,
+    VAULT_PROFILE
+  );
+
+  unlockVaultSession(vaultKey);
+  return payload;
+}
+
+export async function unlockDemoVaultWithRecoveryPhrase(
+  recoveryPhrase: string
+): Promise<DemoVaultPayload> {
+  const record = loadVaultRecord();
+  if (!record) {
+    throw new Error("Vault is not configured");
+  }
+
+  const scope = vaultScope(DEMO_USER_ID);
+  const envelope = recoveryPhraseEnvelopeSchema.parse(record.recoveryEnvelope);
+  const vaultKey = await unlockWithRecoveryEnvelope(
+    recoveryPhrase,
     envelope,
     scope,
     VAULT_PROFILE

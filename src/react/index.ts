@@ -20,3 +20,6 @@ export {
 
 export * from "./admin/index.js";
 export * from "./password/index.js";
+export * from "./protected-gate/index.js";
+export * from "./status-dock/index.js";
+export * from "./unlock/index.js";

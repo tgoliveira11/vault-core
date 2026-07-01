@@ -1,6 +1,10 @@
 @import "tailwindcss";
 @import "@tgoliveira/vault-core/vault-admin.css";
 
+@theme {
+  --container-4xl: calc(56rem * 4 / 3);
+}
+
 :root {
   --background: #f8fafc;
   --foreground: #0f172a;

@@ -25,12 +25,83 @@ API changes increment the minor version.
 - Browser vault deletion helpers: `deleteVaultAfterAuthorization()` and
   `deleteVaultWithPasswordAuthorization()` — apps pass a `purgePersistedVault` callback for
   envelope/payload removal; vault-core clears in-memory session state.
+- `VaultStatusDock` and `VaultDockQuickUnlock` React components exported from
+  `@tgoliveira/vault-core/react` — header-attached vault lock/unlock UI with auto-lock countdown,
+  quick unlock slot, collapse preference, and `requestVaultDockExpand()` integration.
+- `VaultProtectedGate` React component — blur overlay on vault-protected pages while locked;
+  blocks interaction, keeps content mounted, expands the status dock on Enter, and redirects only
+  when the vault is not configured.
+- `VaultProtectedGate` `overlayClassName` and `overlayBackground` props — customize lock overlay
+  appearance via extra classes or the `--vc-vault-lock-overlay-color` CSS variable.
+- `VaultLockOverlayExclude` — marks layout chrome (navigation, header) that stays interactive above
+  the lock overlay; overlay panels are carved around registered exclusion regions.
+- `computeVaultLockOverlayPanels()`, `useVaultLockOverlayPanels()`, and
+  `VAULT_LOCK_OVERLAY_EXCLUDE_SELECTOR` for custom layouts.
+- `shouldVaultLockOverlayExpandDock()` helper for Enter-key dock expansion guards.
+- `VaultUnlockPanel` React component — full-page unlock UI with vault password, recovery phrase, and
+  optional passkey unlock (`autoFocusPassword` defaults to `true`; `autoStartPasskey` defaults to
+  `false` — passkey requires an explicit click on the full unlock page).
+- Return-path helpers: `VAULT_UNLOCK_RETURN_QUERY_PARAM` (`next`), `resolveVaultUnlockReturnPath()`,
+  `readVaultUnlockReturnPath()`, `buildVaultUnlockHref()`, and `useVaultUnlockPageNavigation()` for
+  post-unlock redirects.
+- `vc-vault-unlock-*` styles in `vault-admin.css` for the unlock page panel.
+- `suppressVaultActivity()` on `@tgoliveira/vault-core/browser` — prevents dock interactions from
+  resetting the inactivity timer; activity guard ignores `[data-vault-dock-ignore-activity]`.
+- `vc-status-dock-*` styles in `vault-admin.css` for the status dock.
 
 ### Changed
 
+- `VaultProtectedGate` lock overlay is rendered as one or more fixed panels that cover the viewport
+  except regions marked with `VaultLockOverlayExclude` (for example the app header / navigation).
+- `VaultProtectedGate` lock overlay is much heavier (24px blur, ~92% background opacity) so
+  underlying page content is barely visible (~5–10%) while locked.
+- `VaultStatusDock` locked collapsed handle reserves the same width as the unlocked handle (invisible
+  countdown slot and matching label width) so the dock does not resize when the vault locks.
+- `VaultStatusDock` keeps the collapsed locked handle visible on the full unlock page (no longer
+  hidden when `isFullUnlockPage` matches).
+- `VaultStatusDock` defaults `buildUnlockHref` to `buildVaultUnlockHref(unlockPath, returnPath)` when
+  the app does not supply a custom builder.
+- `VaultDockQuickUnlock` auto-focuses the vault password field, submits on Enter, and auto-starts
+  passkey unlock on mount when passkey is primary (`autoFocusPassword` / `autoStartPasskey` default
+  to `true`; passkey auto-start is best-effort — browsers may require a recent user gesture).
+- `VaultStatusDock` collapses the expanded unlocked panel when auto-lock fires or the session
+  becomes locked; locked handle copy is **Vault locked** (was **Vault closed**); `data-vault-state`
+  uses `locked` instead of `closed` when the vault is locked.
+- Vault auto-lock countdown no longer resets on pointer, keyboard, touch, or focus events by default.
+  Only explicit `touchVaultSession()` (the vault status dock **Stay unlocked** action) renews the timer.
+  Opt in to activity-based renewal with `registerVaultActivityGuard()` or
+  `registerActivityGuard` on `VaultSessionProvider` / `useVaultSession`.
+- `registerActivityGuard` on `VaultSessionProvider` and `useVaultSession` now defaults to `false`.
 - `listVaultAdminConfigEntries()` accepts optional `adminOverrides` and includes all env-catalog password
   policy fields; each entry exposes `overridable`.
 - `VaultAdminEnvSource` now includes `"admin"`.
+
+### Changed
+
+- `VaultStatusDock` **Lock now** uses the same subtle button style as **Stay unlocked** in the
+  expanded open panel (was a text link).
+- Locked quick-unlock panel width matches the open expanded dock (`15rem`) so passkey/password
+  actions align with **Stay unlocked**.
+- `VaultDockQuickUnlock` unlock and passkey buttons use the same subtle dock action style as
+  **Stay unlocked** / **Lock now** in the expanded open panel (was accent primary).
+- Dock passkey unlock cancellation or failure redirects to the full unlock page with the current
+  return path (`redirectOnPasskeyUnlockFailure`, default `true`; `onNavigateToUnlock` for SPA apps).
+- Expanded vault dock stays open for clicks and focus inside the dock region (handle + panel); it
+  collapses on outside click or Escape only (handle no longer toggles closed while expanded).
+
+### Fixed
+
+- `VaultStatusDock` expanded panel stays open when interacting with password-manager autofill UI
+  (for example Enpass) rendered outside the dock DOM while the vault password field remains focused.
+- `VaultStatusDock` **Stay unlocked** label and circular countdown ring now use the active vault
+  session auto-lock minutes (`configureVaultSession` / `VaultSessionProvider`) when
+  `autoLockMinutes` is omitted, instead of always defaulting to 15 minutes.
+- `getVaultAutoLockMinutes()` exported from `@tgoliveira/vault-core/browser` for the resolved
+  session timeout.
+- `VaultStatusDock` keeps the collapsed locked handle visible while the quick-unlock panel is
+  expanded (password / passkey), matching unlocked expanded behavior.
+- `VaultStatusDock` keeps the collapsed handle (lock icon and auto-lock countdown) visible while the
+  unlocked expanded panel is open, instead of replacing it with the panel alone.
 
 ## [0.3.0] - 2026-06-29
 

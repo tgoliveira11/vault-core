@@ -10,22 +10,29 @@ let sessionConfig: VaultSessionConfig = {};
 let inactivityTimer: ReturnType<typeof setTimeout> | null = null;
 let manuallyLocked = false;
 let lastActivityAt = 0;
+let activitySuppressedUntil = 0;
 const listeners = new Set<() => void>();
 const DEFAULT_ACTIVITY_EVENTS = ["pointerdown", "keydown", "touchstart", "focus"] as const;
+const VAULT_DOCK_IGNORE_ACTIVITY_SELECTOR = "[data-vault-dock-ignore-activity]";
 
 export function configureVaultSession(config: VaultSessionConfig): void {
   sessionConfig = config;
 }
 
 function getAutoLockTimeoutMs(): number {
+  return getVaultAutoLockMinutes() * 60 * 1000;
+}
+
+/** Resolved vault auto-lock duration in minutes (session config, then package default). */
+export function getVaultAutoLockMinutes(): number {
   const resolved = sessionConfig.resolveAutoLockMinutes?.();
   const minutes =
     resolved ??
     sessionConfig.autoLockMinutes ??
     DEFAULT_VAULT_AUTO_LOCK_MINUTES;
-  const safeMinutes =
-    Number.isFinite(minutes) && minutes > 0 ? minutes : DEFAULT_VAULT_AUTO_LOCK_MINUTES;
-  return safeMinutes * 60 * 1000;
+  return Number.isFinite(minutes) && minutes > 0
+    ? minutes
+    : DEFAULT_VAULT_AUTO_LOCK_MINUTES;
 }
 
 function notifyVaultSessionChange(): void {
@@ -99,12 +106,46 @@ export function registerVaultUnloadGuard(): () => void {
   return () => window.removeEventListener("pagehide", handler);
 }
 
+/**
+ * Briefly suppress `registerVaultActivityGuard` listeners (not explicit `touchVaultSession`).
+ * Used around vault status dock open/close when activity-based renewal is enabled.
+ */
+export function suppressVaultActivity(ms = 500): void {
+  activitySuppressedUntil = Date.now() + ms;
+}
+
+function shouldIgnoreVaultActivityEvent(event: Event): boolean {
+  if (Date.now() < activitySuppressedUntil) return true;
+  const target = event.target;
+  if (
+    target instanceof Element &&
+    target.closest(VAULT_DOCK_IGNORE_ACTIVITY_SELECTOR)
+  ) {
+    return true;
+  }
+  if (
+    event.type === "focus" &&
+    (target === document.body || target === document.documentElement)
+  ) {
+    return true;
+  }
+  return false;
+}
+
+/**
+ * Opt-in: renew the auto-lock countdown on pointer, keyboard, touch, and focus events.
+ * Default session integration does not register this guard; only explicit `touchVaultSession()`
+ * (for example the vault status dock "Stay unlocked" action) resets the timer.
+ */
 export function registerVaultActivityGuard(
   events: readonly string[] = DEFAULT_ACTIVITY_EVENTS
 ): () => void {
   if (typeof window === "undefined") return () => undefined;
 
-  const handler = () => touchVaultSession();
+  const handler = (event: Event) => {
+    if (shouldIgnoreVaultActivityEvent(event)) return;
+    touchVaultSession();
+  };
   for (const event of events) {
     window.addEventListener(event, handler, { passive: true });
   }

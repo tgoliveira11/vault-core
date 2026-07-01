@@ -182,9 +182,11 @@ New code should use the canonical APIs. Deprecated unlock aliases use the curren
 - `lockVaultSessionManually()` / `isVaultManuallyLocked()`
 - `touchVaultSession()` / `scheduleVaultAutoLock()` / `clearVaultAutoLockTimer()`
 - `getVaultAutoLockRemainingMs()`
+- `getVaultAutoLockMinutes()` — resolved session auto-lock duration in minutes
+- `suppressVaultActivity(ms?)` — when activity-based renewal is enabled, briefly suppresses guard listeners so vault dock toggles do not reset inactivity
 - `getSessionVaultKey()` / `isVaultUnlocked()`
 - `subscribeVaultSession(listener)`
-- `registerVaultActivityGuard(events?)`
+- `registerVaultActivityGuard(events?)` — opt-in; renews the countdown on pointer, keyboard, touch, and focus events
 - `registerVaultUnloadGuard()`
 - `resetVaultSessionLockState()`
 - `deleteVaultAfterAuthorization(options)` / `deleteVaultWithPasswordAuthorization(options)`
@@ -220,8 +222,10 @@ boolean aliases that fail closed.
 - `useVaultClientStatus(serverStatus, prfSupported)`
 - `VaultClientStatus` / `VaultServerStatusSnapshot`
 
-Provider and session hook guard options are `registerActivityGuard` and `registerUnloadGuard`, both
-defaulting to `true`.
+Provider and session hook guard options are `registerActivityGuard` (defaults to `false`) and
+`registerUnloadGuard` (defaults to `true`). Set `registerActivityGuard` when the app should renew the
+auto-lock countdown on user activity; otherwise call `touchVaultSession()` explicitly (for example from
+the vault status dock **Stay unlocked** action).
 
 ### Vault admin UI
 
@@ -244,6 +248,92 @@ Helpers:
 - `VaultAdminPageProps`, `VaultAdminLinkProps`
 
 See [`docs/VAULT_ADMIN.md`](docs/VAULT_ADMIN.md).
+
+### Vault status dock
+
+Import styles once (includes `vc-status-dock-*` classes).
+
+- `VaultStatusDock` / `VaultStatusDockProps` — collapsible header dock (lock state, auto-lock countdown, lock now, quick-unlock slot)
+- `VaultDockQuickUnlock` / `VaultDockQuickUnlockProps` — password or passkey primary unlock;
+  `autoFocusPassword` and `autoStartPasskey` (default `true`) control focus and passkey auto-start
+- `createVaultFullUnlockPageMatcher(unlockPath)` — detect full unlock route (dock stays collapsed, handle visible)
+- `requestVaultDockExpand()` / `subscribeVaultDockExpand(listener)` — expand from elsewhere in the app
+- `useVaultAutoLockCountdown(active, autoLockMinutes?)` / `useVaultAutoLockFraction(...)` /
+  `useVaultAutoLockMinutes(overrideMinutes?)` / `resolveVaultAutoLockMinutes(overrideMinutes?)`
+- `navigateToVaultFullUnlock(href, onNavigate?)` — SPA or hard redirect to full unlock
+- `resolveVaultDockPasskeyAvailability(serverStatus)`
+- `readVaultStatusDockCollapsedPreference(key?)` / `writeVaultStatusDockCollapsedPreference(collapsed, key?)`
+- Copy helpers: `getVaultStatusDockExpandedCopy`, `getVaultStatusDockHandleLabel`, `DEFAULT_VAULT_STATUS_DOCK_LABELS`
+- Icons: `VaultStatusIcon`, `VaultStatusDockChevron`, `VaultStatusDockLockIcon`
+
+`VaultStatusDock` requires app-provided `serverStatus`, `pathname`, `unlockPath`, optional
+`LinkComponent`, `buildUnlockHref` (defaults to `buildVaultUnlockHref(unlockPath, returnPath)`),
+`renderQuickUnlock`, optional `autoLockMinutes` (override; when omitted, uses
+`configureVaultSession()` / `VaultSessionProvider`), `onNavigateToUnlock`, and
+`redirectOnPasskeyUnlockFailure` (default `true`). The quick-unlock slot receives
+`fullUnlockHref` and `onPasskeyUnlockFailed` for passkey fallback to the full unlock page. Set `visible={false}`
+when the user is signed out. Hide before vault setup via `serverStatus.configured === false`.
+
+### Vault protected gate
+
+Import styles once (includes `vc-vault-protected-gate*` and `vc-vault-lock-overlay` classes).
+
+- `VaultProtectedGate` / `VaultProtectedGateProps` — wraps vault-protected page content; when the
+  vault is locked, renders children under fixed blur overlay panel(s) that block interaction while
+  excluded chrome (`VaultLockOverlayExclude`) and the status dock (`vc-status-dock-host`) stay usable.
+- `VaultLockOverlayExclude` / `VaultLockOverlayExcludeProps` — wrap app chrome (header, nav, dock
+  host) that must remain visible and clickable while the vault is locked. Mount as a **sibling**
+  outside the gate's inert content. Sets `data-vault-lock-overlay-exclude="true"`.
+- `VAULT_LOCK_OVERLAY_EXCLUDE_ATTR` / `VAULT_LOCK_OVERLAY_EXCLUDE_SELECTOR` — DOM marker constants.
+- `computeVaultLockOverlayPanels(viewportWidth, viewportHeight, exclusions)` — pure helper for
+  viewport-minus-hole overlay geometry.
+- `useVaultLockOverlayPanels(active)` — tracks exclusion rects and returns overlay panel layout.
+- `shouldVaultLockOverlayExpandDock(event)` — returns whether Enter should expand the dock (skips
+  inputs, textareas, selects, and contenteditable targets).
+
+**Security:** The lock overlay is visual UX only — it blurs content and blocks pointer interaction in
+the browser, but it is not a security boundary. Consumers **must** gate vault-sensitive operations in
+application code (for example `useVaultUnlocked()`, `useVaultSession()`, or equivalent checks before
+decrypt, persist, or render secrets). Do not rely on the overlay or `inert` alone to protect data.
+
+Props:
+
+- `children` — protected page content (stays mounted while locked).
+- `configured?: boolean | null` — when `false`, redirects to `redirectToSetup`; when `null`, shows
+  `loadingFallback`; when omitted or `true`, only lock overlay applies.
+- `redirectToSetup?` / `onRedirectToSetup?(path)` — setup redirect (no redirect on lock).
+- `onExpandDock?` / `expandEventName?` — Enter-key quick unlock (defaults to `requestVaultDockExpand()`).
+- `loadingFallback?` — shown while `configured === null` or during setup redirect.
+- `overlayClassName?` — extra class names on each lock overlay panel element.
+- `overlayBackground?` — sets `--vc-vault-lock-overlay-color` on each overlay panel (any CSS color or
+  `color-mix()` expression). Omit for the default `color-mix(in srgb, var(--vc-background, canvas) 92%, transparent)`.
+  Consumers may also set `--vc-vault-lock-overlay-color` in CSS on `.vc-vault-lock-overlay` or an ancestor.
+
+**Layout:** Wrap persistent app chrome in `VaultLockOverlayExclude` (sibling above `VaultProtectedGate`).
+Mount `VaultStatusDock` inside that excluded region (typically `vc-status-dock-host` in the header).
+The overlay covers the viewport except carved-out exclusion rectangles; excluded regions use
+`z-index: 55`, overlay panels `50`, dock host `60`.
+
+Mount `VaultStatusDock` as a sibling in the app header (not inside the gate). Press **Enter** while
+the overlay is active to expand the dock for quick unlock.
+
+### Vault unlock page
+
+Import styles once (includes `vc-vault-unlock-*` classes).
+
+- `VaultUnlockPanel` / `VaultUnlockPanelProps` — password, recovery phrase, and optional passkey unlock
+  (`autoFocusPassword` default `true`; `autoStartPasskey` default `false` on the full unlock page;
+  passkey auto-start remains opt-in). Customizable `labels`, `passkeyReady`, etc.
+- `VAULT_UNLOCK_RETURN_QUERY_PARAM` — default query key for post-unlock navigation (`"next"`)
+- `resolveVaultUnlockReturnPath(raw, options?)` — sanitize a return path (relative `/…` only)
+- `readVaultUnlockReturnPath(searchParams, options?)` — read and sanitize from URL search params
+- `buildVaultUnlockHref(unlockPath, returnPath, options?)` — build unlock route with return path
+- `useVaultUnlockPageNavigation({ configured, returnPath, setupPath?, onNavigate })` — redirect when
+  setup is required or when the vault becomes unlocked
+
+**Return URL contract:** Callers link to the unlock page with `buildVaultUnlockHref("/vault/unlock", currentPath)`.
+After a successful unlock, navigate to the sanitized `returnPath`. Only same-origin relative paths are
+accepted; `//host`, absolute URLs, and empty values fall back to `defaultPath` (default `/`).
 
 ## Admin config: `@tgoliveira/vault-core`
 
