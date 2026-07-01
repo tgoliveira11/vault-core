@@ -60,6 +60,40 @@ export default function DashboardPage() {
           </ul>
         </section>
 
+        <section className="vc-admin-card">
+          <h2 className="vc-admin-card-title">Client vault</h2>
+          <p className="vc-admin-card-desc mt-2">
+            Setup stores encrypted envelopes in this browser.{" "}
+            <code>/vault</code> is reachable only while the in-memory session is unlocked.
+          </p>
+          <div className="mt-4 flex flex-wrap gap-2">
+            <Link
+              href="/vault/setup"
+              className="inline-block rounded-md border border-[var(--border)] px-4 py-2 text-sm font-medium hover:bg-[var(--card-muted)]"
+            >
+              Vault setup
+            </Link>
+            <Link
+              href="/vault"
+              className="inline-block rounded-md bg-[var(--primary)] px-4 py-2 text-sm font-medium text-white"
+            >
+              My vault →
+            </Link>
+            <Link
+              href="/vault/unlock?next=/vault"
+              className="inline-block rounded-md border border-[var(--border)] px-4 py-2 text-sm font-medium hover:bg-[var(--card-muted)]"
+            >
+              Unlock vault
+            </Link>
+            <Link
+              href="/vault/settings"
+              className="inline-block rounded-md border border-[var(--border)] px-4 py-2 text-sm font-medium hover:bg-[var(--card-muted)]"
+            >
+              Vault security
+            </Link>
+          </div>
+        </section>
+
         <section className="vc-admin-card sm:col-span-2">
           <h2 className="vc-admin-card-title">Vault admin UI (from package)</h2>
           <p className="vc-admin-card-desc mt-2">

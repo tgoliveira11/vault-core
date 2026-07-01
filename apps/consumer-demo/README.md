@@ -46,6 +46,10 @@ Open http://localhost:3013
 | Route | Source |
 | --- | --- |
 | `/dashboard` | Demo hub — session status, Postgres health |
+| `/vault/setup` | Client vault setup (password + recovery phrase) |
+| `/vault/unlock` | Unlock vault (password) |
+| `/vault` | Client vault — notes demo; requires unlocked session |
+| `/vault/settings` | Change password, rotate recovery phrase, link passkey, KDF upgrade |
 | `/admin/vault` | `VaultAdminPanelPage` |
 | `/admin/vault/config` | `VaultAdminConfigPage` |
 | `/admin/vault/env-template` | `VaultAdminEnvTemplatePage` |

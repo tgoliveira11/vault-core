@@ -18,6 +18,13 @@ API changes increment the minor version.
 - Editable `VaultAdminConfigPage` when `configApiBase` is set (GET/POST/DELETE `{apiBase}/admin/config`).
 - Source badge `admin` on configuration entries overridden at runtime.
 - `configApiBase` and `adminOverrides` props on `VaultAdminPageProps`.
+- Vault password policy assessment helpers: `assessVaultPassword()`, `validateVaultPasswordAgainstPolicy()`,
+  `validateVaultPasswordSetup()`, and related requirement/strength utilities.
+- React components `VaultPasswordField` and `VaultPasswordSetupFields` exported from
+  `@tgoliveira/vault-core/react` (strength score, enforcement mode, requirement checklist).
+- Browser vault deletion helpers: `deleteVaultAfterAuthorization()` and
+  `deleteVaultWithPasswordAuthorization()` — apps pass a `purgePersistedVault` callback for
+  envelope/payload removal; vault-core clears in-memory session state.
 
 ### Changed
 

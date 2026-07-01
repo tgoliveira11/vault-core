@@ -2,7 +2,7 @@
 
 Living inventory of what `@tgoliveira/vault-core` exposes today. Update this file when exports, admin screens, published artifacts, or shipped/planned status changes.
 
-Last reviewed: **2026-06-19** (package version **0.3.0**, unreleased admin overrides on branch)
+Last reviewed: **2026-07-01** (package version **0.3.0**, unreleased vault deletion helpers on branch)
 
 ## Package entry points (shipped)
 
@@ -22,6 +22,7 @@ Last reviewed: **2026-06-19** (package version **0.3.0**, unreleased admin overr
 - BIP39 12/24-word recovery phrases and recovery kit text
 - Password rotation (`rotateVaultPassword`)
 - Recovery phrase rotation (`rotateRecoveryPhrase`)
+- Vault deletion after authorization (`deleteVaultAfterAuthorization`, `deleteVaultWithPasswordAuthorization` on browser entry)
 - Auto-upgrade legacy KDF on unlock
 - Plaintext rejection / sentinel validation
 - Canonical crypto policy (`VAULT_CRYPTO_POLICY`) + CI guard

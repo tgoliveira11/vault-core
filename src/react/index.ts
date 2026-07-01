@@ -19,3 +19,4 @@ export {
 } from "./session/vault-session-provider.js";
 
 export * from "./admin/index.js";
+export * from "./password/index.js";

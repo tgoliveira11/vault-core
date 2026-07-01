@@ -290,3 +290,54 @@
   background: #fef2f2;
   border-color: var(--vc-danger);
 }
+
+.vc-password-field {
+  width: 100%;
+}
+
+.vc-password-feedback {
+  font-size: 0.8125rem;
+  color: var(--vc-muted);
+  line-height: 1.5;
+}
+
+.vc-password-feedback-enforcement,
+.vc-password-feedback-hint,
+.vc-password-message {
+  margin: 0 0 0.375rem;
+}
+
+.vc-password-strength {
+  margin: 0 0 0.5rem;
+  font-weight: 500;
+}
+
+.vc-password-strength--weak {
+  color: var(--vc-danger);
+}
+
+.vc-password-strength--fair {
+  color: #d97706;
+}
+
+.vc-password-strength--good {
+  color: #2563eb;
+}
+
+.vc-password-strength--strong {
+  color: var(--vc-success);
+}
+
+.vc-password-requirements {
+  margin: 0.25rem 0 0.5rem;
+  padding-left: 0;
+  list-style: none;
+}
+
+.vc-password-requirement {
+  margin: 0.125rem 0;
+}
+
+.vc-password-requirement--met {
+  color: var(--vc-success);
+}

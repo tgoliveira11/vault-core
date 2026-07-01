@@ -121,6 +121,13 @@ export {
 };
 
 export {
+  deleteVaultAfterAuthorization,
+  deleteVaultWithPasswordAuthorization,
+  type DeleteVaultAfterAuthorizationOptions,
+  type DeleteVaultWithPasswordAuthorizationOptions,
+} from "./session/vault-deletion.js";
+
+export {
   configureVaultSession,
   subscribeVaultSession,
   isVaultManuallyLocked,

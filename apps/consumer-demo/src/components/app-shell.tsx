@@ -2,6 +2,9 @@ import Link from "next/link";
 
 const NAV = [
   { href: "/dashboard", label: "Dashboard" },
+  { href: "/vault/setup", label: "Vault setup" },
+  { href: "/vault", label: "My vault" },
+  { href: "/vault/settings", label: "Vault security" },
   { href: "/admin/vault", label: "Vault admin" },
 ] as const;
 

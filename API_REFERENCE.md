@@ -187,6 +187,7 @@ New code should use the canonical APIs. Deprecated unlock aliases use the curren
 - `registerVaultActivityGuard(events?)`
 - `registerVaultUnloadGuard()`
 - `resetVaultSessionLockState()`
+- `deleteVaultAfterAuthorization(options)` / `deleteVaultWithPasswordAuthorization(options)`
 - `VaultSessionConfig`
 
 Direct session-key setters are intentionally not exported.

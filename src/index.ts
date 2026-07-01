@@ -17,6 +17,28 @@ export * from "./keys/user-vault-key.js";
 export * from "./validation/schemas.js";
 export * from "./validation/aad-assert.js";
 export {
+  assessVaultPassword,
+  getVaultPasswordPolicyHint,
+  getVaultPasswordStrengthDisplay,
+  shouldShowVaultPasswordStrengthUi,
+  validateVaultPasswordForSubmission,
+  type VaultPasswordAssessment,
+  type VaultPasswordStrengthLabel,
+} from "./validation/vault-password-policy-core.js";
+export {
+  calculateVaultPasswordStrength,
+  getVaultPasswordEnforcementMessage,
+  getVaultPasswordPolicyRequirements,
+  validateVaultPasswordAgainstPolicy,
+  validateVaultPasswordConfirmation,
+  validateVaultPasswordSetup,
+  type VaultPasswordRequirement,
+  type VaultPasswordRequirementId,
+  type VaultPasswordSetupValidationResult,
+  type VaultPasswordStrength,
+  type VaultPasswordValidationResult,
+} from "./validation/vault-password-policy.js";
+export {
   assertNoVaultPlaintextFields,
   rejectVaultPlaintextFields,
   validateNoPlaintextLeak,

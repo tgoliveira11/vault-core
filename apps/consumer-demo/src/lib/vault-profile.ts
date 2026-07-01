@@ -9,7 +9,7 @@ export const VAULT_PROFILE: VaultCryptoProfile = {
     process.env.VAULT_AAD_CONTEXT_ENVELOPE ?? "vault-core-demo:envelope:v1",
 };
 
-export const DEMO_USER_ID = "demo-user-001";
+export const DEMO_USER_ID = "00000000-0000-4000-8000-000000000001";
 
 export function vaultScope(userId: string = DEMO_USER_ID) {
   return {
