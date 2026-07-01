@@ -1,4 +1,17 @@
 export {
+  VAULT_CONFIG_KEY_DEFINITIONS,
+  VAULT_OVERRIDABLE_CONFIG_KEYS,
+  getVaultConfigKeyDefinition,
+  isVaultOverridableConfigKey,
+  validateVaultAdminOverride,
+  type VaultConfigKeyDefinition,
+  type VaultOverridableConfigKey,
+} from "./config-keys.js";
+export {
+  applyVaultAdminOverrides,
+  type VaultAdminConfigOverrideRecord,
+} from "./config-overrides.js";
+export {
   VAULT_ADMIN_ENV_CATALOG,
   buildVaultEnvLocalTemplate,
   type VaultAdminEnvVarDefinition,

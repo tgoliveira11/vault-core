@@ -1,6 +1,6 @@
 import type { VaultCryptoProfile } from "../profile.js";
 
-export type VaultAdminEnvSource = "env" | "default" | "profile";
+export type VaultAdminEnvSource = "admin" | "env" | "default" | "profile";
 
 export type VaultPasswordEnforcement = "off" | "warn" | "enforce";
 
@@ -35,6 +35,8 @@ export type VaultAdminConfigInput = {
   prfSaltPrefix?: string;
   productName?: string;
   defaultRecoveryWordCount?: 12 | 24;
+  /** Runtime admin overrides (highest priority). */
+  adminOverrides?: Record<string, unknown>;
 };
 
 export type VaultAdminConfig = {
@@ -57,6 +59,7 @@ export type VaultAdminConfigEntry = {
   group: VaultAdminConfigGroup;
   value: string | number | boolean;
   source: VaultAdminEnvSource;
+  overridable?: boolean;
   sensitive?: boolean;
 };
 

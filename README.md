@@ -29,6 +29,14 @@ Build vault-core before consuming:
 cd ../vault-core && npm run validate
 ```
 
+Local consumer demo (not published to npm):
+
+```bash
+cd apps/consumer-demo && npm install && npm run dev
+```
+
+Open http://localhost:3013 — see [apps/consumer-demo/README.md](apps/consumer-demo/README.md).
+
 ## Testing
 
 ```bash

@@ -8,6 +8,23 @@ API changes increment the minor version.
 
 ## [Unreleased]
 
+### Added
+
+- Runtime admin config overrides with resolution priority **admin → env → default**:
+  `applyVaultAdminOverrides()`, `validateVaultAdminOverride()`, `VAULT_OVERRIDABLE_CONFIG_KEYS`, and
+  `VAULT_CONFIG_KEY_DEFINITIONS`.
+- `buildVaultAdminConfigFromEnv()` accepts optional `adminOverrides` for consuming apps that persist
+  overrides in a database or other store.
+- Editable `VaultAdminConfigPage` when `configApiBase` is set (GET/POST/DELETE `{apiBase}/admin/config`).
+- Source badge `admin` on configuration entries overridden at runtime.
+- `configApiBase` and `adminOverrides` props on `VaultAdminPageProps`.
+
+### Changed
+
+- `listVaultAdminConfigEntries()` accepts optional `adminOverrides` and includes all env-catalog password
+  policy fields; each entry exposes `overridable`.
+- `VaultAdminEnvSource` now includes `"admin"`.
+
 ## [0.3.0] - 2026-06-29
 
 ### Added

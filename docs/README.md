@@ -8,6 +8,8 @@ Use this page as the documentation router for `@tgoliveira/vault-core`.
   setup through password, recovery phrase, passkey PRF, persistence boundaries, and sessions.
 - [`ADOPTING_VAULT_CORE_IN_EXISTING_APPS.md`](ADOPTING_VAULT_CORE_IN_EXISTING_APPS.md): phased
   migration for an application that already has vault code or stored ciphertext.
+- [`../apps/consumer-demo/README.md`](../apps/consumer-demo/README.md): runnable local reference app
+  (not published to npm).
 - [`../API_REFERENCE.md`](../API_REFERENCE.md): public entry points and their security preconditions.
 - [`../SECURITY.md`](../SECURITY.md): threat model, secret boundaries, and storage rules.
 

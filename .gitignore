@@ -2,3 +2,6 @@ node_modules/
 dist/
 coverage/
 *.tsbuildinfo
+apps/consumer-demo/node_modules/
+apps/consumer-demo/.next/
+apps/consumer-demo/.env.local

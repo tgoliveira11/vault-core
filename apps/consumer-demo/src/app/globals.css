@@ -1,0 +1,40 @@
+@import "tailwindcss";
+@import "@tgoliveira/vault-core/vault-admin.css";
+
+:root {
+  --background: #f8fafc;
+  --foreground: #0f172a;
+  --muted: #64748b;
+  --border: #e2e8f0;
+  --card: #ffffff;
+  --card-muted: #f1f5f9;
+  --primary: #2563eb;
+  --success: #16a34a;
+  --warning: #d97706;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --background: #0f172a;
+    --foreground: #f1f5f9;
+    --muted: #94a3b8;
+    --border: #334155;
+    --card: #1e293b;
+    --card-muted: #0f172a;
+    --primary: #60a5fa;
+  }
+}
+
+body {
+  font-family: ui-sans-serif, system-ui, sans-serif;
+  background: var(--background);
+  color: var(--foreground);
+}
+
+code {
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 0.875em;
+  background: var(--card-muted);
+  padding: 0.125rem 0.375rem;
+  border-radius: 0.25rem;
+}

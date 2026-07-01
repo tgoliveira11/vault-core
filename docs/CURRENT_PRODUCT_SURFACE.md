@@ -2,7 +2,7 @@
 
 Living inventory of what `@tgoliveira/vault-core` exposes today. Update this file when exports, admin screens, published artifacts, or shipped/planned status changes.
 
-Last reviewed: **2026-06-29** (package version **0.3.0**)
+Last reviewed: **2026-06-19** (package version **0.3.0**, unreleased admin overrides on branch)
 
 ## Package entry points (shipped)
 
@@ -31,6 +31,7 @@ Last reviewed: **2026-06-29** (package version **0.3.0**)
 Exported from main entry — app maps `process.env`; package never reads env directly:
 
 - `buildVaultAdminConfigFromEnv`, `listVaultAdminConfigEntries`
+- `applyVaultAdminOverrides`, `validateVaultAdminOverride`, `VAULT_OVERRIDABLE_CONFIG_KEYS`, `VAULT_CONFIG_KEY_DEFINITIONS`
 - `VAULT_ADMIN_ENV_CATALOG`, `buildVaultEnvLocalTemplate`
 - `resolveVaultAdminPaths`, `listVaultAdminScreens`, `DEFAULT_VAULT_ADMIN_PATHS`
 
@@ -51,7 +52,9 @@ Mounted by consuming apps under configurable base path (default `/admin/vault`):
 | Vault password policy | `VaultAdminPasswordPolicyPage` | `/admin/vault/password-policy` |
 | Security boundaries | `VaultAdminSecurityPage` | `/admin/vault/security` |
 
-Read-only configuration display. No account auth or vault decryption in admin pages.
+Editable when the consuming app provides `configApiBase` (runtime overrides via app-owned API/DB).
+Read-only display otherwise. Crypto policy constants remain read-only. No account auth or vault
+decryption in admin pages.
 
 ## React session helpers (shipped)
 
@@ -65,14 +68,12 @@ Read-only configuration display. No account auth or vault decryption in admin pa
 ## Explicitly out of scope (not shipped)
 
 - Account authentication / OAuth / sessions for users
-- Database, API routes, persistence adapters
+- Database, API routes, persistence adapters (package exports override helpers only; apps implement storage)
 - Email / SMTP / notification flows
 - Product-specific payload schemas on the default entry
 - Automatic npm publish on merge or tag
-- Runtime config overrides via admin database (secure-auth style)
+- **`apps/consumer-demo/`** — local Next.js reference app in the git repo only (not in npm tarball); mounts all vault admin UI pages at `/admin/vault/*`, persists admin overrides in Postgres, exposes `/api/vault/admin/config`
 
 ## Planned / not yet shipped
 
-_None tracked in this repository._
-
-Add rows here when features are designed but not yet released.
+- Consumer demo: vault setup and unlock flows (custom app UI — not exported as pages from vault-core)
