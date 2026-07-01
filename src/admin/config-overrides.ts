@@ -15,6 +15,7 @@ export function applyVaultAdminOverrides(
     passwordPolicy: { ...config.passwordPolicy },
     session: { ...config.session },
     features: { ...config.features },
+    rateLimit: { ...config.rateLimit },
   };
 
   for (const [key, rawValue] of Object.entries(overrides)) {
@@ -27,12 +28,6 @@ export function applyVaultAdminOverrides(
         break;
       case "basePath":
         next.basePath = rawValue as string;
-        break;
-      case "aadContextVault":
-        next.profile = { ...next.profile, aadContextVault: rawValue as string };
-        break;
-      case "aadContextEnvelope":
-        next.profile = { ...next.profile, aadContextEnvelope: rawValue as string };
         break;
       case "prfSaltPrefix":
         next.prfSaltPrefix = rawValue as string;
@@ -83,6 +78,24 @@ export function applyVaultAdminOverrides(
         break;
       case "passkeyPrfUnlockEnabled":
         next.features = { ...next.features, passkeyPrfUnlockEnabled: rawValue as boolean };
+        break;
+      case "unlockMaxFailures":
+        next.rateLimit = { ...next.rateLimit, unlockMaxFailures: rawValue as number };
+        break;
+      case "unlockFailureWindowMinutes":
+        next.rateLimit = {
+          ...next.rateLimit,
+          unlockFailureWindowMinutes: rawValue as number,
+        };
+        break;
+      case "unlockLockoutMinutes":
+        next.rateLimit = { ...next.rateLimit, unlockLockoutMinutes: rawValue as number };
+        break;
+      case "apiMaxRequests":
+        next.rateLimit = { ...next.rateLimit, apiMaxRequests: rawValue as number };
+        break;
+      case "apiWindowSeconds":
+        next.rateLimit = { ...next.rateLimit, apiWindowSeconds: rawValue as number };
         break;
     }
   }

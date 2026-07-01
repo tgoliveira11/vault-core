@@ -28,7 +28,8 @@ Postgres listens on **host port 5437** (container 5432):
 | Password | `vault_demo_dev` |
 | Database | `vault_core_demo` |
 
-Copy `.env.example` to `.env.local` (includes `DATABASE_URL` and `VAULT_ADMIN_ENABLED=true`).
+Copy `.env.example` to `.env.local` (includes `DATABASE_URL`, `VAULT_ADMIN_ENABLED=true`, and
+`DEMO_ADMIN_EMAIL` for the mock admin gate).
 
 ## Run locally
 
@@ -50,7 +51,8 @@ Open http://localhost:3013
 | `/vault/unlock` | Unlock vault (password, recovery phrase, or passkey when linked); honors `?next=` return path |
 | `/vault` | Client vault — notes demo; requires unlocked session |
 | `/vault/settings` | Change password, rotate recovery phrase, link passkey, KDF upgrade |
-| `/admin/vault` | `VaultAdminPanelPage` |
+| `/admin/vault` | `VaultAdminPanelPage` (requires mock admin sign-in) |
+| `/admin/login` | Mock admin email gate (`DEMO_ADMIN_EMAIL`) |
 | `/admin/vault/config` | `VaultAdminConfigPage` |
 | `/admin/vault/env-template` | `VaultAdminEnvTemplatePage` |
 | `/admin/vault/crypto-policy` | `VaultAdminCryptoPolicyPage` |
@@ -59,6 +61,21 @@ Open http://localhost:3013
 | `/admin/vault/password-policy` | `VaultAdminPasswordPolicyPage` |
 | `/admin/vault/security` | `VaultAdminSecurityPage` |
 | `/api/health` | Postgres connectivity check |
+| `/api/vault/admin/config` | Vault admin overrides API (auth + rate limit + plaintext guard) |
+
+### Mock admin authentication (demo only)
+
+Vault admin pages (`/admin/vault/*`) and `/api/vault/*` require a signed cookie after posting the
+configured email to `/api/demo/auth/login`. Set in `.env.local`:
+
+- `DEMO_ADMIN_EMAIL` — allowed admin email (mock credential)
+- `DEMO_ADMIN_SESSION_SECRET` — HMAC secret for the demo session cookie
+
+Unlock flows call `withVaultUnlockRateLimit()` in `vault-demo-crypto.ts` (not only in React UI).
+The app sends a demo Content-Security-Policy via `next.config.ts`.
+
+See [docs/CONSUMER_SECURITY_REQUIREMENTS.md](../../docs/CONSUMER_SECURITY_REQUIREMENTS.md) for
+production integration requirements.
 
 Admin pages are thin re-exports in `src/app/admin/vault/*` using `getVaultAdminPageProps()` from `src/lib/vault-admin-page-props.ts`.
 

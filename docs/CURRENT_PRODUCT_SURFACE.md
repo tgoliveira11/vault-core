@@ -14,6 +14,11 @@ Last reviewed: **2026-07-01** (package version **0.3.0**, unreleased vault delet
 | `@tgoliveira/vault-core/testing` | Shipped | Plaintext sentinels and leak-detection helpers |
 | `@tgoliveira/vault-core/vault-admin.css` | Shipped | Styles for vault admin pages and vault status dock |
 
+## Consumer integration docs (shipped)
+
+- [docs/CONSUMER_SECURITY_REQUIREMENTS.md](./CONSUMER_SECURITY_REQUIREMENTS.md) — mandatory checklist
+  for apps and agents (auth/RBAC, rate limits, CSP, plaintext guards, unlock access control)
+
 ## Core capabilities (shipped)
 
 - AES-256-GCM encrypted payloads with canonical AAD
@@ -33,10 +38,11 @@ Exported from main entry — app maps `process.env`; package never reads env dir
 
 - `buildVaultAdminConfigFromEnv`, `listVaultAdminConfigEntries`
 - `applyVaultAdminOverrides`, `validateVaultAdminOverride`, `VAULT_OVERRIDABLE_CONFIG_KEYS`, `VAULT_CONFIG_KEY_DEFINITIONS`
+- Rate limiting: `createVaultUnlockRateLimiter()`, `createVaultApiRateLimiter()`, `VaultRateLimitError`, `withVaultUnlockRateLimit()`, `buildVaultRateLimitHttpResponse()`
 - `VAULT_ADMIN_ENV_CATALOG`, `buildVaultEnvLocalTemplate`
 - `resolveVaultAdminPaths`, `listVaultAdminScreens`, `DEFAULT_VAULT_ADMIN_PATHS`
 
-Documented env groups: admin, crypto profile, session, password policy, features. See [VAULT_ADMIN.md](./VAULT_ADMIN.md).
+Documented env groups: admin, crypto profile, session, password policy, rate limit, features. See [VAULT_ADMIN.md](./VAULT_ADMIN.md).
 
 ## Vault admin UI screens (shipped)
 

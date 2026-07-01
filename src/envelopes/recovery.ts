@@ -8,15 +8,21 @@ import type {
 } from "../validation/schemas.js";
 import type { RecoveryPhraseWordCount } from "../profile.js";
 import type { VaultCryptoProfile, VaultAadScope } from "../profile.js";
-import { stringToBytes, bytesToBase64Url, base64UrlToBytes } from "../crypto/encoding.js";
+import { stringToBytes } from "../crypto/encoding.js";
 import {
   deriveArgon2idAesKey,
   deriveArgon2idAesKeyFromMetadata,
+  deriveArgon2idKeyPair,
+  deriveArgon2idKeyPairFromMetadata,
   serializeArgon2idMetadata,
 } from "../kdf/argon2id.js";
 import { DEFAULT_ARGON2ID_PARAMS } from "../kdf/params.js";
 import { RecoveryPhraseConfirmationError } from "../errors/vault-errors.js";
-import { encryptField, decryptField, exportAesKey, importAesKey } from "../crypto/aes-gcm.js";
+import type { WrapUserVaultKeyOptions } from "../crypto/vault-key-envelope.js";
+import {
+  unwrapUserVaultKeyWithDerivedKeys,
+  wrapUserVaultKeyWithDerivedKeys,
+} from "../crypto/vault-key-envelope.js";
 import { assertVaultKeyAad } from "../validation/aad-assert.js";
 
 export const RECOVERY_PHRASE_WORDLIST_SOURCE = "BIP39 English (BIP-0039)" as const;
@@ -166,7 +172,7 @@ export function assertRecoveryPhraseWordConfirmation(
 export async function deriveRecoveryPhraseKey(
   phrase: string,
   salt?: Uint8Array
-): Promise<{ key: CryptoKey; metadata: Argon2idKdfMetadata }> {
+): Promise<{ key: CryptoKey; wrappingKey: CryptoKey; metadata: Argon2idKdfMetadata }> {
   const normalized = normalizeRecoveryPhrase(phrase);
   if (!validateRecoveryPhraseFormat(normalized)) {
     throw new Error("Invalid recovery phrase");
@@ -176,9 +182,10 @@ export async function deriveRecoveryPhraseKey(
   const saltBytes =
     salt ?? crypto.getRandomValues(new Uint8Array(DEFAULT_ARGON2ID_PARAMS.saltLength));
   const passwordBytes = stringToBytes(normalized);
-  const key = await deriveArgon2idAesKey(passwordBytes, saltBytes);
+  const { encryptionKey, wrappingKey } = await deriveArgon2idKeyPair(passwordBytes, saltBytes);
   return {
-    key,
+    key: encryptionKey,
+    wrappingKey,
     metadata: serializeArgon2idMetadata(saltBytes),
   };
 }
@@ -186,34 +193,15 @@ export async function deriveRecoveryPhraseKey(
 export async function deriveRecoveryPhraseKeyFromMetadata(
   phrase: string,
   metadata: Argon2idKdfMetadata
-): Promise<CryptoKey> {
+): Promise<{ encryptionKey: CryptoKey; wrappingKey: CryptoKey }> {
   const normalized = normalizeRecoveryPhrase(phrase);
   if (!validateRecoveryPhraseFormat(normalized)) {
     throw new Error("Invalid recovery phrase");
   }
-  return deriveArgon2idAesKeyFromMetadata(stringToBytes(normalized), metadata);
+  return deriveArgon2idKeyPairFromMetadata(stringToBytes(normalized), metadata);
 }
 
-async function wrapVaultKeyWithDerivedKey(
-  vaultKey: CryptoKey,
-  derivedKey: CryptoKey,
-  scope: WrapScope,
-  profile: VaultCryptoProfile
-): Promise<EncryptedVaultPayload> {
-  return encryptField(bytesToBase64Url(await exportAesKey(vaultKey)), derivedKey, {
-    userId: scope.userId,
-    resourceId: scope.resourceId,
-    field: "vault_key",
-  }, profile);
-}
-
-async function unwrapVaultKeyWithDerivedKey(
-  encryptedVaultKey: EncryptedVaultPayload,
-  derivedKey: CryptoKey
-): Promise<CryptoKey> {
-  const keyBytes = base64UrlToBytes(await decryptField(encryptedVaultKey, derivedKey));
-  return importAesKey(keyBytes);
-}
+export type CreateRecoveryEnvelopeOptions = WrapUserVaultKeyOptions;
 
 export async function createRecoveryEnvelope(
   vaultKey: CryptoKey,
@@ -221,10 +209,20 @@ export async function createRecoveryEnvelope(
   scope: WrapScope,
   profile: VaultCryptoProfile,
   publicMetadata?: { phraseLength: RecoveryPhraseWordCount },
-  salt?: Uint8Array
+  salt?: Uint8Array,
+  options?: CreateRecoveryEnvelopeOptions
 ): Promise<{ envelope: RecoveryPhraseEnvelope; kdfMetadata: Argon2idKdfMetadata }> {
-  const { key: derivedKey, metadata } = await deriveRecoveryPhraseKey(recoveryPhrase, salt);
-  const encryptedVaultKey = await wrapVaultKeyWithDerivedKey(vaultKey, derivedKey, scope, profile);
+  const { key: encryptionKey, wrappingKey, metadata } = await deriveRecoveryPhraseKey(
+    recoveryPhrase,
+    salt
+  );
+  const encryptedVaultKey = await wrapUserVaultKeyWithDerivedKeys(
+    vaultKey,
+    { encryptionKey, wrappingKey },
+    scope,
+    profile,
+    options
+  );
   return {
     envelope: {
       method: "recovery_phrase",
@@ -250,8 +248,11 @@ export async function unlockWithRecoveryEnvelope(
     throw new Error("Recovery phrase envelope requires Argon2id metadata");
   }
   assertVaultKeyAad(expectedScope, envelope.encryptedVaultKey, profile);
-  const derivedKey = await deriveRecoveryPhraseKeyFromMetadata(recoveryPhrase, envelope.kdfMetadata);
-  return unwrapVaultKeyWithDerivedKey(envelope.encryptedVaultKey, derivedKey);
+  const derivedKeys = await deriveRecoveryPhraseKeyFromMetadata(
+    recoveryPhrase,
+    envelope.kdfMetadata
+  );
+  return unwrapUserVaultKeyWithDerivedKeys(envelope.encryptedVaultKey, derivedKeys);
 }
 
 /** @deprecated Use createRecoveryEnvelope */

@@ -12,12 +12,28 @@ import {
   unlockWithPasskeyPrfEnvelope,
   unlockWithRecoveryEnvelope,
   vaultSetupEnvelopeFieldsSchema,
+  withVaultUnlockRateLimit,
   type EncryptedVaultPayload,
 } from "@tgoliveira/vault-core";
 import { unlockVaultSession, getSessionVaultKey } from "@tgoliveira/vault-core/browser";
 import { DEMO_USER_ID, VAULT_PROFILE, vaultScope } from "@/lib/vault-profile";
 import { authenticateDemoPasskey, loadPasskeyCredentialId } from "@/lib/vault-demo-passkey";
+import { getDemoVaultUnlockRateLimiter } from "@/lib/vault-rate-limit";
 import { loadVaultRecord, saveVaultRecord, type StoredVaultRecord } from "@/lib/vault-demo-store";
+
+const DEMO_UNLOCK_SCOPE = "demo";
+
+function runDemoUnlockAttempt<T>(
+  action: "password" | "recovery_phrase" | "passkey_prf",
+  attempt: () => Promise<T>
+): Promise<T> {
+  return withVaultUnlockRateLimit(
+    getDemoVaultUnlockRateLimiter(),
+    DEMO_UNLOCK_SCOPE,
+    action,
+    attempt
+  );
+}
 
 export type DemoVaultPayload = {
   version: 1;
@@ -79,89 +95,95 @@ export async function createDemoVault(input: {
 }
 
 export async function unlockDemoVault(vaultPassword: string): Promise<DemoVaultPayload> {
-  const record = loadVaultRecord();
-  if (!record) {
-    throw new Error("Vault is not configured");
-  }
+  return runDemoUnlockAttempt("password", async () => {
+    const record = loadVaultRecord();
+    if (!record) {
+      throw new Error("Vault is not configured");
+    }
 
-  const scope = vaultScope(DEMO_USER_ID);
-  const envelope = passwordEnvelopeSchema.parse(record.passwordEnvelope);
-  const vaultKey = await unlockWithPasswordEnvelope(
-    vaultPassword,
-    envelope,
-    scope,
-    VAULT_PROFILE
-  );
+    const scope = vaultScope(DEMO_USER_ID);
+    const envelope = passwordEnvelopeSchema.parse(record.passwordEnvelope);
+    const vaultKey = await unlockWithPasswordEnvelope(
+      vaultPassword,
+      envelope,
+      scope,
+      VAULT_PROFILE
+    );
 
-  const payload = await decryptVaultPayload<DemoVaultPayload>(
-    record.encryptedBlob,
-    vaultKey,
-    scope,
-    VAULT_PROFILE
-  );
+    const payload = await decryptVaultPayload<DemoVaultPayload>(
+      record.encryptedBlob,
+      vaultKey,
+      scope,
+      VAULT_PROFILE
+    );
 
-  unlockVaultSession(vaultKey);
-  return payload;
+    unlockVaultSession(vaultKey);
+    return payload;
+  });
 }
 
 export async function unlockDemoVaultWithRecoveryPhrase(
   recoveryPhrase: string
 ): Promise<DemoVaultPayload> {
-  const record = loadVaultRecord();
-  if (!record) {
-    throw new Error("Vault is not configured");
-  }
+  return runDemoUnlockAttempt("recovery_phrase", async () => {
+    const record = loadVaultRecord();
+    if (!record) {
+      throw new Error("Vault is not configured");
+    }
 
-  const scope = vaultScope(DEMO_USER_ID);
-  const envelope = recoveryPhraseEnvelopeSchema.parse(record.recoveryEnvelope);
-  const vaultKey = await unlockWithRecoveryEnvelope(
-    recoveryPhrase,
-    envelope,
-    scope,
-    VAULT_PROFILE
-  );
+    const scope = vaultScope(DEMO_USER_ID);
+    const envelope = recoveryPhraseEnvelopeSchema.parse(record.recoveryEnvelope);
+    const vaultKey = await unlockWithRecoveryEnvelope(
+      recoveryPhrase,
+      envelope,
+      scope,
+      VAULT_PROFILE
+    );
 
-  const payload = await decryptVaultPayload<DemoVaultPayload>(
-    record.encryptedBlob,
-    vaultKey,
-    scope,
-    VAULT_PROFILE
-  );
+    const payload = await decryptVaultPayload<DemoVaultPayload>(
+      record.encryptedBlob,
+      vaultKey,
+      scope,
+      VAULT_PROFILE
+    );
 
-  unlockVaultSession(vaultKey);
-  return payload;
+    unlockVaultSession(vaultKey);
+    return payload;
+  });
 }
 
 export async function unlockDemoVaultWithPasskey(): Promise<DemoVaultPayload> {
-  const record = loadVaultRecord();
-  if (!record?.passkeyPrfEnvelope) {
-    throw new Error("Passkey unlock is not configured");
-  }
+  return runDemoUnlockAttempt("passkey_prf", async () => {
+    const record = loadVaultRecord();
+    if (!record?.passkeyPrfEnvelope) {
+      throw new Error("Passkey unlock is not configured");
+    }
 
-  const credentialId = loadPasskeyCredentialId();
-  if (!credentialId) {
-    throw new Error("No passkey credential is linked on this device");
-  }
+    const credentialId = loadPasskeyCredentialId();
+    if (!credentialId) {
+      throw new Error("No passkey credential is linked on this device");
+    }
 
-  const prfOutput = await authenticateDemoPasskey(credentialId);
-  const scope = vaultScope(DEMO_USER_ID);
-  const envelope = passkeyPrfEnvelopeSchema.parse(record.passkeyPrfEnvelope);
-  const vaultKey = await unlockWithPasskeyPrfEnvelope(
-    envelope,
-    prfOutput,
-    scope,
-    VAULT_PROFILE
-  );
+    const prfOutput = await authenticateDemoPasskey(credentialId);
+    const scope = vaultScope(DEMO_USER_ID);
+    const envelope = passkeyPrfEnvelopeSchema.parse(record.passkeyPrfEnvelope);
+    const vaultKey = await unlockWithPasskeyPrfEnvelope(
+      envelope,
+      prfOutput,
+      scope,
+      VAULT_PROFILE
+    );
 
-  const payload = await decryptVaultPayload<DemoVaultPayload>(
-    record.encryptedBlob,
-    vaultKey,
-    scope,
-    VAULT_PROFILE
-  );
+    const payload = await decryptVaultPayload<DemoVaultPayload>(
+      record.encryptedBlob,
+      vaultKey,
+      scope,
+      VAULT_PROFILE
+    );
 
-  unlockVaultSession(vaultKey);
-  return payload;
+    unlockVaultSession(vaultKey);
+    return payload;
+  });
 }
 
 export function isDemoPasskeyUnlockAvailable(): boolean {

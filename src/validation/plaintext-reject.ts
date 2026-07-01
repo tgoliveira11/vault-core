@@ -6,6 +6,12 @@ export const PLAINTEXT_FORBIDDEN_VAULT_FIELDS = [
   "password",
   "recoveryPhrase",
   "recoveryWords",
+  "mnemonic",
+  "seed",
+  "seedPhrase",
+  "passphrase",
+  "privateKey",
+  "secret",
   "userVaultKey",
   "prfOutput",
   "decryptedPayload",
@@ -21,7 +27,13 @@ export const PLAINTEXT_FORBIDDEN_VAULT_FIELDS = [
 
 export type PlaintextForbiddenField = (typeof PLAINTEXT_FORBIDDEN_VAULT_FIELDS)[number];
 
-const FORBIDDEN_FIELD_SET = new Set<string>(PLAINTEXT_FORBIDDEN_VAULT_FIELDS);
+const FORBIDDEN_FIELD_NAMES_LOWER = new Set(
+  PLAINTEXT_FORBIDDEN_VAULT_FIELDS.map((field) => field.toLowerCase())
+);
+
+export function isVaultPlaintextForbiddenField(field: string): boolean {
+  return FORBIDDEN_FIELD_NAMES_LOWER.has(field.toLowerCase());
+}
 
 export function rejectVaultPlaintextFields(body: Record<string, unknown>): string | null {
   const visited = new WeakSet<object>();
@@ -33,7 +45,7 @@ export function rejectVaultPlaintextFields(body: Record<string, unknown>): strin
 
     for (const [field, nestedValue] of Object.entries(value)) {
       const fieldPath = path ? `${path}.${field}` : field;
-      if (FORBIDDEN_FIELD_SET.has(field) && nestedValue !== undefined) {
+      if (isVaultPlaintextForbiddenField(field) && nestedValue !== undefined) {
         return `Plaintext field '${field}' is not allowed at '${fieldPath}'`;
       }
 

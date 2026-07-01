@@ -22,6 +22,14 @@ export type VaultAdminSessionConfig = {
   autoLockMinutes: number;
 };
 
+export type VaultAdminRateLimitConfig = {
+  unlockMaxFailures: number;
+  unlockFailureWindowMinutes: number;
+  unlockLockoutMinutes: number;
+  apiMaxRequests: number;
+  apiWindowSeconds: number;
+};
+
 export type VaultAdminFeatureFlags = {
   adminEnabled: boolean;
   passkeyPrfUnlockEnabled: boolean;
@@ -48,6 +56,7 @@ export type VaultAdminConfig = {
   defaultRecoveryWordCount: 12 | 24;
   passwordPolicy: VaultAdminPasswordPolicy;
   session: VaultAdminSessionConfig;
+  rateLimit: VaultAdminRateLimitConfig;
   features: VaultAdminFeatureFlags;
 };
 
@@ -68,6 +77,7 @@ export type VaultAdminConfigGroup =
   | "crypto_profile"
   | "session"
   | "password_policy"
+  | "rate_limit"
   | "features";
 
 export type VaultAdminPaths = {

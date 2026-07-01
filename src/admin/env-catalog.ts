@@ -142,6 +142,41 @@ export const VAULT_ADMIN_ENV_CATALOG: VaultAdminEnvVarDefinition[] = [
     group: "features",
     example: "true",
   },
+  {
+    envVar: "VAULT_UNLOCK_MAX_FAILURES",
+    label: "Unlock max failures",
+    description: "Failed unlock attempts allowed per scope before lockout.",
+    group: "rate_limit",
+    example: "5",
+  },
+  {
+    envVar: "VAULT_UNLOCK_FAILURE_WINDOW_MINUTES",
+    label: "Unlock failure window (minutes)",
+    description: "Rolling window for counting failed unlock attempts.",
+    group: "rate_limit",
+    example: "15",
+  },
+  {
+    envVar: "VAULT_UNLOCK_LOCKOUT_MINUTES",
+    label: "Unlock lockout (minutes)",
+    description: "Lockout duration after exceeding failed unlock attempts.",
+    group: "rate_limit",
+    example: "30",
+  },
+  {
+    envVar: "VAULT_API_RATE_LIMIT_MAX_REQUESTS",
+    label: "API max requests",
+    description: "Maximum vault HTTP API requests per client key per window.",
+    group: "rate_limit",
+    example: "120",
+  },
+  {
+    envVar: "VAULT_API_RATE_LIMIT_WINDOW_SECONDS",
+    label: "API rate limit window (seconds)",
+    description: "Fixed window length for vault HTTP API rate limiting.",
+    group: "rate_limit",
+    example: "60",
+  },
 ];
 
 export function buildVaultEnvLocalTemplate(productName = "My App"): string {

@@ -16,6 +16,7 @@ import {
 } from "@/lib/vault-demo-crypto";
 import { getDemoPasskeySupport } from "@/lib/vault-demo-passkey";
 import { isVaultConfigured, loadVaultRecord } from "@/lib/vault-demo-store";
+import { getDemoVaultUnlockRateLimiter } from "@/lib/vault-rate-limit";
 
 function VaultUnlockForm() {
   const router = useRouter();
@@ -92,6 +93,8 @@ function VaultUnlockForm() {
         <VaultUnlockPanel
           loading={busy}
           error={error}
+          unlockRateLimiter={getDemoVaultUnlockRateLimiter()}
+          rateLimitScopeKey="demo"
           serverStatus={{
             configured,
             hasPasskeyPrfEnvelope: hasPasskeyEnvelope,

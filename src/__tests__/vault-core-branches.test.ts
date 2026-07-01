@@ -5,6 +5,7 @@ import {
   PasskeyUnlockError,
   RecoveryPhraseConfirmationError,
   VaultConflictError,
+  VaultKeyNotExtractableError,
   VaultNotFoundError,
   assertRecoveryPhraseConfirmation,
   assertRecoveryPhraseUnlockInput,
@@ -143,7 +144,7 @@ describe("recovery helper branches", () => {
   });
 
   it("exercises recovery envelope validation and deprecated wrappers", async () => {
-    const vaultKey = await importUserVaultKey(FIXTURE_UVK_BYTES);
+    const vaultKey = await importUserVaultKey(FIXTURE_UVK_BYTES, { extractable: true });
     const wrapped = await wrapVaultKeyForRecoveryPhrase(
       vaultKey,
       FIXTURE_12_WORD_PHRASE,
@@ -209,7 +210,7 @@ describe("passkey PRF branches", () => {
   });
 
   it("handles missing and invalid PRF outputs", async () => {
-    const vaultKey = await importUserVaultKey(FIXTURE_UVK_BYTES);
+    const vaultKey = await importUserVaultKey(FIXTURE_UVK_BYTES, { extractable: true });
     const envelope = await createPasskeyPrfEnvelope(
       vaultKey,
       new Uint8Array(64).fill(7),
@@ -253,7 +254,7 @@ describe("passkey PRF branches", () => {
   });
 
   it("supports deprecated passkey envelope forms", async () => {
-    const vaultKey = await importUserVaultKey(FIXTURE_UVK_BYTES);
+    const vaultKey = await importUserVaultKey(FIXTURE_UVK_BYTES, { extractable: true });
     const encryptedVaultKey = await wrapVaultKeyForPasskey(
       vaultKey,
       FIXTURE_PRF_OUTPUT,
@@ -289,7 +290,7 @@ describe("passkey PRF branches", () => {
 
 describe("AAD and KDF validation branches", () => {
   async function makePayloads() {
-    const vaultKey = await importUserVaultKey(FIXTURE_UVK_BYTES);
+    const vaultKey = await importUserVaultKey(FIXTURE_UVK_BYTES, { extractable: true });
     const { envelope } = await createPasswordEnvelope(
       vaultKey,
       FIXTURE_VAULT_PASSWORD,
@@ -405,12 +406,14 @@ describe("small public utilities", () => {
   it("exports keys, random bytes, and validates schemas", async () => {
     const key = await createUserVaultKey();
     expect(await exportUserVaultKey(key)).toHaveLength(32);
+    const nonExtractableKey = await importUserVaultKey(FIXTURE_UVK_BYTES, { extractable: false });
+    await expect(exportUserVaultKey(nonExtractableKey)).rejects.toThrow(VaultKeyNotExtractableError);
     expect(randomBytes(17)).toHaveLength(17);
     expect(encryptedPayloadSchema.safeParse({}).success).toBe(false);
   });
 
   it("rejects method and KDF mismatches in envelope schemas", async () => {
-    const vaultKey = await importUserVaultKey(FIXTURE_UVK_BYTES);
+    const vaultKey = await importUserVaultKey(FIXTURE_UVK_BYTES, { extractable: true });
     const { envelope } = await createPasswordEnvelope(
       vaultKey,
       FIXTURE_VAULT_PASSWORD,

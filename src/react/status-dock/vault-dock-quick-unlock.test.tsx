@@ -11,6 +11,7 @@ vi.mock("./resolve-passkey-dock-availability.js", () => ({
 }));
 
 import { resolveVaultDockPasskeyAvailability } from "./resolve-passkey-dock-availability.js";
+import { createVaultUnlockRateLimiter } from "../../rate-limit/vault-unlock-rate-limit.js";
 import { VaultDockQuickUnlock } from "./vault-dock-quick-unlock.js";
 
 describe("VaultDockQuickUnlock", () => {
@@ -131,6 +132,30 @@ describe("VaultDockQuickUnlock", () => {
     });
     render(<VaultDockQuickUnlock onUnlockPassword={vi.fn()} />);
     expect(screen.getByText(/passkey unlock is unavailable/i)).toBeTruthy();
+  });
+
+  it("shows rate limit error from unlock limiter", async () => {
+    const limiter = createVaultUnlockRateLimiter({
+      maxFailures: 0,
+      failureWindowMs: 60_000,
+      lockoutMs: 60_000,
+    });
+    render(
+      <VaultDockQuickUnlock
+        unlockRateLimiter={limiter}
+        rateLimitScopeKey="user-1"
+        onUnlockPassword={vi.fn()}
+      />
+    );
+
+    fireEvent.change(screen.getByLabelText(/vault password/i), {
+      target: { value: "secret-password" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: /unlock vault/i }));
+
+    await waitFor(() => {
+      expect(screen.getByRole("alert").textContent).toMatch(/too many failed unlock attempts/i);
+    });
   });
 
   it("swallows unlock errors from callbacks", async () => {

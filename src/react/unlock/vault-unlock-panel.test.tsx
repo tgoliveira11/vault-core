@@ -11,6 +11,7 @@ vi.mock("../status-dock/resolve-passkey-dock-availability.js", () => ({
 }));
 
 import { resolveVaultDockPasskeyAvailability } from "../status-dock/resolve-passkey-dock-availability.js";
+import { createVaultUnlockRateLimiter } from "../../rate-limit/vault-unlock-rate-limit.js";
 import { VaultUnlockPanel } from "./vault-unlock-panel.js";
 
 describe("VaultUnlockPanel", () => {
@@ -173,6 +174,177 @@ describe("VaultUnlockPanel", () => {
 
     await waitFor(() => {
       expect(onUnlockPassword).toHaveBeenCalledWith("secret-password");
+    });
+  });
+
+  it("shows rate limit error from unlock limiter", async () => {
+    const limiter = createVaultUnlockRateLimiter({
+      maxFailures: 0,
+      failureWindowMs: 60_000,
+      lockoutMs: 60_000,
+    });
+    render(
+      <VaultUnlockPanel
+        unlockRateLimiter={limiter}
+        rateLimitScopeKey="user-1"
+        onUnlockPassword={vi.fn()}
+        onUnlockRecoveryPhrase={vi.fn()}
+      />
+    );
+
+    fireEvent.change(screen.getByLabelText(/vault password/i), {
+      target: { value: "secret-password" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: /unlock vault/i }));
+
+    await waitFor(() => {
+      expect(screen.getByRole("alert").textContent).toMatch(/too many failed unlock attempts/i);
+    });
+  });
+
+  it("records unlock success when rate limiter is configured", async () => {
+    const limiter = createVaultUnlockRateLimiter({
+      maxFailures: 1,
+      failureWindowMs: 60_000,
+      lockoutMs: 60_000,
+    });
+    const onUnlockPassword = vi.fn().mockResolvedValue(undefined);
+    render(
+      <VaultUnlockPanel
+        unlockRateLimiter={limiter}
+        onUnlockPassword={onUnlockPassword}
+        onUnlockRecoveryPhrase={vi.fn()}
+      />
+    );
+
+    fireEvent.change(screen.getByLabelText(/vault password/i), {
+      target: { value: "secret-password" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: /unlock vault/i }));
+
+    await waitFor(() => {
+      expect(onUnlockPassword).toHaveBeenCalled();
+    });
+  });
+
+  it("shows rate limit error on recovery unlock", async () => {
+    const limiter = createVaultUnlockRateLimiter({
+      maxFailures: 0,
+      failureWindowMs: 60_000,
+      lockoutMs: 60_000,
+    });
+    render(
+      <VaultUnlockPanel
+        unlockRateLimiter={limiter}
+        onUnlockPassword={vi.fn()}
+        onUnlockRecoveryPhrase={vi.fn()}
+      />
+    );
+
+    fireEvent.click(screen.getByRole("tab", { name: /recovery phrase/i }));
+    fireEvent.change(screen.getByLabelText(/recovery phrase/i), {
+      target: { value: "alpha beta gamma" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: /recover vault access/i }));
+
+    await waitFor(() => {
+      expect(screen.getByRole("alert").textContent).toMatch(/too many failed unlock attempts/i);
+    });
+  });
+
+  it("shows rate limit error on passkey unlock", async () => {
+    vi.mocked(resolveVaultDockPasskeyAvailability).mockReturnValue({
+      hasEnvelope: true,
+      showPasskey: true,
+      prfExplicitlyUnsupported: false,
+    });
+    const limiter = createVaultUnlockRateLimiter({
+      maxFailures: 0,
+      failureWindowMs: 60_000,
+      lockoutMs: 60_000,
+    });
+    render(
+      <VaultUnlockPanel
+        unlockRateLimiter={limiter}
+        onUnlockPassword={vi.fn()}
+        onUnlockRecoveryPhrase={vi.fn()}
+        onUnlockPasskey={vi.fn()}
+        passkeyReady
+        autoStartPasskey={false}
+      />
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: /unlock with passkey/i }));
+
+    await waitFor(() => {
+      expect(screen.getByRole("alert").textContent).toMatch(/too many failed unlock attempts/i);
+    });
+  });
+
+  it("prefers rate limit error over external error prop", async () => {
+    const limiter = createVaultUnlockRateLimiter({
+      maxFailures: 0,
+      failureWindowMs: 60_000,
+      lockoutMs: 60_000,
+    });
+    render(
+      <VaultUnlockPanel
+        error="External unlock error"
+        unlockRateLimiter={limiter}
+        onUnlockPassword={vi.fn()}
+        onUnlockRecoveryPhrase={vi.fn()}
+      />
+    );
+
+    fireEvent.change(screen.getByLabelText(/vault password/i), {
+      target: { value: "secret-password" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: /unlock vault/i }));
+
+    await waitFor(() => {
+      expect(screen.getByRole("alert").textContent).toMatch(/too many failed unlock attempts/i);
+    });
+  });
+
+  it("does not submit unlock while loading when rate limiter is configured", () => {
+    const onUnlockPassword = vi.fn();
+    render(
+      <VaultUnlockPanel
+        loading
+        unlockRateLimiter={createVaultUnlockRateLimiter({
+          maxFailures: 5,
+          failureWindowMs: 60_000,
+          lockoutMs: 60_000,
+        })}
+        onUnlockPassword={onUnlockPassword}
+        onUnlockRecoveryPhrase={vi.fn()}
+      />
+    );
+
+    const input = screen.getByLabelText(/vault password/i);
+    fireEvent.change(input, { target: { value: "secret-password" } });
+    fireEvent.submit(input.closest("form")!);
+
+    expect(onUnlockPassword).not.toHaveBeenCalled();
+  });
+
+  it("keeps external error when unlock fails without rate limiting", async () => {
+    const onUnlockPassword = vi.fn().mockRejectedValue(new Error("bad"));
+    render(
+      <VaultUnlockPanel
+        error="External unlock error"
+        onUnlockPassword={onUnlockPassword}
+        onUnlockRecoveryPhrase={vi.fn()}
+      />
+    );
+
+    fireEvent.change(screen.getByLabelText(/vault password/i), {
+      target: { value: "secret-password" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: /unlock vault/i }));
+
+    await waitFor(() => {
+      expect(screen.getByRole("alert").textContent).toContain("External unlock error");
     });
   });
 

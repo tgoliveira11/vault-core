@@ -1,6 +1,11 @@
 "use client";
 
 import { useEffect, useRef, useState, type FormEvent, type ReactNode } from "react";
+import { VaultRateLimitError } from "../../errors/vault-errors.js";
+import {
+  withVaultUnlockRateLimit,
+  type VaultUnlockRateLimiter,
+} from "../../rate-limit/vault-unlock-rate-limit.js";
 import { resolveVaultDockPasskeyAvailability } from "../status-dock/resolve-passkey-dock-availability.js";
 import type { VaultServerStatusSnapshot } from "../status/resolve-vault-client-status.js";
 
@@ -55,6 +60,8 @@ export type VaultUnlockPanelProps = {
   onUnlockPasskey?: () => void | Promise<void>;
   autoFocusPassword?: boolean;
   autoStartPasskey?: boolean;
+  unlockRateLimiter?: VaultUnlockRateLimiter;
+  rateLimitScopeKey?: string;
   renderError?: (message: string) => ReactNode;
   className?: string;
 };
@@ -82,6 +89,8 @@ export function VaultUnlockPanel({
   onUnlockPasskey,
   autoFocusPassword = true,
   autoStartPasskey = false,
+  unlockRateLimiter,
+  rateLimitScopeKey = "default",
   renderError = (message) => <DefaultError message={message} />,
   className,
 }: VaultUnlockPanelProps) {
@@ -89,6 +98,7 @@ export function VaultUnlockPanel({
   const [method, setMethod] = useState<VaultUnlockMethod>(defaultMethod);
   const [vaultPassword, setVaultPassword] = useState("");
   const [recoveryPhrase, setRecoveryPhrase] = useState("");
+  const [rateLimitError, setRateLimitError] = useState<string | null>(null);
   const passwordInputRef = useRef<HTMLInputElement>(null);
   const passkeyAutoStartedRef = useRef(false);
   const { hasEnvelope, showPasskey: dockShowPasskey, prfExplicitlyUnsupported: dockPrfUnsupported } =
@@ -98,33 +108,60 @@ export function VaultUnlockPanel({
   const showPasskeyUnlock = Boolean(hasEnvelope && onUnlockPasskey);
   const passwordId = `${idPrefix}-vault-password`;
   const phraseId = `${idPrefix}-recovery-phrase`;
+  const displayedError = rateLimitError ?? error;
+
+  async function runUnlockAttempt<T>(
+    action: "password" | "recovery_phrase" | "passkey_prf",
+    attempt: () => Promise<T>
+  ): Promise<T | undefined> {
+    if (loading) return undefined;
+    setRateLimitError(null);
+    try {
+      if (unlockRateLimiter) {
+        return await withVaultUnlockRateLimit(
+          unlockRateLimiter,
+          rateLimitScopeKey,
+          action,
+          attempt
+        );
+      }
+      return await attempt();
+    } catch (caught) {
+      if (caught instanceof VaultRateLimitError) {
+        setRateLimitError(caught.message);
+      }
+      throw caught;
+    }
+  }
 
   async function submitPassword() {
-    if (loading || !vaultPassword) return;
+    if (!vaultPassword) return;
     try {
-      await onUnlockPassword(vaultPassword);
+      await runUnlockAttempt("password", () => Promise.resolve(onUnlockPassword(vaultPassword)));
       setVaultPassword("");
     } catch {
-      // Error surfaced via error prop.
+      // Error surfaced via error or rate limit props.
     }
   }
 
   async function submitRecoveryPhrase() {
-    if (loading || !recoveryPhrase.trim()) return;
+    if (!recoveryPhrase.trim()) return;
     try {
-      await onUnlockRecoveryPhrase(recoveryPhrase);
+      await runUnlockAttempt("recovery_phrase", () =>
+        Promise.resolve(onUnlockRecoveryPhrase(recoveryPhrase))
+      );
       setRecoveryPhrase("");
     } catch {
-      // Error surfaced via error prop.
+      // Error surfaced via error or rate limit props.
     }
   }
 
   async function submitPasskey() {
-    if (loading || !passkeyReady || !onUnlockPasskey) return;
+    if (!passkeyReady || !onUnlockPasskey) return;
     try {
-      await onUnlockPasskey();
+      await runUnlockAttempt("passkey_prf", () => Promise.resolve(onUnlockPasskey()));
     } catch {
-      // Error surfaced via error prop.
+      // Error surfaced via error or rate limit props.
     }
   }
 
@@ -256,7 +293,7 @@ export function VaultUnlockPanel({
         </form>
       )}
 
-      {error ? renderError(error) : null}
+      {displayedError ? renderError(displayedError) : null}
     </div>
   );
 }

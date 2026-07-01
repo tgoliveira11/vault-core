@@ -54,6 +54,25 @@ export class VaultPasswordUnchangedError extends Error {
   }
 }
 
+export class VaultRateLimitError extends Error {
+  readonly retryAfterMs: number;
+  readonly resetAtMs: number;
+
+  constructor(message: string, retryAfterMs: number, resetAtMs: number) {
+    super(message);
+    this.name = "VaultRateLimitError";
+    this.retryAfterMs = retryAfterMs;
+    this.resetAtMs = resetAtMs;
+  }
+}
+
+export class VaultKeyNotExtractableError extends Error {
+  constructor(message = "User vault key is non-extractable") {
+    super(message);
+    this.name = "VaultKeyNotExtractableError";
+  }
+}
+
 export type VaultCoreError =
   | VaultPlaintextRejectionError
   | VaultConflictError
@@ -62,4 +81,6 @@ export type VaultCoreError =
   | PasskeyUnlockError
   | RecoveryPhraseConfirmationError
   | VaultAuthorizationError
-  | VaultPasswordUnchangedError;
+  | VaultPasswordUnchangedError
+  | VaultRateLimitError
+  | VaultKeyNotExtractableError;

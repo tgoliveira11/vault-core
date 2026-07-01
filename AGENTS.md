@@ -25,8 +25,9 @@ Cursor agents: `.cursor/rules/branch-pr-publish.mdc` (always applied).
 2. `docs/IMPLEMENTATION_GUIDE.md` for the complete consumer workflow.
 3. `apps/consumer-demo/README.md` for a runnable local integration reference (not published to npm).
 4. `SECURITY.md` before changing crypto, persistence, validation, or session behavior.
-5. `API_REFERENCE.md` for public entry points and security preconditions.
-6. `CHANGELOG.md` before modifying a public contract.
+5. [docs/CONSUMER_SECURITY_REQUIREMENTS.md](docs/CONSUMER_SECURITY_REQUIREMENTS.md) before integrating vault into app routes, unlock flows, or admin APIs.
+6. `API_REFERENCE.md` for public entry points and security preconditions.
+7. `CHANGELOG.md` before modifying a public contract.
 
 ## Branch and PR rules (summary)
 

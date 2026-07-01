@@ -10,6 +10,17 @@ API changes increment the minor version.
 
 ### Added
 
+- Reusable rate-limit primitives exported from `@tgoliveira/vault-core`:
+  `createFixedWindowRateLimiter()`, vault unlock failure limiter (`createVaultUnlockRateLimiter()`,
+  `assertVaultUnlockAllowed()`, `withVaultUnlockRateLimit()`), and vault HTTP API limiter
+  (`createVaultApiRateLimiter()`, `consumeVaultApiRateLimit()`, `buildVaultRateLimitHttpResponse()`).
+- `VaultRateLimitError` with `retryAfterMs` and `resetAtMs`.
+- `VaultKeyNotExtractableError` when `exportUserVaultKey()` is called on a non-extractable UVK.
+- `DEFAULT_RATE_LIMIT_MAX_BUCKETS` (10_000) and optional `maxBuckets` on `createFixedWindowRateLimiter()`.
+- `VaultAdminConfig.rateLimit` section and env keys `VAULT_UNLOCK_*` / `VAULT_API_RATE_LIMIT_*`
+  (overridable via admin panel).
+- Optional `unlockRateLimiter` and `rateLimitScopeKey` props on `VaultUnlockPanel` and
+  `VaultDockQuickUnlock`.
 - Runtime admin config overrides with resolution priority **admin → env → default**:
   `applyVaultAdminOverrides()`, `validateVaultAdminOverride()`, `VAULT_OVERRIDABLE_CONFIG_KEYS`, and
   `VAULT_CONFIG_KEY_DEFINITIONS`.
@@ -51,6 +62,15 @@ API changes increment the minor version.
 
 ### Changed
 
+- `createUserVaultKey()` now generates an extractable AES-GCM UVK for the initial AES-KW envelope
+  wrap; keys restored via envelope unlock are **non-extractable**. Password, recovery, and passkey
+  envelopes wrap the UVK with AES-KW instead of exporting raw key material. Unlock still accepts
+  legacy envelopes whose inner payload is exactly 32 raw bytes. Re-wrap paths reuse the inner blob
+  so rotation never exports a session UVK.
+- `exportUserVaultKey()` throws `VaultKeyNotExtractableError` for non-extractable keys;
+  `userVaultKeysEqual()` falls back to an encrypt/decrypt probe when export is unavailable.
+- In-memory rate limiters prune expired buckets and evict the oldest bucket when `maxBuckets` is
+  exceeded (default 10_000 keys).
 - `VaultProtectedGate` lock overlay is rendered as one or more fixed panels that cover the viewport
   except regions marked with `VaultLockOverlayExclude` (for example the app header / navigation).
 - `VaultProtectedGate` lock overlay is much heavier (24px blur, ~92% background opacity) so
@@ -75,6 +95,17 @@ API changes increment the minor version.
 - `listVaultAdminConfigEntries()` accepts optional `adminOverrides` and includes all env-catalog password
   policy fields; each entry exposes `overridable`.
 - `VaultAdminEnvSource` now includes `"admin"`.
+
+### Security
+
+- `resolveVaultUnlockReturnPath()` rejects encoded open-redirect bypasses (`/%2F%2F…`), backslashes,
+  and scheme-like paths after bounded `decodeURIComponent` normalization.
+- `assertNoVaultPlaintextFields()` matches forbidden field names case-insensitively and blocks
+  `mnemonic`, `seed`, `seedPhrase`, `passphrase`, `privateKey`, and `secret`.
+- `aadContextVault` and `aadContextEnvelope` are no longer overridable via runtime admin panel
+  (deploy-time env / profile only).
+- [docs/CONSUMER_SECURITY_REQUIREMENTS.md](docs/CONSUMER_SECURITY_REQUIREMENTS.md) — mandatory
+  integration checklist for consuming applications and AI agents.
 
 ### Changed
 

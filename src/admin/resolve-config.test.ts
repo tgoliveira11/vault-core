@@ -22,6 +22,8 @@ describe("buildVaultAdminConfigFromEnv", () => {
     expect(config.basePath).toBe("/admin/vault");
     expect(config.passwordPolicy.enforcement).toBe("enforce");
     expect(config.session.autoLockMinutes).toBe(15);
+    expect(config.rateLimit.unlockMaxFailures).toBe(5);
+    expect(config.rateLimit.apiMaxRequests).toBe(120);
     expect(config.profile.aadContextVault).toBe("test:vault:v1");
   });
 

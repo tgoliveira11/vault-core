@@ -23,6 +23,17 @@ describe("resolveVaultUnlockReturnPath", () => {
     expect(resolveVaultUnlockReturnPath("//evil.example")).toBe("/");
     expect(resolveVaultUnlockReturnPath("https://evil.example")).toBe("/");
   });
+
+  it("rejects encoded protocol-relative bypasses", () => {
+    expect(resolveVaultUnlockReturnPath("/%2F%2Fevil.example")).toBe("/");
+    expect(resolveVaultUnlockReturnPath("%2F%2Fevil.example")).toBe("/");
+    expect(resolveVaultUnlockReturnPath("/%2f%2fevil.example")).toBe("/");
+  });
+
+  it("rejects backslashes and scheme-like paths", () => {
+    expect(resolveVaultUnlockReturnPath("/\\evil.example")).toBe("/");
+    expect(resolveVaultUnlockReturnPath("/https:evil")).toBe("/");
+  });
 });
 
 describe("readVaultUnlockReturnPath", () => {
@@ -40,6 +51,10 @@ describe("readVaultUnlockReturnPath", () => {
 describe("buildVaultUnlockHref", () => {
   it("appends the return path query param", () => {
     expect(buildVaultUnlockHref("/vault/unlock", "/vault")).toBe("/vault/unlock?next=%2Fvault");
+  });
+
+  it("sanitizes unsafe return paths in hrefs", () => {
+    expect(buildVaultUnlockHref("/vault/unlock", "//evil.example")).toBe("/vault/unlock?next=%2F");
   });
 
   it("appends with & when unlock path already has search", () => {

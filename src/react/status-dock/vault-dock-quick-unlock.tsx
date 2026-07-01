@@ -1,6 +1,11 @@
 "use client";
 
 import { useEffect, useRef, useState, type FormEvent, type ReactNode } from "react";
+import { VaultRateLimitError } from "../../errors/vault-errors.js";
+import {
+  withVaultUnlockRateLimit,
+  type VaultUnlockRateLimiter,
+} from "../../rate-limit/vault-unlock-rate-limit.js";
 import { resolveVaultDockPasskeyAvailability } from "./resolve-passkey-dock-availability.js";
 import type { VaultServerStatusSnapshot } from "../status/resolve-vault-client-status.js";
 
@@ -35,6 +40,8 @@ export type VaultDockQuickUnlockProps = {
   autoFocusPassword?: boolean;
   /** Attempt passkey unlock once when passkey unlock is primary. Defaults to true. */
   autoStartPasskey?: boolean;
+  unlockRateLimiter?: VaultUnlockRateLimiter;
+  rateLimitScopeKey?: string;
   /** Optional alert slot for styled error output. */
   renderError?: (message: string) => ReactNode;
 };
@@ -60,31 +67,59 @@ export function VaultDockQuickUnlock({
   onPasskeyUnlockFailed,
   autoFocusPassword = true,
   autoStartPasskey = true,
+  unlockRateLimiter,
+  rateLimitScopeKey = "default",
   renderError = (message) => <DefaultError message={message} />,
 }: VaultDockQuickUnlockProps) {
   const labels = { ...DEFAULT_VAULT_DOCK_QUICK_UNLOCK_LABELS, ...labelOverrides };
   const [vaultPassword, setVaultPassword] = useState("");
+  const [rateLimitError, setRateLimitError] = useState<string | null>(null);
   const passwordInputRef = useRef<HTMLInputElement>(null);
   const passkeyAutoStartedRef = useRef(false);
   const { hasEnvelope, showPasskey, prfExplicitlyUnsupported } =
     resolveVaultDockPasskeyAvailability(serverStatus);
   const passwordId = `${idPrefix}-vault-password`;
   const usePasskeyPrimary = hasEnvelope;
+  const displayedError = rateLimitError ?? error;
+
+  async function runUnlockAttempt<T>(
+    action: "password" | "passkey_prf",
+    attempt: () => Promise<T>
+  ): Promise<T | undefined> {
+    if (loading) return undefined;
+    setRateLimitError(null);
+    try {
+      if (unlockRateLimiter) {
+        return await withVaultUnlockRateLimit(
+          unlockRateLimiter,
+          rateLimitScopeKey,
+          action,
+          attempt
+        );
+      }
+      return await attempt();
+    } catch (caught) {
+      if (caught instanceof VaultRateLimitError) {
+        setRateLimitError(caught.message);
+      }
+      throw caught;
+    }
+  }
 
   async function submitPassword() {
-    if (loading || !vaultPassword) return;
+    if (!vaultPassword) return;
     try {
-      await onUnlockPassword(vaultPassword);
+      await runUnlockAttempt("password", () => Promise.resolve(onUnlockPassword(vaultPassword)));
       setVaultPassword("");
     } catch {
-      // Error surfaced via error prop.
+      // Error surfaced via error or rate limit props.
     }
   }
 
   async function submitPasskey() {
-    if (loading || !passkeyReady) return;
+    if (!passkeyReady || !onUnlockPasskey) return;
     try {
-      await onUnlockPasskey?.();
+      await runUnlockAttempt("passkey_prf", () => Promise.resolve(onUnlockPasskey()));
     } catch (error) {
       onPasskeyUnlockFailed?.(error);
     }
@@ -128,7 +163,7 @@ export function VaultDockQuickUnlock({
       return (
         <div className="vc-status-dock-unlock">
           <p className="vc-status-dock-unlock__note">{labels.passkeyUnavailable}</p>
-          {error ? renderError(error) : null}
+          {displayedError ? renderError(displayedError) : null}
         </div>
       );
     }
@@ -146,7 +181,7 @@ export function VaultDockQuickUnlock({
         {prfExplicitlyUnsupported ? (
           <p className="vc-status-dock-unlock__note">{labels.passkeyUnavailable}</p>
         ) : null}
-        {error ? renderError(error) : null}
+        {displayedError ? renderError(displayedError) : null}
       </div>
     );
   }
@@ -172,7 +207,7 @@ export function VaultDockQuickUnlock({
       >
         {loading ? labels.unlocking : labels.unlockVault}
       </button>
-      {error ? renderError(error) : null}
+      {displayedError ? renderError(displayedError) : null}
     </form>
   );
 }

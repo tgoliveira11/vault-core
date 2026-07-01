@@ -28,6 +28,11 @@ The consuming application owns:
 
 Account login must never unlock the vault. Account password reset must never replace vault recovery.
 
+**Agents:** complete the mandatory checklist in
+[CONSUMER_SECURITY_REQUIREMENTS.md](./CONSUMER_SECURITY_REQUIREMENTS.md) before marking vault
+integration done (auth/RBAC on admin APIs, `withVaultUnlockRateLimit` on every unlock code path, CSP,
+`assertNoVaultPlaintextFields`, and programmatic unlock checks — not overlay-only UX).
+
 ## 2. Requirements and installation
 
 - Node.js 20 or newer for build, SSR, and tests.
@@ -589,6 +594,50 @@ export function parseVaultSetupRequest(body: unknown) {
 This guard is defense in depth, not a complete data-loss-prevention system. Use closed route schemas,
 never log request bodies, and verify the authenticated account owns the AAD `userId` and resource.
 
+### Rate limiting
+
+Use the in-memory limiters from `@tgoliveira/vault-core` to protect expensive unlock work and vault
+HTTP routes. Configure via `VaultAdminConfig.rateLimit` or the `VAULT_UNLOCK_*` and
+`VAULT_API_RATE_LIMIT_*` environment variables.
+
+**Unlock failures** (per scope + method: password, recovery phrase, or passkey PRF):
+
+```ts
+import {
+  createVaultUnlockRateLimiterFromAdminConfig,
+  withVaultUnlockRateLimit,
+} from "@tgoliveira/vault-core";
+
+const unlockLimiter = createVaultUnlockRateLimiterFromAdminConfig(adminConfig);
+
+await withVaultUnlockRateLimit(unlockLimiter, userId, "password", async () => {
+  return unlockVaultFromPasswordEnvelope({ password, envelope, profile });
+});
+```
+
+Pass `unlockRateLimiter` and `rateLimitScopeKey` to `VaultUnlockPanel` / `VaultDockQuickUnlock` for
+built-in assert/record behavior. **Also** wrap every direct call to envelope unlock APIs with
+`withVaultUnlockRateLimit()` — UI props alone are bypassable.
+
+**Vault HTTP APIs** (per namespace + client key, e.g. client IP):
+
+```ts
+import {
+  buildVaultRateLimitHttpResponse,
+  consumeVaultApiRateLimit,
+  createVaultApiRateLimiterFromAdminConfig,
+} from "@tgoliveira/vault-core";
+
+const apiLimiter = createVaultApiRateLimiterFromAdminConfig(adminConfig);
+const decision = consumeVaultApiRateLimit(apiLimiter, "vault-admin-config", clientIp);
+if (!decision.allowed) {
+  const limited = buildVaultRateLimitHttpResponse(decision);
+  return Response.json(limited.body, { status: limited.status, headers: limited.headers });
+}
+```
+
+Defaults: 5 failed unlocks / 15 minutes with a 30-minute lockout; 120 API requests / 60 seconds.
+
 ## 15. Password and recovery rotation
 
 Use the rotation helpers after the vault is explicitly unlocked and the UVK is in memory.
@@ -655,6 +704,7 @@ Expected domain errors include:
 - `RecoveryPhraseConfirmationError`
 - `VaultConflictError`
 - `VaultNotFoundError`
+- `VaultRateLimitError` — unlock or API rate limit exceeded (`retryAfterMs`, `resetAtMs`)
 
 Web Crypto, JSON parsing, Zod, and Argon2id validation may also throw standard errors. Convert detailed
 internal failures into generic user-facing unlock messages. Never include entered secrets, decrypted

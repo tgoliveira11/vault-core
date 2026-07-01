@@ -42,6 +42,7 @@ export type {
   VaultAdminFeatureFlags,
   VaultAdminPasswordPolicy,
   VaultAdminPaths,
+  VaultAdminRateLimitConfig,
   VaultAdminSection,
   VaultAdminSessionConfig,
   VaultPasswordEnforcement,

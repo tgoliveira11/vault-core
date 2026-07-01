@@ -61,6 +61,12 @@ describe("admin config overrides", () => {
     expect(() => validateVaultAdminOverride("encryptionAlgorithm", "aes")).toThrow(
       /not overridable/i
     );
+    expect(() => validateVaultAdminOverride("aadContextVault", "evil:v1")).toThrow(
+      /not overridable/i
+    );
+    expect(() => validateVaultAdminOverride("aadContextEnvelope", "evil:v1")).toThrow(
+      /not overridable/i
+    );
   });
 
   it("validates override value types", () => {
@@ -79,8 +85,6 @@ describe("admin config overrides", () => {
     const next = applyVaultAdminOverrides(base, {
       enabled: true,
       basePath: "/custom/admin",
-      aadContextVault: "custom:vault",
-      aadContextEnvelope: "custom:envelope",
       prfSaltPrefix: "custom-prf:",
       defaultRecoveryWordCount: 24,
       autoLockMinutes: 10,
@@ -99,8 +103,6 @@ describe("admin config overrides", () => {
     expect(next.enabled).toBe(true);
     expect(next.features.adminEnabled).toBe(true);
     expect(next.basePath).toBe("/custom/admin");
-    expect(next.profile.aadContextVault).toBe("custom:vault");
-    expect(next.profile.aadContextEnvelope).toBe("custom:envelope");
     expect(next.prfSaltPrefix).toBe("custom-prf:");
     expect(next.defaultRecoveryWordCount).toBe(24);
     expect(next.session.autoLockMinutes).toBe(10);
@@ -114,6 +116,24 @@ describe("admin config overrides", () => {
     expect(next.passwordPolicy.minScore).toBe(1);
     expect(next.passwordPolicy.strengthPosition).toBe("above");
     expect(next.features.passkeyPrfUnlockEnabled).toBe(false);
+    expect(next.rateLimit.unlockMaxFailures).toBe(5);
+    expect(next.rateLimit.apiMaxRequests).toBe(120);
+  });
+
+  it("applies rate limit overrides", () => {
+    const base = buildVaultAdminConfigFromEnv(baseInput);
+    const next = applyVaultAdminOverrides(base, {
+      unlockMaxFailures: 3,
+      unlockFailureWindowMinutes: 10,
+      unlockLockoutMinutes: 20,
+      apiMaxRequests: 60,
+      apiWindowSeconds: 30,
+    });
+    expect(next.rateLimit.unlockMaxFailures).toBe(3);
+    expect(next.rateLimit.unlockFailureWindowMinutes).toBe(10);
+    expect(next.rateLimit.unlockLockoutMinutes).toBe(20);
+    expect(next.rateLimit.apiMaxRequests).toBe(60);
+    expect(next.rateLimit.apiWindowSeconds).toBe(30);
   });
 
   it("returns the same config when overrides are empty", () => {

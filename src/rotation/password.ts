@@ -4,7 +4,14 @@ import {
   VaultAuthorizationError,
   VaultPasswordUnchangedError,
 } from "../errors/vault-errors.js";
-import { createPasswordEnvelope, unlockWithPasswordEnvelope } from "../envelopes/password.js";
+import { unlockWithPasswordEnvelope } from "../envelopes/password.js";
+import {
+  rewrapEncryptedVaultKeyForDerivedKeys,
+} from "../crypto/vault-key-envelope.js";
+import {
+  deriveVaultPasswordKey,
+  deriveVaultPasswordKeyPairFromMetadata,
+} from "../kdf/argon2id.js";
 import { userVaultKeysEqual } from "../keys/user-vault-key.js";
 import { isEnvelopeKdfUpgradeRecommended } from "../crypto/policy.js";
 
@@ -56,15 +63,27 @@ export async function rotateVaultPassword(
     throw new VaultAuthorizationError("Current vault password is incorrect");
   }
 
-  const { envelope } = await createPasswordEnvelope(
+  const oldDerivedKeys = await deriveVaultPasswordKeyPairFromMetadata(
+    currentPassword,
+    currentEnvelope.kdfMetadata
+  );
+  const { key: newEncryptionKey, wrappingKey: newWrappingKey, metadata } =
+    await deriveVaultPasswordKey(newPassword);
+  const encryptedVaultKey = await rewrapEncryptedVaultKeyForDerivedKeys(
+    currentEnvelope.encryptedVaultKey,
+    oldDerivedKeys,
+    { encryptionKey: newEncryptionKey, wrappingKey: newWrappingKey },
     vaultKey,
-    newPassword,
     scope,
     profile
   );
 
   return {
-    envelope,
+    envelope: {
+      method: "password",
+      encryptedVaultKey,
+      kdfMetadata: metadata,
+    },
     replacedKdfVersion: currentEnvelope.kdfMetadata.version,
   };
 }
@@ -107,12 +126,27 @@ export async function maybeUpgradePasswordEnvelopeAfterUnlock(
     throw new VaultAuthorizationError("Vault key mismatch during envelope upgrade");
   }
 
-  const { envelope: upgradedEnvelope } = await createPasswordEnvelope(
-    vaultKey,
+  const oldDerivedKeys = await deriveVaultPasswordKeyPairFromMetadata(
     vaultPassword,
+    envelope.kdfMetadata
+  );
+  const { key: newEncryptionKey, wrappingKey: newWrappingKey, metadata } =
+    await deriveVaultPasswordKey(vaultPassword);
+  const encryptedVaultKey = await rewrapEncryptedVaultKeyForDerivedKeys(
+    envelope.encryptedVaultKey,
+    oldDerivedKeys,
+    { encryptionKey: newEncryptionKey, wrappingKey: newWrappingKey },
+    vaultKey,
     scope,
     profile
   );
 
-  return { upgradedEnvelope, upgradeRecommended: true };
+  return {
+    upgradedEnvelope: {
+      method: "password",
+      encryptedVaultKey,
+      kdfMetadata: metadata,
+    },
+    upgradeRecommended: true,
+  };
 }

@@ -21,7 +21,10 @@ objects and arrays and safely handles cyclic in-memory objects.
 
 - Decrypted vault payload in localStorage or IndexedDB
 
-Browser session helpers clear UVK on lock and `pagehide`. React session helpers also renew the
+Browser session helpers clear UVK on lock and `pagehide`. Envelope unlock restores a
+**non-extractable** session UVK; envelope wrap uses AES-KW (Web Crypto `wrapKey` / `unwrapKey`) so
+raw key bytes are not exported during re-wrap when the inner blob is reused. Legacy envelopes that
+store 32 raw bytes after the outer decrypt remain unlockable. React session helpers also renew the
 inactivity timer on pointer, keyboard, touch, and focus activity by default. Public browser exports
 do not expose direct session-key setters; use `unlockVaultSession()` and `lockVaultSession()` so
 timers and subscribers remain consistent.
@@ -45,6 +48,10 @@ must validate the expected AAD separately.
 Treat encrypted payloads, envelopes, AAD, and KDF metadata loaded from a server or local storage as
 untrusted. Argon2id metadata is bounded before derivation to prevent excessive client memory or CPU
 consumption. Do not bypass the high-level APIs or their runtime validation for persisted data.
+
+Consuming applications must implement authentication, RBAC, CSP, mandatory unlock rate limits, and
+`assertNoVaultPlaintextFields()` on server routes. See
+[docs/CONSUMER_SECURITY_REQUIREMENTS.md](docs/CONSUMER_SECURITY_REQUIREMENTS.md).
 
 ## Logging
 

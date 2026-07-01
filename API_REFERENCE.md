@@ -23,9 +23,9 @@ For complete workflows, use [`docs/IMPLEMENTATION_GUIDE.md`](docs/IMPLEMENTATION
 
 | Export | Purpose |
 | --- | --- |
-| `createUserVaultKey()` | Generates an extractable 256-bit AES-GCM UVK |
-| `importUserVaultKey(bytes)` | Imports raw UVK bytes |
-| `exportUserVaultKey(key)` | Exports raw UVK bytes; keep client-only |
+| `createUserVaultKey()` | Generates an extractable 256-bit AES-GCM UVK for initial envelope setup |
+| `importUserVaultKey(bytes, options?)` | Imports raw UVK bytes; `extractable` defaults to `false` |
+| `exportUserVaultKey(key)` | Exports raw UVK bytes when extractable; throws `VaultKeyNotExtractableError` after envelope unlock |
 | `generateAesKey()`, `importAesKey()`, `exportAesKey()` | Low-level AES key primitives |
 | `encryptVaultPayload(payload, key, scope, profile)` | Serializes and encrypts generic JSON |
 | `decryptVaultPayload(encrypted, key, expectedScope, profile)` | Validates expected AAD, decrypts, and parses JSON |
@@ -141,13 +141,15 @@ Associated inferred types include `EncryptedVaultPayload`, `Argon2idKdfMetadata`
 - `assertVaultPayloadAad(expectedScope, payload, profile)`
 - `rejectVaultPlaintextFields(body)`
 - `assertNoVaultPlaintextFields(body)`
+- `isVaultPlaintextForbiddenField(field)` — case-insensitive check for a single property name
 - `validateNoPlaintextLeak(data)`
 - `scanForSentinels(data, sentinels?)`
 - `containsSentinel(value, sentinels?)`
 - `PLAINTEXT_FORBIDDEN_VAULT_FIELDS`, `ALL_SENTINELS`, and named `SENTINEL_*` constants
 
-The plaintext field guard is recursive and cycle-safe. It is defense in depth; closed API schemas are
-still required.
+The plaintext field guard is recursive and cycle-safe. Field names are matched case-insensitively
+(`VaultPassword`, `mnemonic`, `seed`, `passphrase`, etc.). It is defense in depth; closed API schemas
+are still required.
 
 ### Errors
 
@@ -159,6 +161,8 @@ still required.
 - `RecoveryPhraseConfirmationError`
 - `VaultAuthorizationError`
 - `VaultPasswordUnchangedError`
+- `VaultRateLimitError`
+- `VaultKeyNotExtractableError`
 - `VaultCoreError`
 
 ### Deprecated migration aliases
@@ -323,7 +327,8 @@ Import styles once (includes `vc-vault-unlock-*` classes).
 
 - `VaultUnlockPanel` / `VaultUnlockPanelProps` — password, recovery phrase, and optional passkey unlock
   (`autoFocusPassword` default `true`; `autoStartPasskey` default `false` on the full unlock page;
-  passkey auto-start remains opt-in). Customizable `labels`, `passkeyReady`, etc.
+  passkey auto-start remains opt-in). Optional `unlockRateLimiter` + `rateLimitScopeKey` (default
+  `"default"`) assert before unlock and record failures/successes. Customizable `labels`, `passkeyReady`, etc.
 - `VAULT_UNLOCK_RETURN_QUERY_PARAM` — default query key for post-unlock navigation (`"next"`)
 - `resolveVaultUnlockReturnPath(raw, options?)` — sanitize a return path (relative `/…` only)
 - `readVaultUnlockReturnPath(searchParams, options?)` — read and sanitize from URL search params
@@ -333,7 +338,8 @@ Import styles once (includes `vc-vault-unlock-*` classes).
 
 **Return URL contract:** Callers link to the unlock page with `buildVaultUnlockHref("/vault/unlock", currentPath)`.
 After a successful unlock, navigate to the sanitized `returnPath`. Only same-origin relative paths are
-accepted; `//host`, absolute URLs, and empty values fall back to `defaultPath` (default `/`).
+accepted; `//host`, absolute URLs, encoded `/%2F%2F…` bypasses, backslashes, scheme-like `/https:…`
+paths, and empty values fall back to `defaultPath` (default `/`).
 
 ## Admin config: `@tgoliveira/vault-core`
 
@@ -341,7 +347,23 @@ accepted; `//host`, absolute URLs, and empty values fall back to `defaultPath` (
 - `listVaultAdminConfigEntries(config, env?)`
 - `VAULT_ADMIN_ENV_CATALOG`, `buildVaultEnvLocalTemplate(productName?)`
 - `DEFAULT_VAULT_ADMIN_PATHS`, `resolveVaultAdminPaths(basePath?)`, `listVaultAdminScreens()`, `VAULT_ADMIN_SECTIONS`
-- Types: `VaultAdminConfig`, `VaultAdminConfigEntry`, `VaultAdminPaths`, etc.
+- Types: `VaultAdminConfig`, `VaultAdminConfigEntry`, `VaultAdminPaths`, `VaultAdminRateLimitConfig`, etc.
+
+## Rate limiting: `@tgoliveira/vault-core`
+
+In-memory fixed-window limiters for consuming apps (server routes and client unlock UI).
+
+- `createFixedWindowRateLimiter(config)` — generic O(1) check/consume with lazy pruning and bounded bucket map (`maxBuckets`, default `DEFAULT_RATE_LIMIT_MAX_BUCKETS` = 10_000)
+- `createVaultUnlockRateLimiter(config?)` / `createVaultUnlockRateLimiterFromAdminConfig(config)`
+- `assertVaultUnlockAllowed(limiter, scopeKey, action)`, `recordVaultUnlockFailure()`, `recordVaultUnlockSuccess()`
+- `withVaultUnlockRateLimit(limiter, scopeKey, action, attempt)` — assert, run, record outcome
+- `createVaultApiRateLimiter(config?)` / `createVaultApiRateLimiterFromAdminConfig(config)`
+- `consumeVaultApiRateLimit(limiter, namespace, clientKey)` — returns `RateLimitDecision`
+- `buildVaultRateLimitHttpResponse(decision)` — `{ status: 429, headers, body }` for route handlers
+- Defaults: **5** failed unlocks per **15 min** window, **30 min** lockout; **120** API requests per **60 s** window
+- Env: `VAULT_UNLOCK_MAX_FAILURES`, `VAULT_UNLOCK_FAILURE_WINDOW_MINUTES`, `VAULT_UNLOCK_LOCKOUT_MINUTES`,
+  `VAULT_API_RATE_LIMIT_MAX_REQUESTS`, `VAULT_API_RATE_LIMIT_WINDOW_SECONDS`
+- `VaultDockQuickUnlock` accepts the same optional `unlockRateLimiter` / `rateLimitScopeKey` props
 
 This entry exports the plaintext validation functions, forbidden field list, `ALL_SENTINELS`, and all
 named `SENTINEL_*` values. Use it in network, persistence, logging, and fixture tests. It does not

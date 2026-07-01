@@ -12,6 +12,7 @@ import {
 import { isDemoPasskeyUnlockAvailable, unlockDemoVault, unlockDemoVaultWithPasskey } from "@/lib/vault-demo-crypto";
 import { getDemoPasskeySupport } from "@/lib/vault-demo-passkey";
 import { isVaultConfigured, loadVaultRecord } from "@/lib/vault-demo-store";
+import { getDemoVaultUnlockRateLimiter } from "@/lib/vault-rate-limit";
 
 function DemoLink({ href, className, children, onClick }: VaultStatusDockLinkProps) {
   return (
@@ -90,6 +91,8 @@ function VaultStatusDockClientInner() {
         <VaultDockQuickUnlock
           loading={quickLoading}
           error={quickError}
+          unlockRateLimiter={getDemoVaultUnlockRateLimiter()}
+          rateLimitScopeKey="demo"
           serverStatus={{
             configured,
             hasPasskeyPrfEnvelope: hasPasskeyEnvelope,

@@ -14,7 +14,11 @@ const SECURITY_BOUNDARIES = [
   "Server stores only encrypted envelopes and ciphertext — not vault keys or payloads.",
   "Passkey PRF output is used locally for unlock; it is not sent to your API as a secret.",
   "Admin pages display configuration only; they do not decrypt user vaults.",
-  "Use validateNoPlaintextLeak / assertNoVaultPlaintextFields on server payloads.",
+  "Use validateNoPlaintextLeak / assertNoVaultPlaintextFields on every vault-related server payload.",
+  "Authenticate and RBAC-protect vault admin/config APIs; rate-limit unlock attempts in app code (not UI only).",
+  "VaultProtectedGate overlay is UX only — check useVaultUnlocked() before decrypting in application logic.",
+  "Deploy a strict Content-Security-Policy; XSS with an unlocked vault can exfiltrate the in-memory UVK.",
+  "AAD crypto contexts (aadContextVault / aadContextEnvelope) are deploy-time constants — not runtime admin overrides.",
 ];
 
 export function VaultAdminSecurityPage({ config, paths, LinkComponent }: VaultAdminPageProps) {
@@ -38,8 +42,9 @@ export function VaultAdminSecurityPage({ config, paths, LinkComponent }: VaultAd
 
       <div className="vc-admin-card vc-admin-card--muted" style={{ marginTop: "1rem" }}>
         <p className="vc-admin-card-desc">
-          Product: <strong>{config.productName}</strong>. Protect admin routes with your app&apos;s
-          existing admin authorization — vault-core does not implement account roles.
+          Product: <strong>{config.productName}</strong>. See{" "}
+          <code>docs/CONSUMER_SECURITY_REQUIREMENTS.md</code> in the package for the mandatory
+          consuming-app checklist (auth, rate limits, CSP, plaintext guards).
         </p>
       </div>
     </AdminShell>

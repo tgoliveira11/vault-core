@@ -19,6 +19,12 @@ const DEFAULT_AUTO_LOCK_MINUTES = 15;
 const MIN_AUTO_LOCK_MINUTES = 1;
 const MAX_AUTO_LOCK_MINUTES = 24 * 60;
 
+const DEFAULT_UNLOCK_MAX_FAILURES = 5;
+const DEFAULT_UNLOCK_FAILURE_WINDOW_MINUTES = 15;
+const DEFAULT_UNLOCK_LOCKOUT_MINUTES = 30;
+const DEFAULT_API_MAX_REQUESTS = 120;
+const DEFAULT_API_WINDOW_SECONDS = 60;
+
 function readAutoLockMinutes(env: Record<string, string | undefined>): number {
   const raw =
     env.NEXT_PUBLIC_VAULT_AUTO_LOCK_MINUTES ?? env.VAULT_AUTO_LOCK_MINUTES;
@@ -112,6 +118,36 @@ export function buildVaultAdminConfigFromEnv(
     session: {
       autoLockMinutes: readAutoLockMinutes(env),
     },
+    rateLimit: {
+      unlockMaxFailures: readIntEnv(env, "VAULT_UNLOCK_MAX_FAILURES", DEFAULT_UNLOCK_MAX_FAILURES, {
+        min: 1,
+        max: 100,
+      }),
+      unlockFailureWindowMinutes: readIntEnv(
+        env,
+        "VAULT_UNLOCK_FAILURE_WINDOW_MINUTES",
+        DEFAULT_UNLOCK_FAILURE_WINDOW_MINUTES,
+        { min: 1, max: 24 * 60 }
+      ),
+      unlockLockoutMinutes: readIntEnv(
+        env,
+        "VAULT_UNLOCK_LOCKOUT_MINUTES",
+        DEFAULT_UNLOCK_LOCKOUT_MINUTES,
+        { min: 1, max: 24 * 60 }
+      ),
+      apiMaxRequests: readIntEnv(
+        env,
+        "VAULT_API_RATE_LIMIT_MAX_REQUESTS",
+        DEFAULT_API_MAX_REQUESTS,
+        { min: 1, max: 10_000 }
+      ),
+      apiWindowSeconds: readIntEnv(
+        env,
+        "VAULT_API_RATE_LIMIT_WINDOW_SECONDS",
+        DEFAULT_API_WINDOW_SECONDS,
+        { min: 1, max: 3600 }
+      ),
+    },
     features: {
       adminEnabled: readBoolEnv(env, "VAULT_ADMIN_ENABLED", false),
       passkeyPrfUnlockEnabled: readBoolEnv(env, "VAULT_PASSKEY_PRF_UNLOCK_ENABLED", true),
@@ -183,6 +219,16 @@ export function listVaultAdminConfigEntries(
         return config.passwordPolicy.strengthPosition;
       case "passkeyPrfUnlockEnabled":
         return config.features.passkeyPrfUnlockEnabled;
+      case "unlockMaxFailures":
+        return config.rateLimit.unlockMaxFailures;
+      case "unlockFailureWindowMinutes":
+        return config.rateLimit.unlockFailureWindowMinutes;
+      case "unlockLockoutMinutes":
+        return config.rateLimit.unlockLockoutMinutes;
+      case "apiMaxRequests":
+        return config.rateLimit.apiMaxRequests;
+      case "apiWindowSeconds":
+        return config.rateLimit.apiWindowSeconds;
       case "recommendedKdfVersion":
         return VAULT_CRYPTO_POLICY.kdf.version;
       case "encryptionAlgorithm":
