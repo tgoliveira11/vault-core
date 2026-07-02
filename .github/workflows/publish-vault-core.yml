@@ -15,6 +15,7 @@ concurrency:
 permissions:
   contents: write
   id-token: write
+  pull-requests: write
 
 jobs:
   publish:
@@ -109,16 +110,28 @@ jobs:
             echo "tag_exists=false" >> "$GITHUB_OUTPUT"
           fi
 
-      - name: Commit and push release metadata
+      - name: Merge release metadata via pull request
         if: steps.release.outputs.changed == 'true'
         env:
           RELEASE_VERSION: ${{ steps.release.outputs.version }}
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          BRANCH="chore/release-${RELEASE_VERSION}-metadata"
+          git checkout -b "$BRANCH"
           git add package.json package-lock.json CHANGELOG.md
           git commit -m "Release ${RELEASE_VERSION}"
-          git push origin HEAD:main
+          git push origin "$BRANCH"
+
+          PR_URL=$(gh pr create --base main --head "$BRANCH" \
+            --title "Release ${RELEASE_VERSION}" \
+            --body "Automated release metadata from the publish workflow.")
+
+          gh pr merge "$PR_URL" --squash --delete-branch
+
+          git fetch origin main
+          git checkout main
+          git pull --ff-only origin main
 
       - name: Publish the validated tarball to npmjs
         if: steps.registry.outputs.published == 'false'

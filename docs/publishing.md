@@ -61,7 +61,7 @@ gh workflow run publish-vault-core.yml --ref main -f version=0.4.0
 gh workflow run publish-vault-core.yml --ref main
 ```
 
-The `npmjs` environment may require manual deployment approval depending on [repo-settings.md](./repo-settings.md).
+The `npmjs` environment has no required reviewers (publish starts immediately on `workflow_dispatch`).
 
 ## Workflow order
 
@@ -73,7 +73,7 @@ The `npmjs` environment may require manual deployment approval depending on [rep
 6. `npm run validate`
 7. Build publication tarball (`npm pack`)
 8. Detect existing npm version and git tag
-9. Commit and push release metadata (`Release X.Y.Z`) when version changed
+9. Merge release metadata via an automated PR (`Release X.Y.Z`) when version changed — required because `main` uses pull-request branch protection
 10. Publish tarball to npm (OIDC provenance when configured)
 11. Create and push annotated tag `vault-core-vX.Y.Z` (with `git config user.*` set on runner)
 12. Create GitHub Release if missing
@@ -124,7 +124,7 @@ Requires `id-token: write`, Node ≥ 22.14, npm ≥ 11.5.1. The workflow uses No
 
 ## Bot exception
 
-The publish workflow may push release commits to `main` as `github-actions[bot]`. Branch protection must allow that bot to bypass or satisfy push rules. See [repo-settings.md](./repo-settings.md).
+The publish workflow merges release metadata to `main` via an automated pull request when the version changes. Branch protection must allow PR merge without human approval (`required_approving_review_count: 0`). See [repo-settings.md](./repo-settings.md).
 
 Human contributors and AI agents must not push directly to `main`.
 

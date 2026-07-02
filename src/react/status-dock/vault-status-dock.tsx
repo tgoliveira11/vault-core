@@ -3,6 +3,7 @@
 import {
   useCallback,
   useEffect,
+  useLayoutEffect,
   useMemo,
   useRef,
   useState,
@@ -47,8 +48,31 @@ import {
   resolveVaultAutoLockMinutes,
 } from "./use-vault-auto-lock-countdown.js";
 import { useVaultDockDismiss } from "./use-vault-dock-dismiss.js";
+import {
+  classifyPasskeyUnlockFailure,
+  type PasskeyUnlockFailureKind,
+} from "../../errors/passkey-unlock-failure.js";
 import { buildVaultUnlockHref } from "../unlock/vault-unlock-routes.js";
 import { navigateToVaultFullUnlock } from "./navigate-to-full-unlock.js";
+import { tryConsumePasskeyAutoStart } from "./passkey-auto-start-dedupe.js";
+
+const DEFAULT_PASSKEY_REDIRECT_KINDS: PasskeyUnlockFailureKind[] = ["redirect_to_full_unlock"];
+
+function shouldRedirectOnPasskeyFailure(
+  error: unknown,
+  redirectOnPasskeyUnlockFailure: boolean | PasskeyUnlockFailureKind[],
+  shouldRedirectOnPasskeyUnlockFailure?: (error: unknown) => boolean
+): boolean {
+  if (shouldRedirectOnPasskeyUnlockFailure) {
+    return shouldRedirectOnPasskeyUnlockFailure(error);
+  }
+  if (redirectOnPasskeyUnlockFailure === false) return false;
+  const kind = classifyPasskeyUnlockFailure(error);
+  if (redirectOnPasskeyUnlockFailure === true) {
+    return kind !== "user_cancelled";
+  }
+  return redirectOnPasskeyUnlockFailure.includes(kind);
+}
 
 export type VaultStatusDockLinkProps = {
   href: string;
@@ -83,12 +107,18 @@ export type VaultStatusDockProps = {
   onLock?: () => void;
   onStayUnlocked?: () => void;
   /**
-   * When dock passkey unlock is cancelled or fails, navigates to the full unlock page with the
-   * current return path. Set to `false` to disable. Defaults to `true`.
+   * When dock passkey unlock fails with a matching failure kind, navigates to the full unlock
+   * page with the current return path. User cancellation does not redirect by default.
+   * Defaults to `["redirect_to_full_unlock"]`. Set to `false` to disable, or `true` to redirect
+   * on every failure except user cancellation.
    */
-  redirectOnPasskeyUnlockFailure?: boolean;
+  redirectOnPasskeyUnlockFailure?: boolean | PasskeyUnlockFailureKind[];
+  /** Overrides {@link redirectOnPasskeyUnlockFailure} when provided. */
+  shouldRedirectOnPasskeyUnlockFailure?: (error: unknown) => boolean;
   /** App navigation for full unlock redirect (for example Next.js `router.push`). */
   onNavigateToUnlock?: (href: string) => void;
+  /** Invoked when dock passkey unlock is cancelled (no redirect by default). */
+  onPasskeyUnlockCancelled?: (error: unknown) => void;
   /** Custom quick-unlock slot; defaults to none (link to full unlock only). */
   renderQuickUnlock?: (context: {
     loading: boolean;
@@ -96,7 +126,17 @@ export type VaultStatusDockProps = {
     serverStatus: VaultServerStatusSnapshot | null;
     collapse: () => void;
     fullUnlockHref: string;
+    /** Fatal passkey failures that may redirect to the full unlock page. */
     onPasskeyUnlockFailed: (error: unknown) => void;
+    /** User-cancelled passkey unlock; does not call {@link onNavigateToUnlock}. */
+    onPasskeyUnlockCancelled: (error: unknown) => void;
+    /**
+     * Register a synchronous passkey auto-start handler from dock expand.
+     * Pass to {@link VaultDockQuickUnlock.bindAutoStartPasskey}.
+     */
+    bindAutoStartPasskey: (handler: (() => void) | null) => void;
+    /** Whether passkey auto-start was already consumed for this expand (dedupe). */
+    autoStartConsumed: boolean;
   }) => ReactNode;
 };
 
@@ -160,8 +200,10 @@ export function VaultStatusDock({
   className,
   onLock,
   onStayUnlocked,
-  redirectOnPasskeyUnlockFailure = true,
+  redirectOnPasskeyUnlockFailure = DEFAULT_PASSKEY_REDIRECT_KINDS,
+  shouldRedirectOnPasskeyUnlockFailure,
   onNavigateToUnlock,
+  onPasskeyUnlockCancelled,
   renderQuickUnlock,
 }: VaultStatusDockProps) {
   const labels = { ...DEFAULT_VAULT_STATUS_DOCK_LABELS, ...labelOverrides };
@@ -178,6 +220,10 @@ export function VaultStatusDock({
   const panelRef = useRef<HTMLDivElement>(null);
   const handleRef = useRef<HTMLButtonElement>(null);
   const expandedRootRef = useRef<HTMLDivElement>(null);
+  const autoStartHandlerRef = useRef<(() => void) | null>(null);
+  const pendingAutoStartRef = useRef(false);
+  const autoStartConsumedRef = useRef(false);
+  const autoStartScopeKey = `${collapsedPreferenceKey}:passkey-auto-start`;
   const [expansion, setExpansion] = useState<{
     status: VaultClientStatus;
     expanded: boolean;
@@ -208,16 +254,55 @@ export function VaultStatusDock({
     suppressVaultActivity();
     setExpansion({ status: clientStatus, expanded: false });
     writeVaultStatusDockCollapsedPreference(true, collapsedPreferenceKey);
+    autoStartConsumedRef.current = false;
+    pendingAutoStartRef.current = false;
     handleRef.current?.focus();
   }, [clientStatus, collapsedPreferenceKey]);
+
+  const triggerPasskeyAutoStart = useCallback(() => {
+    if (autoStartConsumedRef.current) return;
+    if (!tryConsumePasskeyAutoStart(autoStartScopeKey)) {
+      autoStartConsumedRef.current = true;
+      return;
+    }
+    autoStartConsumedRef.current = true;
+    pendingAutoStartRef.current = true;
+    if (autoStartHandlerRef.current) {
+      pendingAutoStartRef.current = false;
+      autoStartHandlerRef.current();
+    }
+  }, [autoStartScopeKey]);
+
+  const bindAutoStartPasskey = useCallback((handler: (() => void) | null) => {
+    autoStartHandlerRef.current = handler;
+    if (handler && pendingAutoStartRef.current) {
+      pendingAutoStartRef.current = false;
+      handler();
+    }
+  }, []);
 
   const expand = useCallback(() => {
     suppressVaultActivity();
     setExpansion({ status: clientStatus, expanded: true });
     writeVaultStatusDockCollapsedPreference(false, collapsedPreferenceKey);
-  }, [clientStatus, collapsedPreferenceKey]);
+    triggerPasskeyAutoStart();
+  }, [clientStatus, collapsedPreferenceKey, triggerPasskeyAutoStart]);
 
   useEffect(() => subscribeVaultDockExpand(expand, expandEventName), [expand, expandEventName]);
+
+  useLayoutEffect(() => {
+    if (!expanded || onFullUnlockPage) return;
+    if (clientStatus !== "locked" && clientStatus !== "unsupported_prf") return;
+    if (!quickUnlockEnabled || serverStatus?.configured !== true) return;
+    triggerPasskeyAutoStart();
+  }, [
+    clientStatus,
+    expanded,
+    onFullUnlockPage,
+    quickUnlockEnabled,
+    serverStatus?.configured,
+    triggerPasskeyAutoStart,
+  ]);
 
   useEffect(() => {
     if (
@@ -271,12 +356,33 @@ export function VaultStatusDock({
   );
 
   const handlePasskeyUnlockFailed = useCallback(
-    (_error: unknown) => {
-      if (!redirectOnPasskeyUnlockFailure) return;
+    (error: unknown) => {
+      if (
+        !shouldRedirectOnPasskeyFailure(
+          error,
+          redirectOnPasskeyUnlockFailure,
+          shouldRedirectOnPasskeyUnlockFailure
+        )
+      ) {
+        return;
+      }
       collapse();
       navigateToVaultFullUnlock(unlockHref, onNavigateToUnlock);
     },
-    [collapse, onNavigateToUnlock, redirectOnPasskeyUnlockFailure, unlockHref]
+    [
+      collapse,
+      onNavigateToUnlock,
+      redirectOnPasskeyUnlockFailure,
+      shouldRedirectOnPasskeyUnlockFailure,
+      unlockHref,
+    ]
+  );
+
+  const handlePasskeyUnlockCancelled = useCallback(
+    (error: unknown) => {
+      onPasskeyUnlockCancelled?.(error);
+    },
+    [onPasskeyUnlockCancelled]
   );
 
   if (!visible) return null;
@@ -443,6 +549,9 @@ export function VaultStatusDock({
             collapse,
             fullUnlockHref: unlockHref,
             onPasskeyUnlockFailed: handlePasskeyUnlockFailed,
+            onPasskeyUnlockCancelled: handlePasskeyUnlockCancelled,
+            bindAutoStartPasskey,
+            autoStartConsumed: autoStartConsumedRef.current,
           })}
           <p className="vc-status-dock-panel__fallback">
             <Link

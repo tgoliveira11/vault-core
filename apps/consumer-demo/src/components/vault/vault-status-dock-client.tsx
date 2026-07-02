@@ -87,7 +87,13 @@ function VaultStatusDockClientInner() {
       loading={loading}
       unlockError={error}
       LinkComponent={DemoLink}
-      renderQuickUnlock={({ loading: quickLoading, error: quickError, onPasskeyUnlockFailed }) => (
+      renderQuickUnlock={({
+        loading: quickLoading,
+        error: quickError,
+        onPasskeyUnlockFailed,
+        onPasskeyUnlockCancelled,
+        bindAutoStartPasskey,
+      }) => (
         <VaultDockQuickUnlock
           loading={quickLoading}
           error={quickError}
@@ -102,7 +108,10 @@ function VaultStatusDockClientInner() {
             isDemoPasskeyUnlockAvailable() ? handleUnlockPasskey : undefined
           }
           passkeyReady={isDemoPasskeyUnlockAvailable()}
+          passkeyOptionsReady={passkeySupport.prf}
+          bindAutoStartPasskey={bindAutoStartPasskey}
           onPasskeyUnlockFailed={onPasskeyUnlockFailed}
+          onPasskeyUnlockCancelled={onPasskeyUnlockCancelled}
         />
       )}
     />

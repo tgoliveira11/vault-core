@@ -1,3 +1,9 @@
+export {
+  classifyPasskeyUnlockFailure,
+  shouldRedirectPasskeyUnlockFailureByDefault,
+  type PasskeyUnlockFailureKind,
+} from "../../errors/passkey-unlock-failure.js";
+export { tryConsumePasskeyAutoStart, resetPasskeyAutoStartDedupe } from "./passkey-auto-start-dedupe.js";
 export { formatAutoLockCountdown } from "./format-auto-lock-countdown.js";
 export {
   DEFAULT_VAULT_STATUS_DOCK_LABELS,

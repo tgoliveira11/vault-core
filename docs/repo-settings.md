@@ -34,13 +34,13 @@ Configure in **Settings → Branches → Branch protection rules → main → Re
 
 If checks do not appear in the UI, open a PR once so GitHub registers the workflows.
 
-### Allow release bot to push
+### Allow release bot to update `main`
 
-Either:
+Classic branch protection on this repo requires a **pull request** before merging (`required_approving_review_count: 0`, so no human approval is needed). There is **no** “bypass actors” option in the classic UI for personal repos — use one of:
 
-- Add `github-actions[bot]` to bypass list for administrators (if you are the only admin), or
-- Use a ruleset that permits the `Publish package to npmjs` workflow to push release commits, or
-- Temporarily disable lock branch (recommended minimum).
+1. **Recommended (automated):** the publish workflow opens a `chore/release-X.Y.Z-metadata` PR and squash-merges it when metadata changes.
+2. **Optional GitHub setting:** **Settings → Actions → General → Workflow permissions** → enable **Allow GitHub Actions to create and approve pull requests** if automated `gh pr merge` is blocked.
+3. **Rulesets (if available on your plan):** add a repository ruleset with bypass for `GitHub Actions` — not required when (1) works.
 
 ## Environment — `npmjs`
 

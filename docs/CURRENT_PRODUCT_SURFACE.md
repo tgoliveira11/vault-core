@@ -2,7 +2,7 @@
 
 Living inventory of what `@tgoliveira/vault-core` exposes today. Update this file when exports, admin screens, published artifacts, or shipped/planned status changes.
 
-Last reviewed: **2026-07-01** (package version **0.3.0**, unreleased vault deletion helpers on branch)
+Last reviewed: **2026-07-02** (package version **0.3.0**, passkey dock unlock improvements on branch)
 
 ## Package entry points (shipped)
 
@@ -94,7 +94,9 @@ Exported from `@tgoliveira/vault-core/react` (styles: `vc-status-dock-*` in `vau
 | Export | Purpose |
 | --- | --- |
 | `VaultStatusDock` | Header-attached collapsible lock/unlock handle and expanded panel |
-| `VaultDockQuickUnlock` | Compact password or passkey primary unlock for the dock (auto-focus password, Enter submit, passkey auto-start) |
+| `VaultDockQuickUnlock` | Compact password or passkey primary unlock for the dock (auto-focus password, expand-sync passkey auto-start via `bindAutoStartPasskey`, `passkeyOptionsReady`) |
+| `classifyPasskeyUnlockFailure` / `PasskeyUnlockFailureKind` | Passkey failure classification for dock redirect and callbacks |
+| `tryConsumePasskeyAutoStart` / `resetPasskeyAutoStartDedupe` | Short-TTL sessionStorage dedupe for dock passkey auto-start |
 | `requestVaultDockExpand` / `subscribeVaultDockExpand` | Programmatic expand from locked-content gates |
 | `useVaultAutoLockCountdown` / `useVaultAutoLockFraction` | Live auto-lock countdown and ring fraction |
 | `resolveVaultDockPasskeyAvailability` | Passkey PRF quick-unlock eligibility |

@@ -1,6 +1,9 @@
 "use client";
 
-import { useEffect, useRef, useState, type FormEvent, type ReactNode } from "react";
+import { useLayoutEffect, useRef, useState, type FormEvent, type ReactNode } from "react";
+import {
+  classifyPasskeyUnlockFailure,
+} from "../../errors/passkey-unlock-failure.js";
 import { VaultRateLimitError } from "../../errors/vault-errors.js";
 import {
   withVaultUnlockRateLimit,
@@ -34,11 +37,30 @@ export type VaultDockQuickUnlockProps = {
   onUnlockPassword: (password: string) => void | Promise<void>;
   onUnlockPasskey?: () => void | Promise<void>;
   passkeyReady?: boolean;
-  /** When passkey unlock is cancelled or fails, navigate to the full unlock page. */
+  /**
+   * When false, passkey auto-start waits until the consumer has prepared WebAuthn options
+   * (for example challenge/credential metadata). Defaults to true.
+   */
+  passkeyOptionsReady?: boolean;
+  /**
+   * Invoked when passkey unlock fails in a way that may redirect to the full unlock page.
+   * User cancellation uses {@link onPasskeyUnlockCancelled} instead.
+   */
   onPasskeyUnlockFailed?: (error: unknown) => void;
+  /** Invoked when the user cancels passkey unlock (no redirect by default). */
+  onPasskeyUnlockCancelled?: (error: unknown) => void;
+  /**
+   * Registers a synchronous passkey auto-start handler from {@link VaultStatusDock} expand.
+   * Do not call WebAuthn from `useEffect`; the dock invokes this during expand.
+   */
+  bindAutoStartPasskey?: (handler: (() => void) | null) => void;
   /** Focus the vault password field when password unlock is primary. Defaults to true. */
   autoFocusPassword?: boolean;
-  /** Attempt passkey unlock once when passkey unlock is primary. Defaults to true. */
+  /**
+   * Attempt passkey unlock once when passkey unlock is primary and the dock expands.
+   * Defaults to true. Requires {@link passkeyOptionsReady} and {@link passkeyReady}.
+   * On iOS, expand-click auto-start may still fail; the explicit passkey button is reliable.
+   */
   autoStartPasskey?: boolean;
   unlockRateLimiter?: VaultUnlockRateLimiter;
   rateLimitScopeKey?: string;
@@ -64,7 +86,10 @@ export function VaultDockQuickUnlock({
   onUnlockPassword,
   onUnlockPasskey,
   passkeyReady = true,
+  passkeyOptionsReady = true,
   onPasskeyUnlockFailed,
+  onPasskeyUnlockCancelled,
+  bindAutoStartPasskey,
   autoFocusPassword = true,
   autoStartPasskey = true,
   unlockRateLimiter,
@@ -75,7 +100,6 @@ export function VaultDockQuickUnlock({
   const [vaultPassword, setVaultPassword] = useState("");
   const [rateLimitError, setRateLimitError] = useState<string | null>(null);
   const passwordInputRef = useRef<HTMLInputElement>(null);
-  const passkeyAutoStartedRef = useRef(false);
   const { hasEnvelope, showPasskey, prfExplicitlyUnsupported } =
     resolveVaultDockPasskeyAvailability(serverStatus);
   const passwordId = `${idPrefix}-vault-password`;
@@ -116,42 +140,51 @@ export function VaultDockQuickUnlock({
     }
   }
 
+  function handlePasskeyFailure(error: unknown) {
+    const kind = classifyPasskeyUnlockFailure(error);
+    if (kind === "user_cancelled") {
+      onPasskeyUnlockCancelled?.(error);
+      return;
+    }
+    if (kind === "recoverable") return;
+    onPasskeyUnlockFailed?.(error);
+  }
+
   async function submitPasskey() {
     if (!passkeyReady || !onUnlockPasskey) return;
     try {
       await runUnlockAttempt("passkey_prf", () => Promise.resolve(onUnlockPasskey()));
     } catch (error) {
-      onPasskeyUnlockFailed?.(error);
+      handlePasskeyFailure(error);
     }
   }
 
-  useEffect(() => {
+  const canAutoStartPasskey =
+    autoStartPasskey &&
+    usePasskeyPrimary &&
+    showPasskey &&
+    Boolean(onUnlockPasskey) &&
+    passkeyReady &&
+    passkeyOptionsReady &&
+    !loading;
+
+  useLayoutEffect(() => {
+    if (!bindAutoStartPasskey) return undefined;
+    if (!canAutoStartPasskey) {
+      bindAutoStartPasskey(null);
+      return () => bindAutoStartPasskey(null);
+    }
+    const run = () => {
+      void submitPasskey();
+    };
+    bindAutoStartPasskey(run);
+    return () => bindAutoStartPasskey(null);
+  }, [bindAutoStartPasskey, canAutoStartPasskey, onUnlockPasskey, passkeyReady, passkeyOptionsReady]);
+
+  useLayoutEffect(() => {
     if (!autoFocusPassword || usePasskeyPrimary) return;
     passwordInputRef.current?.focus();
   }, [autoFocusPassword, usePasskeyPrimary]);
-
-  useEffect(() => {
-    if (
-      !autoStartPasskey ||
-      !usePasskeyPrimary ||
-      !showPasskey ||
-      !onUnlockPasskey ||
-      !passkeyReady ||
-      loading ||
-      passkeyAutoStartedRef.current
-    ) {
-      return;
-    }
-    passkeyAutoStartedRef.current = true;
-    void submitPasskey();
-  }, [
-    autoStartPasskey,
-    usePasskeyPrimary,
-    showPasskey,
-    onUnlockPasskey,
-    passkeyReady,
-    loading,
-  ]);
 
   function handlePasswordSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();

@@ -272,7 +272,11 @@ Import styles once (includes `vc-status-dock-*` classes).
 
 - `VaultStatusDock` / `VaultStatusDockProps` — collapsible header dock (lock state, auto-lock countdown, lock now, quick-unlock slot)
 - `VaultDockQuickUnlock` / `VaultDockQuickUnlockProps` — password or passkey primary unlock;
-  `autoFocusPassword` and `autoStartPasskey` (default `true`) control focus and passkey auto-start
+  `autoFocusPassword` and `autoStartPasskey` (default `true`) control focus and passkey auto-start;
+  `passkeyOptionsReady` gates auto-start until WebAuthn options are prepared; wire `bindAutoStartPasskey`
+  from the dock `renderQuickUnlock` context (auto-start runs from expand, not `useEffect`)
+- `classifyPasskeyUnlockFailure(error)` / `PasskeyUnlockFailureKind` — classify passkey failures for dock redirect policy
+- `tryConsumePasskeyAutoStart(scopeKey)` / `resetPasskeyAutoStartDedupe(scopeKey)` — passkey auto-start dedupe helpers
 - `createVaultFullUnlockPageMatcher(unlockPath)` — detect full unlock route (dock stays collapsed, handle visible)
 - `requestVaultDockExpand()` / `subscribeVaultDockExpand(listener)` — expand from elsewhere in the app
 - `useVaultAutoLockCountdown(active, autoLockMinutes?)` / `useVaultAutoLockFraction(...)` /
@@ -286,9 +290,11 @@ Import styles once (includes `vc-status-dock-*` classes).
 `VaultStatusDock` requires app-provided `serverStatus`, `pathname`, `unlockPath`, optional
 `LinkComponent`, `buildUnlockHref` (defaults to `buildVaultUnlockHref(unlockPath, returnPath)`),
 `renderQuickUnlock`, optional `autoLockMinutes` (override; when omitted, uses
-`configureVaultSession()` / `VaultSessionProvider`), `onNavigateToUnlock`, and
-`redirectOnPasskeyUnlockFailure` (default `true`). The quick-unlock slot receives
-`fullUnlockHref` and `onPasskeyUnlockFailed` for passkey fallback to the full unlock page. Set `visible={false}`
+`configureVaultSession()` / `VaultSessionProvider`), `onNavigateToUnlock`,
+`onPasskeyUnlockCancelled`, `shouldRedirectOnPasskeyUnlockFailure`, and
+`redirectOnPasskeyUnlockFailure` (default `["redirect_to_full_unlock"]`; user cancellation does not
+redirect). The quick-unlock slot receives `fullUnlockHref`, `onPasskeyUnlockFailed`,
+`onPasskeyUnlockCancelled`, `bindAutoStartPasskey`, and `autoStartConsumed`. Set `visible={false}`
 when the user is signed out. Hide before vault setup via `serverStatus.configured === false`.
 
 ### Vault protected gate
