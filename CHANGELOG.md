@@ -8,6 +8,21 @@ API changes increment the minor version.
 
 ## [Unreleased]
 
+### Fixed
+
+- Publish workflow merges release metadata via an automated PR instead of pushing directly to `main` (compatible with classic branch protection without bypass actors).
+- **Vault status dock passkey unlock:** user cancellation no longer redirects to the full unlock page by default; passkey auto-start runs synchronously from dock expand (not `useEffect`) when `passkeyOptionsReady` and `passkeyReady`; Strict Mode remount dedupe via sessionStorage TTL.
+
+### Added
+
+- `classifyPasskeyUnlockFailure()` and `PasskeyUnlockFailureKind` exported from `@tgoliveira/vault-core/react` for dock/passkey failure routing.
+- `VaultDockQuickUnlock`: `passkeyOptionsReady`, `onPasskeyUnlockCancelled`, `bindAutoStartPasskey`.
+- `VaultStatusDock`: `onPasskeyUnlockCancelled`, `shouldRedirectOnPasskeyUnlockFailure`; `renderQuickUnlock` context adds `bindAutoStartPasskey`, `onPasskeyUnlockCancelled`, `autoStartConsumed`.
+
+### Changed
+
+- **Breaking:** `redirectOnPasskeyUnlockFailure` default is now `["redirect_to_full_unlock"]` (was `true` redirecting on all failures including user cancel). Pass `true` to redirect on every failure except cancellation, or `false` to disable.
+
 ## [1.0.0] - 2026-07-01
 
 ### Security

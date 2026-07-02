@@ -19,6 +19,7 @@ import {
 } from "./vault-status-dock.js";
 import { VaultDockQuickUnlock } from "./vault-dock-quick-unlock.js";
 import { requestVaultDockExpand } from "./events.js";
+import { resetPasskeyAutoStartDedupe } from "./passkey-auto-start-dedupe.js";
 import {
   readVaultStatusDockCollapsedPreference,
   writeVaultStatusDockCollapsedPreference,
@@ -26,6 +27,7 @@ import {
 
 const serverStatus = { configured: true, hasPasskeyPrfEnvelope: false };
 const preferenceStore = new Map<string, string>();
+const sessionStore = new Map<string, string>();
 
 function installLocalStorageStub() {
   vi.stubGlobal("localStorage", {
@@ -42,6 +44,21 @@ function installLocalStorageStub() {
   });
 }
 
+function installSessionStorageStub() {
+  vi.stubGlobal("sessionStorage", {
+    getItem: (key: string) => sessionStore.get(key) ?? null,
+    setItem: (key: string, value: string) => {
+      sessionStore.set(key, value);
+    },
+    removeItem: (key: string) => {
+      sessionStore.delete(key);
+    },
+    clear: () => {
+      sessionStore.clear();
+    },
+  });
+}
+
 function renderDock(overrides: Partial<ComponentProps<typeof VaultStatusDock>> = {}) {
   return render(
     <div className="vc-status-dock-host">
@@ -51,13 +68,22 @@ function renderDock(overrides: Partial<ComponentProps<typeof VaultStatusDock>> =
         pathname="/vault"
         unlockPath="/vault/unlock"
         autoLockMinutes={15}
-        renderQuickUnlock={({ loading, error, onPasskeyUnlockFailed }) => (
+        collapsedPreferenceKey="test:dock:collapsed"
+        renderQuickUnlock={({
+          loading,
+          error,
+          onPasskeyUnlockFailed,
+          onPasskeyUnlockCancelled,
+          bindAutoStartPasskey,
+        }) => (
           <VaultDockQuickUnlock
             loading={loading}
             error={error}
             serverStatus={serverStatus}
             onUnlockPassword={vi.fn()}
             onPasskeyUnlockFailed={onPasskeyUnlockFailed}
+            onPasskeyUnlockCancelled={onPasskeyUnlockCancelled}
+            bindAutoStartPasskey={bindAutoStartPasskey}
           />
         )}
         {...overrides}
@@ -70,7 +96,10 @@ describe("VaultStatusDock", () => {
   beforeEach(async () => {
     vi.clearAllMocks();
     preferenceStore.clear();
+    sessionStore.clear();
     installLocalStorageStub();
+    installSessionStorageStub();
+    resetPasskeyAutoStartDedupe("test:dock:collapsed:passkey-auto-start");
     configureVaultSession({ autoLockMinutes: 15 });
     resetVaultSessionLockState();
     lockVaultSession();
@@ -417,7 +446,7 @@ describe("VaultStatusDock", () => {
     vi.restoreAllMocks();
   });
 
-  it("redirects to full unlock when dock passkey unlock fails", async () => {
+  it("does not redirect to full unlock when dock passkey unlock is cancelled", async () => {
     vi.spyOn(browser, "isPrfExtensionSupported").mockReturnValue(true);
     const onNavigateToUnlock = vi.fn();
     const onUnlockPasskey = vi.fn().mockRejectedValue(new DOMException("cancelled", "NotAllowedError"));
@@ -426,7 +455,13 @@ describe("VaultStatusDock", () => {
       pathname: "/vault",
       serverStatus: { configured: true, hasPasskeyPrfEnvelope: true },
       prfSupported: true,
-      renderQuickUnlock: ({ loading, error, onPasskeyUnlockFailed }) => (
+      renderQuickUnlock: ({
+        loading,
+        error,
+        onPasskeyUnlockFailed,
+        onPasskeyUnlockCancelled,
+        bindAutoStartPasskey,
+      }) => (
         <VaultDockQuickUnlock
           loading={loading}
           error={error}
@@ -434,15 +469,133 @@ describe("VaultStatusDock", () => {
           onUnlockPassword={vi.fn()}
           onUnlockPasskey={onUnlockPasskey}
           passkeyReady
+          passkeyOptionsReady
+          autoStartPasskey={false}
           onPasskeyUnlockFailed={onPasskeyUnlockFailed}
+          onPasskeyUnlockCancelled={onPasskeyUnlockCancelled}
+          bindAutoStartPasskey={bindAutoStartPasskey}
+        />
+      ),
+    });
+    fireEvent.click(screen.getByTestId("vault-status-dock-handle"));
+    fireEvent.click(screen.getByRole("button", { name: /unlock with passkey/i }));
+    await waitFor(() => {
+      expect(onUnlockPasskey).toHaveBeenCalled();
+    });
+    expect(onNavigateToUnlock).not.toHaveBeenCalled();
+    vi.restoreAllMocks();
+  });
+
+  it("redirects to full unlock when dock passkey unlock fails with PRF unavailable", async () => {
+    vi.spyOn(browser, "isPrfExtensionSupported").mockReturnValue(true);
+    const onNavigateToUnlock = vi.fn();
+    const onUnlockPasskey = vi.fn().mockRejectedValue(new Error("PRF unavailable in this browser"));
+    renderDock({
+      onNavigateToUnlock,
+      pathname: "/vault",
+      serverStatus: { configured: true, hasPasskeyPrfEnvelope: true },
+      prfSupported: true,
+      renderQuickUnlock: ({
+        loading,
+        error,
+        onPasskeyUnlockFailed,
+        onPasskeyUnlockCancelled,
+        bindAutoStartPasskey,
+      }) => (
+        <VaultDockQuickUnlock
+          loading={loading}
+          error={error}
+          serverStatus={{ configured: true, hasPasskeyPrfEnvelope: true }}
+          onUnlockPassword={vi.fn()}
+          onUnlockPasskey={onUnlockPasskey}
+          passkeyReady
+          passkeyOptionsReady
+          autoStartPasskey={false}
+          onPasskeyUnlockFailed={onPasskeyUnlockFailed}
+          onPasskeyUnlockCancelled={onPasskeyUnlockCancelled}
+          bindAutoStartPasskey={bindAutoStartPasskey}
+        />
+      ),
+    });
+    fireEvent.click(screen.getByTestId("vault-status-dock-handle"));
+    fireEvent.click(screen.getByRole("button", { name: /unlock with passkey/i }));
+    await waitFor(() => {
+      expect(onNavigateToUnlock).toHaveBeenCalledWith("/vault/unlock?next=%2Fvault");
+    });
+    vi.restoreAllMocks();
+  });
+
+  it("dedupes passkey auto-start across quick-unlock remount", async () => {
+    vi.spyOn(browser, "isPrfExtensionSupported").mockReturnValue(true);
+    const onUnlockPasskey = vi.fn().mockResolvedValue(undefined);
+
+    function PasskeyQuickUnlock(
+      props: ComponentProps<typeof VaultDockQuickUnlock> & {
+        bindAutoStartPasskey: ComponentProps<typeof VaultDockQuickUnlock>["bindAutoStartPasskey"];
+      }
+    ) {
+      return <VaultDockQuickUnlock {...props} />;
+    }
+
+    const { unmount } = renderDock({
+      serverStatus: { configured: true, hasPasskeyPrfEnvelope: true },
+      prfSupported: true,
+      renderQuickUnlock: ({
+        loading,
+        error,
+        onPasskeyUnlockFailed,
+        onPasskeyUnlockCancelled,
+        bindAutoStartPasskey,
+      }) => (
+        <PasskeyQuickUnlock
+          loading={loading}
+          error={error}
+          serverStatus={{ configured: true, hasPasskeyPrfEnvelope: true }}
+          onUnlockPassword={vi.fn()}
+          onUnlockPasskey={onUnlockPasskey}
+          passkeyReady
+          passkeyOptionsReady
+          onPasskeyUnlockFailed={onPasskeyUnlockFailed}
+          onPasskeyUnlockCancelled={onPasskeyUnlockCancelled}
+          bindAutoStartPasskey={bindAutoStartPasskey}
+        />
+      ),
+    });
+
+    fireEvent.click(screen.getByTestId("vault-status-dock-handle"));
+    await waitFor(() => {
+      expect(onUnlockPasskey).toHaveBeenCalledTimes(1);
+    });
+
+    unmount();
+    renderDock({
+      serverStatus: { configured: true, hasPasskeyPrfEnvelope: true },
+      prfSupported: true,
+      renderQuickUnlock: ({
+        loading,
+        error,
+        onPasskeyUnlockFailed,
+        onPasskeyUnlockCancelled,
+        bindAutoStartPasskey,
+      }) => (
+        <PasskeyQuickUnlock
+          loading={loading}
+          error={error}
+          serverStatus={{ configured: true, hasPasskeyPrfEnvelope: true }}
+          onUnlockPassword={vi.fn()}
+          onUnlockPasskey={onUnlockPasskey}
+          passkeyReady
+          passkeyOptionsReady
+          onPasskeyUnlockFailed={onPasskeyUnlockFailed}
+          onPasskeyUnlockCancelled={onPasskeyUnlockCancelled}
+          bindAutoStartPasskey={bindAutoStartPasskey}
         />
       ),
     });
     fireEvent.click(screen.getByTestId("vault-status-dock-handle"));
     await waitFor(() => {
-      expect(onUnlockPasskey).toHaveBeenCalled();
+      expect(onUnlockPasskey).toHaveBeenCalledTimes(1);
     });
-    expect(onNavigateToUnlock).toHaveBeenCalledWith("/vault/unlock?next=%2Fvault");
     vi.restoreAllMocks();
   });
 });

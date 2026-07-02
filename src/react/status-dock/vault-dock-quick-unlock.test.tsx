@@ -87,7 +87,7 @@ describe("VaultDockQuickUnlock", () => {
     expect(onUnlockPasskey).toHaveBeenCalled();
   });
 
-  it("auto-starts passkey unlock on mount when passkey is primary", async () => {
+  it("auto-starts passkey unlock when dock binds auto-start on expand", async () => {
     vi.mocked(resolveVaultDockPasskeyAvailability).mockReturnValue({
       hasEnvelope: true,
       showPasskey: true,
@@ -99,10 +99,32 @@ describe("VaultDockQuickUnlock", () => {
         onUnlockPassword={vi.fn()}
         onUnlockPasskey={onUnlockPasskey}
         passkeyReady
+        passkeyOptionsReady
+        bindAutoStartPasskey={(handler) => handler?.()}
       />
     );
 
     expect(onUnlockPasskey).toHaveBeenCalledTimes(1);
+  });
+
+  it("does not auto-start passkey when passkeyOptionsReady is false", () => {
+    vi.mocked(resolveVaultDockPasskeyAvailability).mockReturnValue({
+      hasEnvelope: true,
+      showPasskey: true,
+      prfExplicitlyUnsupported: false,
+    });
+    const onUnlockPasskey = vi.fn().mockResolvedValue(undefined);
+    render(
+      <VaultDockQuickUnlock
+        onUnlockPassword={vi.fn()}
+        onUnlockPasskey={onUnlockPasskey}
+        passkeyReady
+        passkeyOptionsReady={false}
+        bindAutoStartPasskey={(handler) => handler?.()}
+      />
+    );
+
+    expect(onUnlockPasskey).not.toHaveBeenCalled();
   });
 
   it("does not auto-start passkey when autoStartPasskey is false", () => {
@@ -186,13 +208,13 @@ describe("VaultDockQuickUnlock", () => {
     expect(screen.getByText(/passkey unlock is unavailable/i)).toBeTruthy();
   });
 
-  it("calls passkey failure handler when passkey unlock throws", async () => {
+  it("calls passkey failure handler when passkey unlock throws a fatal error", async () => {
     vi.mocked(resolveVaultDockPasskeyAvailability).mockReturnValue({
       hasEnvelope: true,
       showPasskey: true,
       prfExplicitlyUnsupported: false,
     });
-    const onUnlockPasskey = vi.fn().mockRejectedValue(new Error("bad"));
+    const onUnlockPasskey = vi.fn().mockRejectedValue(new Error("PRF unavailable"));
     const onPasskeyUnlockFailed = vi.fn();
     render(
       <VaultDockQuickUnlock
@@ -207,6 +229,34 @@ describe("VaultDockQuickUnlock", () => {
     await waitFor(() => {
       expect(onPasskeyUnlockFailed).toHaveBeenCalled();
     });
+  });
+
+  it("calls passkey cancelled handler without failure handler on user cancel", async () => {
+    vi.mocked(resolveVaultDockPasskeyAvailability).mockReturnValue({
+      hasEnvelope: true,
+      showPasskey: true,
+      prfExplicitlyUnsupported: false,
+    });
+    const onUnlockPasskey = vi
+      .fn()
+      .mockRejectedValue(new DOMException("cancelled", "NotAllowedError"));
+    const onPasskeyUnlockFailed = vi.fn();
+    const onPasskeyUnlockCancelled = vi.fn();
+    render(
+      <VaultDockQuickUnlock
+        onUnlockPassword={vi.fn()}
+        onUnlockPasskey={onUnlockPasskey}
+        passkeyReady
+        autoStartPasskey={false}
+        onPasskeyUnlockFailed={onPasskeyUnlockFailed}
+        onPasskeyUnlockCancelled={onPasskeyUnlockCancelled}
+      />
+    );
+    fireEvent.click(screen.getByRole("button", { name: /unlock with passkey/i }));
+    await waitFor(() => {
+      expect(onPasskeyUnlockCancelled).toHaveBeenCalled();
+    });
+    expect(onPasskeyUnlockFailed).not.toHaveBeenCalled();
   });
 
   it("uses custom error renderer", () => {
