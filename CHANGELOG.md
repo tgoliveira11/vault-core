@@ -8,6 +8,8 @@ API changes increment the minor version.
 
 ## [Unreleased]
 
+## [1.0.1] - 2026-07-02
+
 ### Fixed
 
 - Publish workflow merges release metadata via an automated PR instead of pushing directly to `main` (compatible with classic branch protection without bypass actors).
