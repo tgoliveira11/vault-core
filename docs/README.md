@@ -8,6 +8,8 @@ Use this page as the documentation router for `@tgoliveira/vault-core`.
   setup through password, recovery phrase, passkey PRF, persistence boundaries, and sessions.
 - [`ADOPTING_VAULT_CORE_IN_EXISTING_APPS.md`](ADOPTING_VAULT_CORE_IN_EXISTING_APPS.md): phased
   migration for an application that already has vault code or stored ciphertext.
+- [`ADOPTING_VAULT_CORE_1_1_0.md`](ADOPTING_VAULT_CORE_1_1_0.md): upgrade from 1.0.x — passkey PRF
+  epic (#8–#16), duplicate removal, dock wiring, legacy AAD sunset.
 - [`../apps/consumer-demo/README.md`](../apps/consumer-demo/README.md): runnable local reference app
   (not published to npm).
 - [`../API_REFERENCE.md`](../API_REFERENCE.md): public entry points and their security preconditions.

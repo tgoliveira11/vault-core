@@ -18,6 +18,8 @@ Last reviewed: **2026-07-03** (package version **1.0.1**, vault-key envelope hel
 
 - [docs/CONSUMER_SECURITY_REQUIREMENTS.md](./CONSUMER_SECURITY_REQUIREMENTS.md) — mandatory checklist
   for apps and agents (auth/RBAC, rate limits, CSP, plaintext guards, unlock access control)
+- [docs/ADOPTING_VAULT_CORE_1_1_0.md](./ADOPTING_VAULT_CORE_1_1_0.md) — 1.0.x → 1.1.0 upgrade:
+  package vs consumer matrix, phased duplicate removal, dock/React wiring
 
 ## Core capabilities (shipped)
 
