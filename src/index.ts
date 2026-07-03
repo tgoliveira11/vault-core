@@ -75,6 +75,11 @@ export * from "./payload/encrypted-payload.js";
 export * from "./envelopes/password.js";
 export * from "./envelopes/recovery.js";
 export * from "./envelopes/passkey-prf.js";
+export {
+  extractPasskeyPrfOutput,
+  prfBytesForAes256Import,
+  type ExtractPasskeyPrfOutputOptions,
+} from "./envelopes/passkey-prf-output.js";
 
 export * from "./recovery/kit.js";
 

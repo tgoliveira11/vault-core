@@ -1,9 +1,12 @@
 import { stringToBytes, toBufferSource } from "./crypto/encoding.js";
-import {
+
+export {
   extractPasskeyPrfOutput,
-  isPasskeySupported,
-  isPrfExtensionSupported,
-} from "./envelopes/passkey-prf.js";
+  prfBytesForAes256Import,
+  type ExtractPasskeyPrfOutputOptions,
+} from "./envelopes/passkey-prf-output.js";
+
+export { isPasskeySupported, isPrfExtensionSupported } from "./envelopes/passkey-prf.js";
 
 export async function buildPrfSaltBytes(prefix: string, userId: string): Promise<ArrayBuffer> {
   const input = toBufferSource(stringToBytes(`${prefix}${userId}`));
@@ -114,11 +117,6 @@ export function persistVaultRecordLocally(): never {
   throw new Error("Decrypted vault state must not be persisted to localStorage or IndexedDB");
 }
 
-export {
-  extractPasskeyPrfOutput,
-  isPasskeySupported,
-  isPrfExtensionSupported,
-};
 
 export {
   deleteVaultAfterAuthorization,

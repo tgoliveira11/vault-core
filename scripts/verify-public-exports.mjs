@@ -20,6 +20,8 @@ const REQUIRED_CORE_SYMBOLS = [
   "wrapUserVaultKeyWithPrfOutput",
   "unwrapUserVaultKeyWithPrfOutput",
   "WrapUserVaultKeyOptions",
+  "extractPasskeyPrfOutput",
+  "prfBytesForAes256Import",
 ];
 
 const SOURCE_ENTRIES = [
