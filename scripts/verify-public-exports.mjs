@@ -16,6 +16,7 @@ const REQUIRED_CORE_SYMBOLS = [
   "assertInnerVaultKeyBlobMatchesVaultKey",
   "extractInnerVaultKeyBlob",
   "rewrapInnerVaultKeyMaterialForDerivedKeys",
+  "rewrapInnerVaultKeyMaterialForPrfOutput",
   "rewrapEncryptedVaultKeyForDerivedKeys",
   "wrapUserVaultKeyWithPrfOutput",
   "unwrapUserVaultKeyWithPrfOutput",

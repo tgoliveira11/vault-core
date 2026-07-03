@@ -104,15 +104,33 @@ export async function rewrapInnerVaultKeyMaterialForDerivedKeys(
   newDerivedKeys: { wrappingKey: CryptoKey },
   sessionVaultKey: CryptoKey
 ): Promise<Uint8Array> {
+  return rewrapInnerVaultKeyMaterialForWrappingKeys(
+    inner,
+    oldDerivedKeys.wrappingKey,
+    newDerivedKeys.wrappingKey,
+    sessionVaultKey
+  );
+}
+
+/**
+ * Re-wraps stored inner vault-key material for a new AES-KW wrapping key.
+ * Uses a short-lived extractable UVK handle inside Web Crypto only; raw bytes are not exported.
+ */
+export async function rewrapInnerVaultKeyMaterialForWrappingKeys(
+  inner: Uint8Array,
+  oldWrappingKey: CryptoKey,
+  newWrappingKey: CryptoKey,
+  sessionVaultKey: CryptoKey
+): Promise<Uint8Array> {
   const uvkForRewrap = isLegacyRawVaultKeyMaterial(inner)
     ? await importUserVaultAesKey(inner, { extractable: true })
-    : await unwrapAesKey(inner, oldDerivedKeys.wrappingKey, { extractable: true });
+    : await unwrapAesKey(inner, oldWrappingKey, { extractable: true });
 
   if (!(await userVaultKeysEqual(uvkForRewrap, sessionVaultKey))) {
     throw new VaultAuthorizationError("Vault key mismatch during envelope re-wrap");
   }
 
-  return wrapAesKey(uvkForRewrap, newDerivedKeys.wrappingKey);
+  return wrapAesKey(uvkForRewrap, newWrappingKey);
 }
 
 export async function rewrapEncryptedVaultKeyForDerivedKeys(
@@ -135,6 +153,31 @@ export async function rewrapEncryptedVaultKeyForDerivedKeys(
     resourceId: scope.resourceId,
     field: "vault_key",
   }, profile);
+}
+
+/**
+ * Re-wraps stored inner vault-key material for a new PRF output (passkey credential rotation).
+ * Uses a short-lived extractable UVK handle inside Web Crypto only; raw bytes are not exported.
+ */
+export async function rewrapInnerVaultKeyMaterialForPrfOutput(
+  inner: Uint8Array,
+  oldPrfOutput: Uint8Array,
+  newPrfOutput: Uint8Array,
+  sessionVaultKey: CryptoKey
+): Promise<Uint8Array> {
+  const oldWrappingKey = await importAesKwKey(
+    oldPrfOutput.byteLength === 32 ? oldPrfOutput : oldPrfOutput.slice(0, 32)
+  );
+  const newWrappingKey = await importAesKwKey(
+    newPrfOutput.byteLength === 32 ? newPrfOutput : newPrfOutput.slice(0, 32)
+  );
+
+  return rewrapInnerVaultKeyMaterialForWrappingKeys(
+    inner,
+    oldWrappingKey,
+    newWrappingKey,
+    sessionVaultKey
+  );
 }
 
 export async function wrapUserVaultKeyWithPrfOutput(

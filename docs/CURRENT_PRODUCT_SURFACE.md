@@ -34,8 +34,11 @@ Last reviewed: **2026-07-03** (package version **1.0.1**, vault-key envelope hel
 - Plaintext rejection / sentinel validation
 - Canonical crypto policy (`VAULT_CRYPTO_POLICY`) + CI guard
 - Vault-key envelope helpers (`assertInnerVaultKeyBlobMatchesVaultKey`, `extractInnerVaultKeyBlob`,
-  `rewrapInnerVaultKeyMaterialForDerivedKeys`, `rewrapEncryptedVaultKeyForDerivedKeys`,
-  `wrapUserVaultKeyWithPrfOutput`, `unwrapUserVaultKeyWithPrfOutput`, `WrapUserVaultKeyOptions`)
+  `rewrapInnerVaultKeyMaterialForDerivedKeys`, `rewrapInnerVaultKeyMaterialForPrfOutput`,
+  `rewrapEncryptedVaultKeyForDerivedKeys`, `wrapUserVaultKeyWithPrfOutput`,
+  `unwrapUserVaultKeyWithPrfOutput`, `WrapUserVaultKeyOptions`)
+- Passkey enroll after unlock: `createPasskeyPrfEnvelope` options, `createPasskeyPrfEnvelopeWithSessionCache`,
+  browser `VaultInnerKeyMaterialCache` (memory-only, cleared on lock)
 
 ## Admin config helpers (shipped)
 
@@ -90,6 +93,20 @@ Exported from `@tgoliveira/vault-core/browser`:
 
 Wire `VaultSessionProvider` `sessionConfig.resolveAutoLockMinutes` to return the user preference
 when set (see consumer-demo `Providers`).
+
+## Browser inner-key cache (shipped)
+
+Memory-only cache for passkey enroll after unlock when the session UVK is non-extractable. Cleared
+on `lockVaultSession()` / `lockVaultSessionManually()` — never persisted to storage.
+
+| Export | Purpose |
+| --- | --- |
+| `VaultInnerKeyMaterialCache` | Grouped API: `clear`, `getCached`, `cacheFromEnvelopeDecrypt`, `cacheFromPasskeyEnvelope` |
+| `cacheVaultInnerKeyMaterialAfterPasswordUnlock` | Populate cache after password unlock |
+| `cacheVaultInnerKeyMaterialAfterRecoveryUnlock` | Populate cache after recovery unlock |
+| `cacheVaultInnerKeyMaterialFromPasskeyUnlock` | Populate cache after passkey unlock |
+| `createPasskeyPrfEnvelopeWithSessionCache` | Create passkey envelope using cache when `innerVaultKeyBlob` omitted |
+| `INNER_VAULT_KEY_CACHE_MISMATCH_MESSAGE` | Actionable error when cached material is stale |
 
 ## Vault status dock (shipped)
 

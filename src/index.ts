@@ -18,6 +18,8 @@ export {
   assertInnerVaultKeyBlobMatchesVaultKey,
   extractInnerVaultKeyBlob,
   rewrapInnerVaultKeyMaterialForDerivedKeys,
+  rewrapInnerVaultKeyMaterialForWrappingKeys,
+  rewrapInnerVaultKeyMaterialForPrfOutput,
   rewrapEncryptedVaultKeyForDerivedKeys,
   wrapUserVaultKeyWithPrfOutput,
   unwrapUserVaultKeyWithPrfOutput,

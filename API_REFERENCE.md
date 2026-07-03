@@ -77,6 +77,7 @@ passkey envelope after unlock when the session UVK is non-extractable.
 | `assertInnerVaultKeyBlobMatchesVaultKey(inner, vaultKey, wrappingKey)` | Validates reused inner material against the session UVK |
 | `extractInnerVaultKeyBlob(encryptedVaultKey, encryptionKey)` | Decrypts the outer envelope layer and returns inner AES-KW or legacy raw bytes |
 | `rewrapInnerVaultKeyMaterialForDerivedKeys(inner, oldDerivedKeys, newDerivedKeys, sessionVaultKey)` | Re-wraps inner material for password/recovery KDF rotation |
+| `rewrapInnerVaultKeyMaterialForPrfOutput(inner, oldPrfOutput, newPrfOutput, sessionVaultKey)` | Re-wraps inner material for passkey PRF credential rotation |
 | `rewrapEncryptedVaultKeyForDerivedKeys(encryptedVaultKey, oldDerivedKeys, newDerivedKeys, sessionVaultKey, scope, profile)` | Full encrypted `vault_key` re-wrap for derived-key rotation |
 | `wrapUserVaultKeyWithPrfOutput(vaultKey, prfOutput, scope, profile, prfEncryptionKey, options?)` | Wraps UVK for passkey PRF envelopes; accepts `innerVaultKeyBlob` when UVK is non-extractable |
 | `unwrapUserVaultKeyWithPrfOutput(encryptedVaultKey, prfOutput, prfEncryptionKey)` | Unwraps UVK from a passkey PRF `vault_key` payload |
@@ -131,7 +132,8 @@ provided.
 
 ### Passkey PRF envelopes
 
-- `createPasskeyPrfEnvelope(vaultKey, prfOutput, scope, profile, publicMetadata?)`
+- `createPasskeyPrfEnvelope(vaultKey, prfOutput, scope, profile, publicMetadata?, options?)` — optional `WrapUserVaultKeyOptions` for re-wrap with `innerVaultKeyBlob`
+- `createPasskeyPrfEnvelopeWithSessionCache(...)` — uses in-memory inner-key cache when `innerVaultKeyBlob` is omitted
 - `unlockWithPasskeyPrfEnvelope(envelope, prfOutput, expectedScope, profile, options?)`
 - `unwrapVaultKeyFromPasskey(encryptedVaultKey, prfOutput, expectedScope, profile)`
 - `extractPasskeyPrfOutput(extensionResults, options?)` — prefers `evalByCredential[credentialId]` on Safari; coerces ArrayBuffer, views, base64url, and number arrays
@@ -242,6 +244,11 @@ boolean aliases that fail closed.
 - `createRecoveryKitDownload(content, filename)`
 - `printRecoveryKitContent(content)`
 - `extractPasskeyPrfOutput`, `isPasskeySupported`, `isPrfExtensionSupported`
+- `createPasskeyPrfEnvelopeWithSessionCache`, `CreatePasskeyPrfEnvelopeOptions`
+- `VaultInnerKeyMaterialCache` — memory-only inner-key cache (`clear`, `getCached`, `cacheFromEnvelopeDecrypt`, `cacheFromPasskeyEnvelope`)
+- `cacheVaultInnerKeyMaterialAfterPasswordUnlock`, `cacheVaultInnerKeyMaterialAfterRecoveryUnlock`, `cacheVaultInnerKeyMaterialFromPasskeyUnlock`
+- `clearVaultInnerKeyMaterialCache`, `getCachedVaultInnerKeyMaterial`, `resolveInnerVaultKeyBlobForWrap`
+- `INNER_VAULT_KEY_CACHE_MISMATCH_MESSAGE` — actionable error when cached material is stale
 - `createRecoveryKitText`, `buildRecoveryKitContent`
 
 ## React: `@tgoliveira/vault-core/react`

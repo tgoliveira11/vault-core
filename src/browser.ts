@@ -117,6 +117,25 @@ export function persistVaultRecordLocally(): never {
   throw new Error("Decrypted vault state must not be persisted to localStorage or IndexedDB");
 }
 
+export {
+  createPasskeyPrfEnvelopeWithSessionCache,
+  type CreatePasskeyPrfEnvelopeOptions,
+} from "./envelopes/passkey-prf.js";
+
+export {
+  VaultInnerKeyMaterialCache,
+  cacheVaultInnerKeyMaterialAfterPasswordUnlock,
+  cacheVaultInnerKeyMaterialAfterRecoveryUnlock,
+  cacheVaultInnerKeyMaterialFromPasskeyUnlock,
+  cacheVaultInnerKeyMaterialFromEnvelopeDecrypt,
+  cacheVaultInnerKeyMaterialFromPasskeyEnvelope,
+  clearVaultInnerKeyMaterialCache,
+  getCachedVaultInnerKeyMaterial,
+  INNER_VAULT_KEY_CACHE_MISMATCH_MESSAGE,
+  resolveInnerVaultKeyBlobForWrap,
+  type VaultInnerKeyMaterialCacheEntry,
+} from "./browser/inner-key-material-cache.js";
+
 
 export {
   deleteVaultAfterAuthorization,
