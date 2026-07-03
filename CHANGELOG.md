@@ -20,6 +20,7 @@ API changes increment the minor version.
 - Legacy `vault_key` multi-AAD unlock (`isLegacyVaultKeyEnvelope`, `unwrapVaultKeyWithLegacyAadFallback`, profile `legacyVaultKeyUnlock`) with migration guide in `docs/MIGRATION_LEGACY_VAULT_KEY.md`.
 - Browser WebAuthn unlock ceremony helpers: `prepareWebAuthnPrfExtensions`, `alignPrfExtensionsForCredential`, `preferPlatformTransportsForVaultUnlock`, `prepareVaultUnlockAuthenticationOptions`, `isAppleMobileUserAgent`, and `resolveVaultUnlockUserAgent` for iOS PRF `eval` parity and Apple mobile internal transport pinning.
 - iOS PRF gate: `isPrfExtensionSupported({ userAgent?, minAppleMobileMajorVersion? })`, `parseAppleMobileOsMajorVersion`, `DEFAULT_APPLE_MOBILE_PRF_MIN_MAJOR_VERSION` (18). Apple mobile iOS/iPadOS below 18 no longer reports PRF support.
+- `classifyPasskeyCryptoError(error)` and `getDefaultPasskeyCryptoErrorMessage(kind, locale?)` for passkey unwrap/re-wrap crypto failures (`PasskeyCryptoFailureKind`: `prf_mismatch`, `rewrap_requires_unlock`, `decrypt_failed`, `unknown`). Complements dock-oriented `classifyPasskeyUnlockFailure`.
 
 ### Changed
 

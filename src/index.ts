@@ -1,6 +1,11 @@
 export * from "./constants.js";
 export * from "./profile.js";
 export * from "./errors/vault-errors.js";
+export {
+  classifyPasskeyCryptoError,
+  getDefaultPasskeyCryptoErrorMessage,
+  type PasskeyCryptoFailureKind,
+} from "./errors/passkey-crypto-failure.js";
 
 export * from "./crypto/aes-gcm.js";
 export * from "./crypto/aad.js";

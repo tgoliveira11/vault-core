@@ -46,6 +46,7 @@ Last reviewed: **2026-07-03** (package version **1.0.1**, vault-key envelope hel
   browser `VaultInnerKeyMaterialCache` (memory-only, cleared on lock)
 - Passkey device binding (`VaultDeviceBindingStore`, `scopeAuthenticationOptionsToDevice`,
   `resolvePasskeyUnlockAvailableOnDevice`, `parseDeviceBindingId`; `docs/examples/device-binding/`)
+- Passkey crypto failure classifier (`classifyPasskeyCryptoError`, `getDefaultPasskeyCryptoErrorMessage`, `PasskeyCryptoFailureKind`)
 
 ## Admin config helpers (shipped)
 
