@@ -335,7 +335,8 @@ if (!(credential instanceof PublicKeyCredential)) {
 }
 
 const prfOutput = extractPasskeyPrfOutput(
-  credential.getClientExtensionResults()
+  credential.getClientExtensionResults(),
+  { credentialId: credential.id }
 );
 ```
 

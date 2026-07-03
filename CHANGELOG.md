@@ -11,6 +11,7 @@ API changes increment the minor version.
 ### Added
 
 - Public vault-key envelope helpers on `@tgoliveira/vault-core`: `assertInnerVaultKeyBlobMatchesVaultKey`, `extractInnerVaultKeyBlob`, `rewrapInnerVaultKeyMaterialForDerivedKeys`, `rewrapEncryptedVaultKeyForDerivedKeys`, `wrapUserVaultKeyWithPrfOutput`, `unwrapUserVaultKeyWithPrfOutput`, and `WrapUserVaultKeyOptions` for rotation, KDF upgrade, and passkey re-wrap without deep `dist/crypto/*` imports.
+- `extractPasskeyPrfOutput(results, options?)` with Safari-aware `evalByCredential` preference, type coercion (ArrayBuffer, views, base64url, number arrays), and `prfBytesForAes256Import` helper.
 
 ## [1.0.1] - 2026-07-02
 

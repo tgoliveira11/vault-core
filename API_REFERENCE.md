@@ -134,7 +134,8 @@ provided.
 - `createPasskeyPrfEnvelope(vaultKey, prfOutput, scope, profile, publicMetadata?)`
 - `unlockWithPasskeyPrfEnvelope(envelope, prfOutput, expectedScope, profile, options?)`
 - `unwrapVaultKeyFromPasskey(encryptedVaultKey, prfOutput, expectedScope, profile)`
-- `extractPasskeyPrfOutput(extensionResults)`
+- `extractPasskeyPrfOutput(extensionResults, options?)` — prefers `evalByCredential[credentialId]` on Safari; coerces ArrayBuffer, views, base64url, and number arrays
+- `prfBytesForAes256Import(bytes)` — normalizes PRF output to 32 bytes for AES import
 - `isPasskeySupported()` / `isPrfExtensionSupported()`
 
 The application owns WebAuthn ceremonies. Capability probes are preliminary; the actual ceremony may

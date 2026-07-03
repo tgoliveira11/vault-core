@@ -6,6 +6,8 @@ import {
   rewrapEncryptedVaultKeyForDerivedKeys,
   wrapUserVaultKeyWithPrfOutput,
   unwrapUserVaultKeyWithPrfOutput,
+  extractPasskeyPrfOutput,
+  prfBytesForAes256Import,
   type WrapUserVaultKeyOptions,
 } from "../index.js";
 
@@ -17,6 +19,8 @@ describe("public vault-key envelope exports", () => {
     expect(typeof rewrapEncryptedVaultKeyForDerivedKeys).toBe("function");
     expect(typeof wrapUserVaultKeyWithPrfOutput).toBe("function");
     expect(typeof unwrapUserVaultKeyWithPrfOutput).toBe("function");
+    expect(typeof extractPasskeyPrfOutput).toBe("function");
+    expect(typeof prfBytesForAes256Import).toBe("function");
   });
 
   it("exports WrapUserVaultKeyOptions as a type", () => {

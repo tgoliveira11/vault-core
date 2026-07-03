@@ -8,13 +8,11 @@ import {
 } from "../crypto/vault-key-envelope.js";
 import { assertVaultKeyAad } from "../validation/aad-assert.js";
 
-interface PrfClientExtensionResults {
-  prf?: {
-    results?: {
-      first?: ArrayBuffer;
-    };
-  };
-}
+export {
+  extractPasskeyPrfOutput,
+  prfBytesForAes256Import,
+  type ExtractPasskeyPrfOutputOptions,
+} from "./passkey-prf-output.js";
 
 export function isPasskeySupported(): boolean {
   return typeof globalThis !== "undefined" &&
@@ -25,15 +23,6 @@ export function isPrfExtensionSupported(): boolean {
   if (!isPasskeySupported()) return false;
   return typeof PublicKeyCredential !== "undefined" &&
     "getClientExtensionResults" in PublicKeyCredential.prototype;
-}
-
-export function extractPasskeyPrfOutput(
-  clientExtensionResults: Record<string, unknown>
-): Uint8Array | null {
-  const prf = (clientExtensionResults as PrfClientExtensionResults).prf;
-  const first = prf?.results?.first;
-  if (!first || first.byteLength < 32) return null;
-  return new Uint8Array(first);
 }
 
 async function importPrfAsAesKey(prfOutput: Uint8Array): Promise<CryptoKey> {
