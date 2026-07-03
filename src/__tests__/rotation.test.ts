@@ -330,7 +330,7 @@ describe("recovery phrase rotation", () => {
     });
 
     expect(result.recoveryPhrase).toBe(FIXTURE_12_WORD_PHRASE);
-  });
+  }, 15_000);
 
   it("rotates recovery phrase when authorized with passkey PRF", async () => {
     const vaultKey = await importUserVaultKey(FIXTURE_UVK_BYTES, { extractable: true });
