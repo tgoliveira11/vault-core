@@ -8,6 +8,10 @@ API changes increment the minor version.
 
 ## [Unreleased]
 
+### Added
+
+- Public vault-key envelope helpers on `@tgoliveira/vault-core`: `assertInnerVaultKeyBlobMatchesVaultKey`, `extractInnerVaultKeyBlob`, `rewrapInnerVaultKeyMaterialForDerivedKeys`, `rewrapEncryptedVaultKeyForDerivedKeys`, `wrapUserVaultKeyWithPrfOutput`, `unwrapUserVaultKeyWithPrfOutput`, and `WrapUserVaultKeyOptions` for rotation, KDF upgrade, and passkey re-wrap without deep `dist/crypto/*` imports.
+
 ## [1.0.1] - 2026-07-02
 
 ### Fixed

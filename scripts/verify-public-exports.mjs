@@ -11,6 +11,17 @@ const ROOT = join(dirname(fileURLToPath(import.meta.url)), "..");
 
 const FORBIDDEN_SYMBOLS = ["setSessionVaultKey"];
 
+/** Symbols that must be reachable from @tgoliveira/vault-core (src/index.ts). */
+const REQUIRED_CORE_SYMBOLS = [
+  "assertInnerVaultKeyBlobMatchesVaultKey",
+  "extractInnerVaultKeyBlob",
+  "rewrapInnerVaultKeyMaterialForDerivedKeys",
+  "rewrapEncryptedVaultKeyForDerivedKeys",
+  "wrapUserVaultKeyWithPrfOutput",
+  "unwrapUserVaultKeyWithPrfOutput",
+  "WrapUserVaultKeyOptions",
+];
+
 const SOURCE_ENTRIES = [
   "src/index.ts",
   "src/browser.ts",
@@ -53,10 +64,29 @@ function inspectFile(relativePath) {
   return violations;
 }
 
+function inspectRequiredCoreExports(relativePath) {
+  const absolutePath = join(ROOT, relativePath);
+  if (!existsSync(absolutePath)) {
+    return [`Missing expected entry file: ${relativePath}`];
+  }
+
+  const content = readFileSync(absolutePath, "utf8");
+  const missing = REQUIRED_CORE_SYMBOLS.filter((symbol) => !content.includes(symbol));
+  return missing.map(
+    (symbol) => `${relativePath}: must publicly export "${symbol}"`
+  );
+}
+
 function main() {
   const checkDist = process.argv.includes("--dist");
   const targets = checkDist ? DIST_ENTRIES : SOURCE_ENTRIES;
   const violations = targets.flatMap((file) => inspectFile(file));
+
+  if (!checkDist) {
+    violations.push(...inspectRequiredCoreExports("src/index.ts"));
+  } else {
+    violations.push(...inspectRequiredCoreExports("dist/index.d.ts"));
+  }
 
   if (violations.length > 0) {
     console.error("Public export guard failed:\n");

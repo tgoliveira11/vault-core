@@ -65,6 +65,25 @@ caller separately validates expected AAD, such as a bounded legacy migration.
 
 Applications normally use envelope APIs instead of direct derivation functions.
 
+### Vault-key envelope helpers
+
+Low-level helpers for wrapping and re-wrapping the user vault key (UVK) inside password, recovery,
+and passkey envelopes. Use these when rotating credentials, upgrading KDF parameters, or creating a
+passkey envelope after unlock when the session UVK is non-extractable.
+
+| Export | Purpose |
+| --- | --- |
+| `WrapUserVaultKeyOptions` | Optional `{ innerVaultKeyBlob? }` to re-wrap without exporting the UVK |
+| `assertInnerVaultKeyBlobMatchesVaultKey(inner, vaultKey, wrappingKey)` | Validates reused inner material against the session UVK |
+| `extractInnerVaultKeyBlob(encryptedVaultKey, encryptionKey)` | Decrypts the outer envelope layer and returns inner AES-KW or legacy raw bytes |
+| `rewrapInnerVaultKeyMaterialForDerivedKeys(inner, oldDerivedKeys, newDerivedKeys, sessionVaultKey)` | Re-wraps inner material for password/recovery KDF rotation |
+| `rewrapEncryptedVaultKeyForDerivedKeys(encryptedVaultKey, oldDerivedKeys, newDerivedKeys, sessionVaultKey, scope, profile)` | Full encrypted `vault_key` re-wrap for derived-key rotation |
+| `wrapUserVaultKeyWithPrfOutput(vaultKey, prfOutput, scope, profile, prfEncryptionKey, options?)` | Wraps UVK for passkey PRF envelopes; accepts `innerVaultKeyBlob` when UVK is non-extractable |
+| `unwrapUserVaultKeyWithPrfOutput(encryptedVaultKey, prfOutput, prfEncryptionKey)` | Unwraps UVK from a passkey PRF `vault_key` payload |
+
+Prefer high-level envelope APIs (`createPasswordEnvelope`, `createPasskeyPrfEnvelope`, rotation
+helpers) unless you need explicit control over inner blob reuse during re-wrap.
+
 ### Crypto policy and rotation
 
 | Export | Purpose |

@@ -14,6 +14,16 @@ export * from "./kdf/params.js";
 
 export * from "./keys/user-vault-key.js";
 
+export {
+  assertInnerVaultKeyBlobMatchesVaultKey,
+  extractInnerVaultKeyBlob,
+  rewrapInnerVaultKeyMaterialForDerivedKeys,
+  rewrapEncryptedVaultKeyForDerivedKeys,
+  wrapUserVaultKeyWithPrfOutput,
+  unwrapUserVaultKeyWithPrfOutput,
+  type WrapUserVaultKeyOptions,
+} from "./crypto/vault-key-envelope.js";
+
 export * from "./validation/schemas.js";
 export * from "./validation/aad-assert.js";
 export {
