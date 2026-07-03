@@ -25,6 +25,8 @@ Last reviewed: **2026-07-03** (package version **1.0.1**, vault-key envelope hel
 - Argon2id password and recovery envelopes (`kdf-v1` legacy, `kdf-v2` recommended)
 - Passkey PRF envelope wrap/unwrap (no WebAuthn ceremony)
 - Robust `extractPasskeyPrfOutput` with Safari `evalByCredential` preference and byte coercion
+- WebAuthn unlock ceremony prep (`prepareWebAuthnPrfExtensions`, `alignPrfExtensionsForCredential`,
+  `preferPlatformTransportsForVaultUnlock`, `prepareVaultUnlockAuthenticationOptions`)
 - BIP39 12/24-word recovery phrases and recovery kit text
 - Password rotation (`rotateVaultPassword`)
 - Recovery phrase rotation (`rotateRecoveryPhrase`)

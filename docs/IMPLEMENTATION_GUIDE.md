@@ -305,7 +305,9 @@ replace the old password envelope atomically on the server.
 ## 9. Passkey PRF integration
 
 The package does not run WebAuthn ceremonies. The application must request the PRF extension and pass
-the first PRF result to vault-core.
+the first PRF result to vault-core. Use the browser helpers below to prepare authentication options
+(iOS `eval` parity, salt coercion, Apple mobile transport pinning) before calling
+`navigator.credentials.get`.
 
 Use a stable, application-specific PRF salt:
 
@@ -315,6 +317,7 @@ import {
   extractPasskeyPrfOutput,
   isPasskeySupported,
   isPrfExtensionSupported,
+  prepareVaultUnlockAuthenticationOptions,
 } from "@tgoliveira/vault-core/browser";
 
 const salt = await buildPrfSaltBytes("acme-passkey-prf-v1:", userId);
@@ -323,12 +326,23 @@ if (!isPasskeySupported() || !isPrfExtensionSupported()) {
   // Offer password or recovery phrase unlock instead.
 }
 
-const credential = await navigator.credentials.get({
-  publicKey: {
-    ...applicationOwnedRequestOptions,
-    extensions: { prf: { eval: { first: salt } } },
+const publicKey = prepareVaultUnlockAuthenticationOptions(
+  {
+    challenge: applicationChallenge,
+    rpId: applicationRpId,
+    allowCredentials: [{ id: credentialId, type: "public-key" }],
+    extensions: {
+      prf: {
+        evalByCredential: {
+          [credentialId]: { first: salt },
+        },
+      },
+    },
   },
-});
+  { credentialId, filterSingleCredential: true }
+);
+
+const credential = await navigator.credentials.get({ publicKey });
 
 if (!(credential instanceof PublicKeyCredential)) {
   throw new Error("Passkey ceremony did not return a public-key credential");
@@ -340,7 +354,7 @@ const prfOutput = extractPasskeyPrfOutput(
 );
 ```
 
-Exact WebAuthn option typing and credential verification belong to the application. Never send
+Credential verification and server-side WebAuthn validation remain application-owned. Never send
 `prfOutput` to the server.
 
 Unlock after obtaining the PRF output:

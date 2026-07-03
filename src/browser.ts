@@ -8,6 +8,25 @@ export {
 
 export { isPasskeySupported, isPrfExtensionSupported } from "./envelopes/passkey-prf.js";
 
+export {
+  alignPrfExtensionsForCredential,
+  prepareWebAuthnPrfExtensions,
+  type PublicKeyCredentialRequestOptionsInput,
+  type WebAuthnExtensionsInput,
+  type WebAuthnPrfExtensionInput,
+} from "./browser/webauthn-prf-options.js";
+
+export {
+  isAppleMobileUserAgent,
+  preferPlatformTransportsForVaultUnlock,
+  resolveVaultUnlockUserAgent,
+} from "./browser/vault-unlock-transports.js";
+
+export {
+  prepareVaultUnlockAuthenticationOptions,
+  type PrepareVaultUnlockAuthenticationOptionsContext,
+} from "./browser/vault-unlock-auth-options.js";
+
 export async function buildPrfSaltBytes(prefix: string, userId: string): Promise<ArrayBuffer> {
   const input = toBufferSource(stringToBytes(`${prefix}${userId}`));
   return crypto.subtle.digest("SHA-256", input);
