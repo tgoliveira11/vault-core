@@ -28,6 +28,7 @@ export {
 
 export * from "./validation/schemas.js";
 export * from "./validation/aad-assert.js";
+export { normalizeEnvelopeAadContext } from "./validation/envelope-aad-normalize.js";
 export {
   assessVaultPassword,
   getVaultPasswordPolicyHint,

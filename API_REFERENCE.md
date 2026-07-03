@@ -160,6 +160,7 @@ Associated inferred types include `EncryptedVaultPayload`, `Argon2idKdfMetadata`
 ### AAD and plaintext validation
 
 - `assertVaultKeyAad(expectedScope, payload, profile)`
+- `normalizeEnvelopeAadContext(payload, profile)` — injects `aadContextEnvelope` when `vault_key` context is null/undefined
 - `assertVaultPayloadAad(expectedScope, payload, profile)`
 - `rejectVaultPlaintextFields(body)`
 - `assertNoVaultPlaintextFields(body)`
