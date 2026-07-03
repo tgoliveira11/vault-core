@@ -2,7 +2,7 @@
 
 Living inventory of what `@tgoliveira/vault-core` exposes today. Update this file when exports, admin screens, published artifacts, or shipped/planned status changes.
 
-Last reviewed: **2026-07-02** (package version **0.3.0**, passkey dock unlock improvements on branch)
+Last reviewed: **2026-07-03** (package version **1.0.1**, vault-key envelope helpers export)
 
 ## Package entry points (shipped)
 
@@ -32,6 +32,9 @@ Last reviewed: **2026-07-02** (package version **0.3.0**, passkey dock unlock im
 - Auto-upgrade legacy KDF on unlock
 - Plaintext rejection / sentinel validation
 - Canonical crypto policy (`VAULT_CRYPTO_POLICY`) + CI guard
+- Vault-key envelope helpers (`assertInnerVaultKeyBlobMatchesVaultKey`, `extractInnerVaultKeyBlob`,
+  `rewrapInnerVaultKeyMaterialForDerivedKeys`, `rewrapEncryptedVaultKeyForDerivedKeys`,
+  `wrapUserVaultKeyWithPrfOutput`, `unwrapUserVaultKeyWithPrfOutput`, `WrapUserVaultKeyOptions`)
 
 ## Admin config helpers (shipped)
 
