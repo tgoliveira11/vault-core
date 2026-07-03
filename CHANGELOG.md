@@ -18,6 +18,11 @@ API changes increment the minor version.
 - Browser helpers: `cacheVaultInnerKeyMaterialAfterPasswordUnlock`, `cacheVaultInnerKeyMaterialAfterRecoveryUnlock`, `cacheVaultInnerKeyMaterialFromPasskeyUnlock`.
 - `normalizeEnvelopeAadContext(payload, profile)` injects missing `aad.context` on `vault_key` envelopes before passkey unwrap.
 - Browser WebAuthn unlock ceremony helpers: `prepareWebAuthnPrfExtensions`, `alignPrfExtensionsForCredential`, `preferPlatformTransportsForVaultUnlock`, `prepareVaultUnlockAuthenticationOptions`, `isAppleMobileUserAgent`, and `resolveVaultUnlockUserAgent` for iOS PRF `eval` parity and Apple mobile internal transport pinning.
+- iOS PRF gate: `isPrfExtensionSupported({ userAgent?, minAppleMobileMajorVersion? })`, `parseAppleMobileOsMajorVersion`, `DEFAULT_APPLE_MOBILE_PRF_MIN_MAJOR_VERSION` (18). Apple mobile iOS/iPadOS below 18 no longer reports PRF support.
+
+### Changed
+
+- **Minor behavior change:** `isPrfExtensionSupported()` returns `false` on iPhone/iPad/iPod with iOS major version &lt; 18 even when `getClientExtensionResults` exists. Pass an explicit `userAgent` in tests and SSR.
 
 ## [1.0.1] - 2026-07-02
 

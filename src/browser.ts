@@ -9,6 +9,12 @@ export {
 export { isPasskeySupported, isPrfExtensionSupported } from "./envelopes/passkey-prf.js";
 
 export {
+  DEFAULT_APPLE_MOBILE_PRF_MIN_MAJOR_VERSION,
+  parseAppleMobileOsMajorVersion,
+  type PrfExtensionSupportOptions,
+} from "./envelopes/passkey-prf-support.js";
+
+export {
   alignPrfExtensionsForCredential,
   prepareWebAuthnPrfExtensions,
   type PublicKeyCredentialRequestOptionsInput,
