@@ -53,6 +53,7 @@ See [CONTRIBUTING.md](CONTRIBUTING.md) and [docs/contributing.md](docs/contribut
 
 ## Documentation
 
+- [Adopting 1.1.0](docs/ADOPTING_VAULT_CORE_1_1_0.md) — upgrade from 1.0.x; remove duplicate passkey/legacy code
 - [Complete implementation guide](docs/IMPLEMENTATION_GUIDE.md)
 - [Documentation index](docs/README.md)
 - [API reference](API_REFERENCE.md)

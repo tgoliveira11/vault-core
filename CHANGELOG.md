@@ -8,6 +8,10 @@ API changes increment the minor version.
 
 ## [Unreleased]
 
+### Added
+
+- Consumer adoption guide for 1.1.0: `docs/ADOPTING_VAULT_CORE_1_1_0.md` (package vs app responsibilities, phased duplicate removal, dock wiring).
+
 ## [1.1.0] - 2026-07-03
 
 ### Added

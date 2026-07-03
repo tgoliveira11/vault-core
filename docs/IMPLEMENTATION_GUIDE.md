@@ -304,6 +304,9 @@ replace the old password envelope atomically on the server.
 
 ## 9. Passkey PRF integration
 
+**Upgrading from 1.0.x?** See [ADOPTING_VAULT_CORE_1_1_0.md](./ADOPTING_VAULT_CORE_1_1_0.md) for
+what to import vs delete (inner-key cache, WebAuthn prep, legacy AAD, device binding, classifiers).
+
 The package does not run WebAuthn ceremonies. The application must request the PRF extension and pass
 the first PRF result to vault-core. Use the browser helpers below to prepare authentication options
 (iOS `eval` parity, salt coercion, Apple mobile transport pinning) before calling
