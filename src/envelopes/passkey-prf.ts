@@ -29,11 +29,12 @@ export function isPasskeySupported(): boolean {
     typeof globalThis.PublicKeyCredential !== "undefined";
 }
 
-export function isPrfExtensionSupported(): boolean {
-  if (!isPasskeySupported()) return false;
-  return typeof PublicKeyCredential !== "undefined" &&
-    "getClientExtensionResults" in PublicKeyCredential.prototype;
-}
+export {
+  DEFAULT_APPLE_MOBILE_PRF_MIN_MAJOR_VERSION,
+  isPrfExtensionSupported,
+  parseAppleMobileOsMajorVersion,
+  type PrfExtensionSupportOptions,
+} from "./passkey-prf-support.js";
 
 async function importPrfAsAesKey(prfOutput: Uint8Array): Promise<CryptoKey> {
   const keyBytes = prfOutput.byteLength === 32 ? prfOutput : prfOutput.slice(0, 32);

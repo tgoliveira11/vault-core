@@ -140,8 +140,8 @@ provided.
 - `normalizeEnvelopeAadContext(payload, profile)`
 - `extractPasskeyPrfOutput(extensionResults, options?)` — prefers `evalByCredential[credentialId]` on Safari; coerces ArrayBuffer, views, base64url, and number arrays
 - `prfBytesForAes256Import(bytes)` — normalizes PRF output to 32 bytes for AES import
-- `isPasskeySupported()` / `isPrfExtensionSupported()`
-
+- `isPasskeySupported()` / `isPrfExtensionSupported(options?)` — gates Apple mobile iOS &lt; 18
+- `parseAppleMobileOsMajorVersion(userAgent)`, `DEFAULT_APPLE_MOBILE_PRF_MIN_MAJOR_VERSION`
 
 ### Passkey device binding
 
@@ -155,7 +155,8 @@ provided.
 Example: [`docs/examples/device-binding/README.md`](docs/examples/device-binding/README.md).
 
 The application owns WebAuthn ceremonies. Capability probes are preliminary; the actual ceremony may
-still return no PRF output. PRF output must remain client-only.
+still return no PRF output. PRF output must remain client-only. On Apple mobile, pass `userAgent` in
+Node/tests; the default is `navigator.userAgent` in the browser.
 
 ### Runtime schemas and types
 
