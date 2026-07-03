@@ -9,6 +9,7 @@ export type VaultClientStatus =
 export type VaultServerStatusSnapshot = {
   configured: boolean;
   hasPasskeyPrfEnvelope?: boolean;
+  passkeyUnlockAvailableOnThisDevice?: boolean;
 };
 
 export function resolveVaultClientStatus(

@@ -42,6 +42,8 @@ Last reviewed: **2026-07-03** (package version **1.0.1**, vault-key envelope hel
   `unwrapUserVaultKeyWithPrfOutput`, `WrapUserVaultKeyOptions`)
 - Passkey enroll after unlock: `createPasskeyPrfEnvelope` options, `createPasskeyPrfEnvelopeWithSessionCache`,
   browser `VaultInnerKeyMaterialCache` (memory-only, cleared on lock)
+- Passkey device binding (`VaultDeviceBindingStore`, `scopeAuthenticationOptionsToDevice`,
+  `resolvePasskeyUnlockAvailableOnDevice`, `parseDeviceBindingId`; `docs/examples/device-binding/`)
 
 ## Admin config helpers (shipped)
 
@@ -123,7 +125,7 @@ Exported from `@tgoliveira/vault-core/react` (styles: `vc-status-dock-*` in `vau
 | `tryConsumePasskeyAutoStart` / `resetPasskeyAutoStartDedupe` | Short-TTL sessionStorage dedupe for dock passkey auto-start |
 | `requestVaultDockExpand` / `subscribeVaultDockExpand` | Programmatic expand from locked-content gates |
 | `useVaultAutoLockCountdown` / `useVaultAutoLockFraction` | Live auto-lock countdown and ring fraction |
-| `resolveVaultDockPasskeyAvailability` | Passkey PRF quick-unlock eligibility |
+| `resolveVaultDockPasskeyAvailability` | Passkey PRF quick-unlock eligibility (envelope + PRF + device flag) |
 | Copy/preference helpers | `getVaultStatusDockExpandedCopy`, collapse `localStorage` preference |
 
 Apps inject routes (`unlockPath`, `buildUnlockHref`, `LinkComponent`), server status snapshot,
