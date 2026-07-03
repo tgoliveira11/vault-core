@@ -14,7 +14,7 @@ For complete workflows, use [`docs/IMPLEMENTATION_GUIDE.md`](docs/IMPLEMENTATION
 | `ENCRYPTION_ALG` | Stored algorithm identifier, currently `AES-GCM` |
 | `VAULT_CRYPTO_VERSION` | Vault protocol version, currently `vault-v1` |
 | `DEFAULT_VAULT_AUTO_LOCK_MINUTES` | Default browser inactivity timeout |
-| `VaultCryptoProfile` | Stable application AAD contexts |
+| `VaultCryptoProfile` | Stable application AAD contexts (`legacyVaultKeyUnlock?` defaults true) |
 | `VaultAadScope`, `VaultAadField` | Authenticated user/resource/field scope |
 | `RecoveryPhraseWordCount` | `12 | 24` |
 | `resolveAadContext(scope, profile)` | Resolves explicit or profile-derived AAD context |
@@ -136,6 +136,8 @@ provided.
 - `createPasskeyPrfEnvelopeWithSessionCache(...)` — uses in-memory inner-key cache when `innerVaultKeyBlob` is omitted
 - `unlockWithPasskeyPrfEnvelope(envelope, prfOutput, expectedScope, profile, options?)`
 - `unwrapVaultKeyFromPasskey(encryptedVaultKey, prfOutput, expectedScope, profile)`
+- `isLegacyVaultKeyEnvelope(payload, profile)` / `unwrapVaultKeyWithLegacyAadFallback(...)` / `unlockVaultKeyEnvelopeWithAadRouting(...)`
+- `normalizeEnvelopeAadContext(payload, profile)`
 - `extractPasskeyPrfOutput(extensionResults, options?)` — prefers `evalByCredential[credentialId]` on Safari; coerces ArrayBuffer, views, base64url, and number arrays
 - `prfBytesForAes256Import(bytes)` — normalizes PRF output to 32 bytes for AES import
 - `isPasskeySupported()` / `isPrfExtensionSupported()`

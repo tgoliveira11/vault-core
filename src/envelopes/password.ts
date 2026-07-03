@@ -15,6 +15,7 @@ import {
   deriveVaultPasswordKeyPairFromMetadata,
 } from "../kdf/argon2id.js";
 import { assertVaultKeyAad } from "../validation/aad-assert.js";
+import { unlockVaultKeyEnvelopeWithAadRouting } from "./legacy-vault-key-unlock.js";
 
 type WrapScope = Pick<VaultAadScope, "userId" | "resourceId">;
 
@@ -58,12 +59,16 @@ export async function unlockWithPasswordEnvelope(
   if (envelope.kdfMetadata?.kdf !== "argon2id") {
     throw new Error("Vault password envelope requires Argon2id metadata");
   }
-  assertVaultKeyAad(expectedScope, envelope.encryptedVaultKey, profile);
   const derivedKeys = await deriveVaultPasswordKeyPairFromMetadata(
     vaultPassword,
     envelope.kdfMetadata
   );
-  return unwrapUserVaultKeyWithDerivedKeys(envelope.encryptedVaultKey, derivedKeys);
+  return unlockVaultKeyEnvelopeWithAadRouting(
+    envelope.encryptedVaultKey,
+    expectedScope,
+    profile,
+    (candidate) => unwrapUserVaultKeyWithDerivedKeys(candidate, derivedKeys)
+  );
 }
 
 /** @deprecated Use createPasswordEnvelope */

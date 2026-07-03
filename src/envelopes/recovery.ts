@@ -23,7 +23,7 @@ import {
   unwrapUserVaultKeyWithDerivedKeys,
   wrapUserVaultKeyWithDerivedKeys,
 } from "../crypto/vault-key-envelope.js";
-import { assertVaultKeyAad } from "../validation/aad-assert.js";
+import { unlockVaultKeyEnvelopeWithAadRouting } from "./legacy-vault-key-unlock.js";
 
 export const RECOVERY_PHRASE_WORDLIST_SOURCE = "BIP39 English (BIP-0039)" as const;
 export const DEFAULT_RECOVERY_PHRASE_WORD_COUNT: RecoveryPhraseWordCount = 24;
@@ -247,12 +247,16 @@ export async function unlockWithRecoveryEnvelope(
   if (envelope.kdfMetadata?.kdf !== "argon2id") {
     throw new Error("Recovery phrase envelope requires Argon2id metadata");
   }
-  assertVaultKeyAad(expectedScope, envelope.encryptedVaultKey, profile);
   const derivedKeys = await deriveRecoveryPhraseKeyFromMetadata(
     recoveryPhrase,
     envelope.kdfMetadata
   );
-  return unwrapUserVaultKeyWithDerivedKeys(envelope.encryptedVaultKey, derivedKeys);
+  return unlockVaultKeyEnvelopeWithAadRouting(
+    envelope.encryptedVaultKey,
+    expectedScope,
+    profile,
+    (candidate) => unwrapUserVaultKeyWithDerivedKeys(candidate, derivedKeys)
+  );
 }
 
 /** @deprecated Use createRecoveryEnvelope */

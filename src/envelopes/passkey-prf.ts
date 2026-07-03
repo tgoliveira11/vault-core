@@ -16,7 +16,7 @@ import {
   INNER_VAULT_KEY_CACHE_MISMATCH_MESSAGE,
 } from "../session/inner-key-material-cache.js";
 import { assertVaultKeyAad } from "../validation/aad-assert.js";
-import { normalizeEnvelopeAadContext } from "../validation/envelope-aad-normalize.js";
+import { unlockVaultKeyEnvelopeWithAadRouting } from "./legacy-vault-key-unlock.js";
 
 export {
   extractPasskeyPrfOutput,
@@ -151,12 +151,21 @@ export async function unwrapVaultKeyFromPasskey(
   if (prfOutput.byteLength < 32) {
     throw new Error("PRF output must be at least 32 bytes");
   }
-  const normalizedPayload = options?.strictAad
-    ? encryptedVaultKey
-    : normalizeEnvelopeAadContext(encryptedVaultKey, profile);
-  assertVaultKeyAad(expectedScope, normalizedPayload, profile);
   const prfKey = await importPrfAsAesKey(prfOutput);
-  return unwrapUserVaultKeyWithPrfOutput(normalizedPayload, prfOutput, prfKey);
+  const decrypt = async (candidate: EncryptedVaultPayload) =>
+    unwrapUserVaultKeyWithPrfOutput(candidate, prfOutput, prfKey);
+
+  if (options?.strictAad) {
+    assertVaultKeyAad(expectedScope, encryptedVaultKey, profile);
+    return decrypt(encryptedVaultKey);
+  }
+
+  return unlockVaultKeyEnvelopeWithAadRouting(
+    encryptedVaultKey,
+    expectedScope,
+    profile,
+    decrypt
+  );
 }
 
 export async function unlockWithPasskeyPrfEnvelope(
