@@ -16,6 +16,7 @@ API changes increment the minor version.
 - `createPasskeyPrfEnvelopeWithSessionCache()` and browser `VaultInnerKeyMaterialCache` (memory-only, cleared on `lockVaultSession` / `lockVaultSessionManually`) for passkey enroll after password, recovery, or passkey unlock.
 - Browser helpers: `cacheVaultInnerKeyMaterialAfterPasswordUnlock`, `cacheVaultInnerKeyMaterialAfterRecoveryUnlock`, `cacheVaultInnerKeyMaterialFromPasskeyUnlock`.
 - `normalizeEnvelopeAadContext(payload, profile)` injects missing `aad.context` on `vault_key` envelopes before passkey unwrap.
+- Legacy `vault_key` multi-AAD unlock (`isLegacyVaultKeyEnvelope`, `unwrapVaultKeyWithLegacyAadFallback`, profile `legacyVaultKeyUnlock`) with migration guide in `docs/MIGRATION_LEGACY_VAULT_KEY.md`.
 - Browser WebAuthn unlock ceremony helpers: `prepareWebAuthnPrfExtensions`, `alignPrfExtensionsForCredential`, `preferPlatformTransportsForVaultUnlock`, `prepareVaultUnlockAuthenticationOptions`, `isAppleMobileUserAgent`, and `resolveVaultUnlockUserAgent` for iOS PRF `eval` parity and Apple mobile internal transport pinning.
 
 ## [1.0.1] - 2026-07-02

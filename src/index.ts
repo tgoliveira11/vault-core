@@ -79,6 +79,11 @@ export * from "./envelopes/password.js";
 export * from "./envelopes/recovery.js";
 export * from "./envelopes/passkey-prf.js";
 export {
+  isLegacyVaultKeyEnvelope,
+  unwrapVaultKeyWithLegacyAadFallback,
+  unlockVaultKeyEnvelopeWithAadRouting,
+} from "./envelopes/legacy-vault-key-unlock.js";
+export {
   extractPasskeyPrfOutput,
   prfBytesForAes256Import,
   type ExtractPasskeyPrfOutputOptions,

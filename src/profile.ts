@@ -4,6 +4,8 @@ export type VaultCryptoProfile = {
   cryptoVersion: VaultCryptoVersion;
   aadContextVault: string;
   aadContextEnvelope: string;
+  /** When `false`, disables multi-AAD legacy vault_key unlock (default `true`). */
+  legacyVaultKeyUnlock?: boolean;
 };
 
 export type VaultAadField = "vault_key" | "vault_payload" | "vault_index";
