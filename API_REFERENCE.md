@@ -202,6 +202,8 @@ are still required.
 - `VaultPasswordUnchangedError`
 - `VaultRateLimitError`
 - `VaultKeyNotExtractableError`
+- `classifyPasskeyCryptoError(error)` / `PasskeyCryptoFailureKind` — passkey unwrap/re-wrap crypto failure taxonomy
+- `getDefaultPasskeyCryptoErrorMessage(kind, locale?)` — neutral English defaults (i18n-ready)
 - `VaultPayloadSizeError` — IV/ciphertext exceeds bounded decode limits
 - `VaultPayloadValidationError` — decrypted vault JSON failed Zod schema validation
 - `VaultCoreError`
@@ -323,7 +325,7 @@ Import styles once (includes `vc-status-dock-*` classes).
   `autoFocusPassword` and `autoStartPasskey` (default `true`) control focus and passkey auto-start;
   `passkeyOptionsReady` gates auto-start until WebAuthn options are prepared; wire `bindAutoStartPasskey`
   from the dock `renderQuickUnlock` context (auto-start runs from expand, not `useEffect`)
-- `classifyPasskeyUnlockFailure(error)` / `PasskeyUnlockFailureKind` — classify passkey failures for dock redirect policy
+- `classifyPasskeyUnlockFailure(error)` / `PasskeyUnlockFailureKind` — classify passkey failures for dock redirect policy (complements root `classifyPasskeyCryptoError` for crypto copy)
 - `tryConsumePasskeyAutoStart(scopeKey)` / `resetPasskeyAutoStartDedupe(scopeKey)` — passkey auto-start dedupe helpers
 - `createVaultFullUnlockPageMatcher(unlockPath)` — detect full unlock route (dock stays collapsed, handle visible)
 - `requestVaultDockExpand()` / `subscribeVaultDockExpand(listener)` — expand from elsewhere in the app
