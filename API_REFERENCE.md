@@ -139,6 +139,19 @@ provided.
 - `extractPasskeyPrfOutput(extensionResults, options?)` — prefers `evalByCredential[credentialId]` on Safari; coerces ArrayBuffer, views, base64url, and number arrays
 - `prfBytesForAes256Import(bytes)` — normalizes PRF output to 32 bytes for AES import
 - `isPasskeySupported()` / `isPrfExtensionSupported()`
+
+
+### Passkey device binding
+
+| Export | Purpose |
+| --- | --- |
+| `VaultDeviceBindingStore` | App-owned persistence contract |
+| `parseDeviceBindingId(raw)` | Parses `v1.<credentialId>` or raw credential id |
+| `scopeAuthenticationOptionsToDevice(options, { credentialId })` | Filters `allowCredentials` to the bound credential |
+| `resolvePasskeyUnlockAvailableOnDevice(...)` | Server helper for status APIs |
+
+Example: [`docs/examples/device-binding/README.md`](docs/examples/device-binding/README.md).
+
 The application owns WebAuthn ceremonies. Capability probes are preliminary; the actual ceremony may
 still return no PRF output. PRF output must remain client-only.
 
@@ -263,7 +276,7 @@ boolean aliases that fail closed.
 - `useVaultUnlocked()` / `useVaultLockState()`
 - `resolveVaultClientStatus(status, unlocked, prfSupported)`
 - `useVaultClientStatus(serverStatus, prfSupported)`
-- `VaultClientStatus` / `VaultServerStatusSnapshot`
+- `VaultClientStatus` / `VaultServerStatusSnapshot` (`passkeyUnlockAvailableOnThisDevice?`)
 
 Provider and session hook guard options are `registerActivityGuard` (defaults to `false`) and
 `registerUnloadGuard` (defaults to `true`). Set `registerActivityGuard` when the app should renew the

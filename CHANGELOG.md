@@ -14,6 +14,7 @@ API changes increment the minor version.
 - `extractPasskeyPrfOutput(results, options?)` with Safari-aware `evalByCredential` preference, type coercion (ArrayBuffer, views, base64url, number arrays), and `prfBytesForAes256Import` helper.
 - `createPasskeyPrfEnvelope(..., options?: WrapUserVaultKeyOptions)` forwards inner-blob options for non-extractable session UVKs.
 - `createPasskeyPrfEnvelopeWithSessionCache()` and browser `VaultInnerKeyMaterialCache` (memory-only, cleared on `lockVaultSession` / `lockVaultSessionManually`) for passkey enroll after password, recovery, or passkey unlock.
+- Portable passkey device binding helpers and dock `passkeyUnlockAvailableOnThisDevice` flag.
 - Browser helpers: `cacheVaultInnerKeyMaterialAfterPasswordUnlock`, `cacheVaultInnerKeyMaterialAfterRecoveryUnlock`, `cacheVaultInnerKeyMaterialFromPasskeyUnlock`.
 - `normalizeEnvelopeAadContext(payload, profile)` injects missing `aad.context` on `vault_key` envelopes before passkey unwrap.
 - Browser WebAuthn unlock ceremony helpers: `prepareWebAuthnPrfExtensions`, `alignPrfExtensionsForCredential`, `preferPlatformTransportsForVaultUnlock`, `prepareVaultUnlockAuthenticationOptions`, `isAppleMobileUserAgent`, and `resolveVaultUnlockUserAgent` for iOS PRF `eval` parity and Apple mobile internal transport pinning.

@@ -16,6 +16,21 @@ describe("resolveVaultDockPasskeyAvailability", () => {
     });
   });
 
+  it("hides passkey when device binding is inactive on this browser", () => {
+    vi.mocked(isPrfExtensionSupported).mockReturnValue(true);
+    expect(
+      resolveVaultDockPasskeyAvailability({
+        configured: true,
+        hasPasskeyPrfEnvelope: true,
+        passkeyUnlockAvailableOnThisDevice: false,
+      })
+    ).toEqual({
+      hasEnvelope: true,
+      showPasskey: false,
+      prfExplicitlyUnsupported: false,
+    });
+  });
+
   it("hides passkey when PRF is unsupported in the browser", () => {
     vi.mocked(isPrfExtensionSupported).mockReturnValue(false);
     expect(
@@ -36,6 +51,21 @@ describe("resolveVaultDockPasskeyAvailability", () => {
       resolveVaultDockPasskeyAvailability({
         configured: true,
         hasPasskeyPrfEnvelope: true,
+      })
+    ).toEqual({
+      hasEnvelope: true,
+      showPasskey: true,
+      prfExplicitlyUnsupported: false,
+    });
+  });
+
+  it("shows passkey when device binding is active", () => {
+    vi.mocked(isPrfExtensionSupported).mockReturnValue(true);
+    expect(
+      resolveVaultDockPasskeyAvailability({
+        configured: true,
+        hasPasskeyPrfEnvelope: true,
+        passkeyUnlockAvailableOnThisDevice: true,
       })
     ).toEqual({
       hasEnvelope: true,
