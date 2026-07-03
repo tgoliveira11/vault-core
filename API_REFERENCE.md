@@ -139,7 +139,6 @@ provided.
 - `extractPasskeyPrfOutput(extensionResults, options?)` — prefers `evalByCredential[credentialId]` on Safari; coerces ArrayBuffer, views, base64url, and number arrays
 - `prfBytesForAes256Import(bytes)` — normalizes PRF output to 32 bytes for AES import
 - `isPasskeySupported()` / `isPrfExtensionSupported()`
-
 The application owns WebAuthn ceremonies. Capability probes are preliminary; the actual ceremony may
 still return no PRF output. PRF output must remain client-only.
 
@@ -249,6 +248,11 @@ boolean aliases that fail closed.
 - `cacheVaultInnerKeyMaterialAfterPasswordUnlock`, `cacheVaultInnerKeyMaterialAfterRecoveryUnlock`, `cacheVaultInnerKeyMaterialFromPasskeyUnlock`
 - `clearVaultInnerKeyMaterialCache`, `getCachedVaultInnerKeyMaterial`, `resolveInnerVaultKeyBlobForWrap`
 - `INNER_VAULT_KEY_CACHE_MISMATCH_MESSAGE` — actionable error when cached material is stale
+- `prepareWebAuthnPrfExtensions(extensions)` — coerce JSON PRF salts to `ArrayBuffer`
+- `alignPrfExtensionsForCredential(options, credentialId?)` — single-credential iOS `eval` parity
+- `preferPlatformTransportsForVaultUnlock(options, userAgent?)` — pin `internal` on Apple mobile
+- `prepareVaultUnlockAuthenticationOptions(options, { credentialId?, userAgent?, filterSingleCredential? })` — composed unlock ceremony prep
+- `isAppleMobileUserAgent(userAgent)`, `resolveVaultUnlockUserAgent(userAgent?)`
 - `createRecoveryKitText`, `buildRecoveryKitContent`
 
 ## React: `@tgoliveira/vault-core/react`
