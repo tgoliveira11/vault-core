@@ -362,6 +362,44 @@ const vaultKey = await unlockWithPasskeyPrfEnvelope(
 
 Treat PRF support as an optional unlock method. Always preserve password or recovery fallback.
 
+### Passkey enroll after unlock (non-extractable session UVK)
+
+After `createUserVaultKey()` the UVK is extractable; the first passkey envelope can be created
+immediately. After unlock via password, recovery, or passkey, the session UVK is non-extractable —
+use the browser inner-key cache to enroll an additional passkey without exporting the UVK:
+
+```ts
+import {
+  unlockVaultSession,
+  cacheVaultInnerKeyMaterialAfterPasswordUnlock,
+  createPasskeyPrfEnvelopeWithSessionCache,
+} from "@tgoliveira/vault-core/browser";
+import { unlockWithPasswordEnvelope } from "@tgoliveira/vault-core";
+
+const vaultKey = await unlockWithPasswordEnvelope(
+  password,
+  passwordEnvelope,
+  vaultScope(userId),
+  VAULT_PROFILE
+);
+await unlockVaultSession(vaultKey);
+await cacheVaultInnerKeyMaterialAfterPasswordUnlock(
+  vaultKey,
+  passwordEnvelope,
+  password
+);
+
+const passkeyEnvelope = await createPasskeyPrfEnvelopeWithSessionCache(
+  vaultKey,
+  prfOutput,
+  vaultScope(userId),
+  VAULT_PROFILE
+);
+```
+
+The cache is memory-only and cleared automatically on `lockVaultSession()` /
+`lockVaultSessionManually()`. Never persist inner key material, PRF output, or UVK bytes.
+
 ## 10. Save and update encrypted payloads
 
 Keep the typed product schema in the application:

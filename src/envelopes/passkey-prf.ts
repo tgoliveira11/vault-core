@@ -1,11 +1,20 @@
 import type { EncryptedVaultPayload, PasskeyPrfEnvelope } from "../validation/schemas.js";
 import type { VaultCryptoProfile, VaultAadScope } from "../profile.js";
-import { PasskeyPrfRequiredError, PasskeyUnlockError } from "../errors/vault-errors.js";
+import type { WrapUserVaultKeyOptions } from "../crypto/vault-key-envelope.js";
+import { PasskeyPrfRequiredError, PasskeyUnlockError, VaultAuthorizationError } from "../errors/vault-errors.js";
 import { toBufferSource } from "../crypto/encoding.js";
 import {
   unwrapUserVaultKeyWithPrfOutput,
   wrapUserVaultKeyWithPrfOutput,
+  rewrapInnerVaultKeyMaterialForWrappingKeys,
 } from "../crypto/vault-key-envelope.js";
+import { importAesKwKey } from "../crypto/user-vault-key-crypto.js";
+import {
+  getCachedVaultInnerKeyMaterial,
+  clearVaultInnerKeyMaterialCache,
+  resolveInnerVaultKeyBlobForWrap,
+  INNER_VAULT_KEY_CACHE_MISMATCH_MESSAGE,
+} from "../session/inner-key-material-cache.js";
 import { assertVaultKeyAad } from "../validation/aad-assert.js";
 
 export {
@@ -38,12 +47,15 @@ async function importPrfAsAesKey(prfOutput: Uint8Array): Promise<CryptoKey> {
 
 type WrapScope = Pick<VaultAadScope, "userId" | "resourceId">;
 
+export type CreatePasskeyPrfEnvelopeOptions = WrapUserVaultKeyOptions;
+
 export async function createPasskeyPrfEnvelope(
   vaultKey: CryptoKey,
   prfOutput: Uint8Array,
   scope: WrapScope,
   profile: VaultCryptoProfile,
-  publicMetadata?: Record<string, unknown>
+  publicMetadata?: Record<string, unknown>,
+  options?: CreatePasskeyPrfEnvelopeOptions
 ): Promise<PasskeyPrfEnvelope> {
   if (prfOutput.byteLength < 32) {
     throw new Error("PRF output must be at least 32 bytes");
@@ -54,7 +66,8 @@ export async function createPasskeyPrfEnvelope(
     prfOutput,
     scope,
     profile,
-    prfKey
+    prfKey,
+    options
   );
   return {
     method: "passkey_prf",
@@ -62,6 +75,69 @@ export async function createPasskeyPrfEnvelope(
     kdfMetadata: null,
     publicMetadata,
   };
+}
+
+/**
+ * Creates a passkey PRF envelope using the in-memory inner-key cache when
+ * `innerVaultKeyBlob` is omitted and the session UVK is non-extractable.
+ */
+export async function createPasskeyPrfEnvelopeWithSessionCache(
+  vaultKey: CryptoKey,
+  prfOutput: Uint8Array,
+  scope: WrapScope,
+  profile: VaultCryptoProfile,
+  publicMetadata?: Record<string, unknown>,
+  options?: CreatePasskeyPrfEnvelopeOptions
+): Promise<PasskeyPrfEnvelope> {
+  if (options?.innerVaultKeyBlob) {
+    return createPasskeyPrfEnvelope(
+      vaultKey,
+      prfOutput,
+      scope,
+      profile,
+      publicMetadata,
+      options
+    );
+  }
+
+  const cached = getCachedVaultInnerKeyMaterial();
+  if (cached) {
+    try {
+      const prfWrappingKey = await importAesKwKey(
+        prfOutput.byteLength === 32 ? prfOutput : prfOutput.slice(0, 32)
+      );
+      const rewrappedInner = await rewrapInnerVaultKeyMaterialForWrappingKeys(
+        cached.inner,
+        cached.wrappingKey,
+        prfWrappingKey,
+        vaultKey
+      );
+      return createPasskeyPrfEnvelope(
+        vaultKey,
+        prfOutput,
+        scope,
+        profile,
+        publicMetadata,
+        { ...options, innerVaultKeyBlob: rewrappedInner }
+      );
+    } catch (error) {
+      clearVaultInnerKeyMaterialCache();
+      if (error instanceof VaultAuthorizationError) {
+        throw new VaultAuthorizationError(INNER_VAULT_KEY_CACHE_MISMATCH_MESSAGE);
+      }
+      throw error;
+    }
+  }
+
+  const resolvedOptions = await resolveInnerVaultKeyBlobForWrap(vaultKey, options);
+  return createPasskeyPrfEnvelope(
+    vaultKey,
+    prfOutput,
+    scope,
+    profile,
+    publicMetadata,
+    resolvedOptions
+  );
 }
 
 export async function unwrapVaultKeyFromPasskey(

@@ -10,8 +10,11 @@ API changes increment the minor version.
 
 ### Added
 
-- Public vault-key envelope helpers on `@tgoliveira/vault-core`: `assertInnerVaultKeyBlobMatchesVaultKey`, `extractInnerVaultKeyBlob`, `rewrapInnerVaultKeyMaterialForDerivedKeys`, `rewrapEncryptedVaultKeyForDerivedKeys`, `wrapUserVaultKeyWithPrfOutput`, `unwrapUserVaultKeyWithPrfOutput`, and `WrapUserVaultKeyOptions` for rotation, KDF upgrade, and passkey re-wrap without deep `dist/crypto/*` imports.
+- Public vault-key envelope helpers on `@tgoliveira/vault-core`: `assertInnerVaultKeyBlobMatchesVaultKey`, `extractInnerVaultKeyBlob`, `rewrapInnerVaultKeyMaterialForDerivedKeys`, `rewrapInnerVaultKeyMaterialForPrfOutput`, `rewrapEncryptedVaultKeyForDerivedKeys`, `wrapUserVaultKeyWithPrfOutput`, `unwrapUserVaultKeyWithPrfOutput`, and `WrapUserVaultKeyOptions` for rotation, KDF upgrade, and passkey re-wrap without deep `dist/crypto/*` imports.
 - `extractPasskeyPrfOutput(results, options?)` with Safari-aware `evalByCredential` preference, type coercion (ArrayBuffer, views, base64url, number arrays), and `prfBytesForAes256Import` helper.
+- `createPasskeyPrfEnvelope(..., options?: WrapUserVaultKeyOptions)` forwards inner-blob options for non-extractable session UVKs.
+- `createPasskeyPrfEnvelopeWithSessionCache()` and browser `VaultInnerKeyMaterialCache` (memory-only, cleared on `lockVaultSession` / `lockVaultSessionManually`) for passkey enroll after password, recovery, or passkey unlock.
+- Browser helpers: `cacheVaultInnerKeyMaterialAfterPasswordUnlock`, `cacheVaultInnerKeyMaterialAfterRecoveryUnlock`, `cacheVaultInnerKeyMaterialFromPasskeyUnlock`.
 
 ## [1.0.1] - 2026-07-02
 
