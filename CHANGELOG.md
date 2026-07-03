@@ -15,6 +15,7 @@ API changes increment the minor version.
 - `createPasskeyPrfEnvelope(..., options?: WrapUserVaultKeyOptions)` forwards inner-blob options for non-extractable session UVKs.
 - `createPasskeyPrfEnvelopeWithSessionCache()` and browser `VaultInnerKeyMaterialCache` (memory-only, cleared on `lockVaultSession` / `lockVaultSessionManually`) for passkey enroll after password, recovery, or passkey unlock.
 - Browser helpers: `cacheVaultInnerKeyMaterialAfterPasswordUnlock`, `cacheVaultInnerKeyMaterialAfterRecoveryUnlock`, `cacheVaultInnerKeyMaterialFromPasskeyUnlock`.
+- `normalizeEnvelopeAadContext(payload, profile)` injects missing `aad.context` on `vault_key` envelopes before passkey unwrap.
 - Browser WebAuthn unlock ceremony helpers: `prepareWebAuthnPrfExtensions`, `alignPrfExtensionsForCredential`, `preferPlatformTransportsForVaultUnlock`, `prepareVaultUnlockAuthenticationOptions`, `isAppleMobileUserAgent`, and `resolveVaultUnlockUserAgent` for iOS PRF `eval` parity and Apple mobile internal transport pinning.
 
 ## [1.0.1] - 2026-07-02

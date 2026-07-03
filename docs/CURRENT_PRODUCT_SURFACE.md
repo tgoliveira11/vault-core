@@ -32,6 +32,7 @@ Last reviewed: **2026-07-03** (package version **1.0.1**, vault-key envelope hel
 - Recovery phrase rotation (`rotateRecoveryPhrase`)
 - Vault deletion after authorization (`deleteVaultAfterAuthorization`, `deleteVaultWithPasswordAuthorization` on browser entry)
 - Runtime vault payload validation (`decryptVaultPayloadWithSchema`, `VaultPayloadValidationError`)
+- `normalizeEnvelopeAadContext` for passkey envelopes missing `aad.context`
 - Auto-upgrade legacy KDF on unlock
 - Plaintext rejection / sentinel validation
 - Canonical crypto policy (`VAULT_CRYPTO_POLICY`) + CI guard
