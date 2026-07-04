@@ -47,6 +47,7 @@ ceremonies or touch your database.
 | WebAuthn **ceremony** (`navigator.credentials.get/create`) | | ✓ |
 | Server WebAuthn verify (`@simplewebauthn/server`, etc.) | | ✓ |
 | Device-binding **contracts** (`VaultDeviceBindingStore`, scoping helpers) | ✓ | |
+| Multi-device passkey binding (**required** for production apps with passkey PRF) | | ✓ (DB table, httpOnly cookie, status API field) |
 | Device-binding **persistence** (DB rows, cookies, credential id storage) | | ✓ |
 | `normalizeEnvelopeAadContext`, legacy AAD fallback unlock | ✓ | |
 | Profile strings (`aadContextVault`, `aadContextEnvelope`, `legacyVaultKeyUnlock`) | ✓ (types + routing) | ✓ (choose/freeze values, e.g. `ACME_*` env) |
@@ -63,7 +64,162 @@ it touches users, routes, persistence, or `@simplewebauthn`, it stays in the app
 
 ---
 
-## 3. Phase-by-phase migration
+## 3. Multi-device passkey unlock (required for new integrations)
+
+From **1.1.0** onward, consuming applications that ship passkey PRF vault unlock in production
+**must** implement device binding. Binding is **not optional** for multi-device apps: each browser
+or device needs an explicit binding after the user enrolls (or re-links) a passkey on that device.
+
+The reference consumer pattern is **SelahKeep** ([letter-to-god](https://github.com/tgoliveira11/letter-to-god)):
+server-side binding rows, an app-owned httpOnly cookie, vault status reflects binding availability,
+and WebAuthn unlock options are scoped to the bound credential before the ceremony.
+
+Portable contracts and helpers ship in `@tgoliveira/vault-core`; persistence and cookie names stay
+in your app. Full pseudocode:
+[examples/device-binding/README.md](./examples/device-binding/README.md).
+
+### Why binding is required
+
+| Without binding | With binding |
+| --- | --- |
+| Dock may offer passkey unlock on a browser that never enrolled PRF on this device | Dock hides passkey when `passkeyUnlockAvailableOnThisDevice` is `false` |
+| Multiple `allowCredentials` may confuse WebAuthn / PRF `eval` alignment | `scopeAuthenticationOptionsToDevice` pins unlock to the credential bound on this browser |
+| User assumes “I have a passkey” means vault unlock works everywhere | Password/recovery unlock on a new device, then enroll binding on that device |
+
+`resolvePasskeyUnlockAvailableOnDevice` treats a missing `passkeyUnlockAvailableOnThisDevice` as
+**available** when a passkey envelope exists. Production apps that implement binding **must**
+pass `passkeyUnlockAvailableOnThisDevice: false` when this browser has no binding — not omit the
+field.
+
+### Step-by-step implementation (SelahKeep pattern)
+
+#### a. Server — binding store and cookie
+
+1. Add a consumer-owned DB table (see example SQL in
+   [examples/device-binding/README.md](./examples/device-binding/README.md)).
+2. Choose an app-owned cookie name (e.g. `myapp_vault_device_binding`). Store an opaque
+   `bindingId`; resolve it server-side to the WebAuthn `credentialId` for this browser.
+3. Implement an app store with SelahKeep-style methods (names are **your** conventions, not package
+   exports):
+
+| App method | Purpose |
+| --- | --- |
+| `resolveBindingForUser(userId)` | Read cookie → load row → `{ bindingId, credentialId }` or `null` |
+| `bindPasskeyToDevice({ userId, credentialId })` | Upsert row, set httpOnly cookie, return `{ bindingId }` |
+| `touchLastUsed(bindingId)` | Update `last_used_at` after successful passkey unlock |
+
+Wire these to the package `VaultDeviceBindingStore` contract (`getDeviceBindingId`,
+`resolveCredentialId`, optional `saveBinding` / `clearBinding`) for shared server utilities.
+
+#### b. After passkey registration or enroll success
+
+When WebAuthn registration verifies and the passkey PRF envelope is persisted, call
+`bindPasskeyToDevice` so this browser is bound to the new credential:
+
+```ts
+const { credentialId } = await verifyRegistrationResponse(/* @simplewebauthn/server */);
+await persistPasskeyPrfEnvelope(/* ciphertext only */);
+await vaultDeviceBindingStore.bindPasskeyToDevice({ userId, credentialId });
+```
+
+Also call `bindPasskeyToDevice` when the user links a passkey **after** password or recovery
+unlock on a device that did not have a binding yet (same ceremony, same persistence point).
+
+#### c. Vault status API — binding availability
+
+`GET /api/vault/status` (or equivalent) **must** include binding availability whenever a passkey
+envelope exists:
+
+```ts
+const binding = await vaultDeviceBindingStore.resolveBindingForUser(userId);
+
+const passkeyUnlockAvailableOnThisDevice = resolvePasskeyUnlockAvailableOnDevice({
+  hasPasskeyPrfEnvelope: vault.hasPasskeyPrfEnvelope,
+  passkeyUnlockAvailableOnThisDevice: binding != null,
+});
+
+return {
+  configured: vault.configured,
+  hasPasskeyPrfEnvelope: vault.hasPasskeyPrfEnvelope,
+  passkeyUnlockAvailableOnThisDevice,
+};
+```
+
+Pass `false` when there is no binding on this browser. The dock and
+`resolvePasskeyDockAvailability` use this field to hide passkey quick-unlock on unbound devices.
+
+#### d. Before WebAuthn authenticate (unlock)
+
+On the unlock API route or client prefetch path:
+
+1. `resolveBindingForUser(userId)` — abort or fall back if `null`.
+2. `scopeAuthenticationOptionsToDevice(serverOptions, { credentialId })`.
+3. `prepareVaultUnlockAuthenticationOptions(...)` with `filterSingleCredential: true` and
+   `userAgent`.
+4. Run `navigator.credentials.get` in the browser.
+5. `touchLastUsed(bindingId)` after successful verification.
+
+```ts
+import {
+  resolvePasskeyUnlockAvailableOnDevice,
+  scopeAuthenticationOptionsToDevice,
+} from "@tgoliveira/vault-core";
+import { prepareVaultUnlockAuthenticationOptions } from "@tgoliveira/vault-core/browser";
+
+const binding = await vaultDeviceBindingStore.resolveBindingForUser(userId);
+if (!binding) throw new Error("passkey_not_bound_on_device");
+
+const scoped = scopeAuthenticationOptionsToDevice(serverOptionsFromApi, {
+  credentialId: binding.credentialId,
+});
+const publicKey = prepareVaultUnlockAuthenticationOptions(scoped, {
+  credentialId: binding.credentialId,
+  filterSingleCredential: true,
+  userAgent,
+});
+```
+
+#### e. React dock — pass server status through
+
+Fetch vault status from your API and pass `passkeyUnlockAvailableOnThisDevice` into
+`VaultStatusDock` and `VaultDockQuickUnlock` `serverStatus` (see §6). Do not derive this flag
+only from client-side storage in production — the server must authoritative reflect whether this
+browser’s cookie resolves to a binding row.
+
+```tsx
+<VaultStatusDock
+  serverStatus={{
+    configured,
+    hasPasskeyPrfEnvelope,
+    passkeyUnlockAvailableOnThisDevice, // from GET /api/vault/status
+  }}
+  /* … */
+/>
+```
+
+#### f. New device behavior
+
+| Situation | Expected UX |
+| --- | --- |
+| User enrolled passkey on device A; opens app on device B | `passkeyUnlockAvailableOnThisDevice: false` — dock shows password/recovery unlock, not passkey quick-unlock |
+| User unlocks on device B with password or recovery | Session unlock works; offer “Link passkey on this device” when PRF is supported |
+| User completes passkey enroll on device B | `bindPasskeyToDevice` → status returns `passkeyUnlockAvailableOnThisDevice: true` on subsequent loads |
+| User clears cookies or uses private browsing | Treat as unbound (`false`) until they enroll or re-link passkey on that browser |
+
+Account passkey **login** and vault passkey **PRF unlock** remain separate: logging in on a new
+device does not imply vault PRF binding until enroll + `bindPasskeyToDevice` completes.
+
+### Migration and opt-out
+
+| Audience | Action |
+| --- | --- |
+| Existing integrations without binding | Add §3 steps before shipping passkey PRF to production users with multiple devices |
+| New integrations (1.1.0+) | Implement binding as part of Phase 2 — **required**, not optional |
+| Single-device-only apps (kiosk, embedded) | May omit binding only with an explicit product decision; document risks: omitting `passkeyUnlockAvailableOnThisDevice` defaults to “available”, so the dock may show passkey on browsers that cannot complete PRF unlock |
+
+---
+
+## 4. Phase-by-phase migration
 
 Generalized from the passkey PRF epic rollout (section 7). Order matters: later phases assume earlier
 imports are wired.
@@ -103,10 +259,10 @@ import {
 
 ---
 
-### Phase 2 — P1: PRF extraction, WebAuthn prep, device binding
+### Phase 2 — P1: PRF extraction, WebAuthn prep, device binding (**required**)
 
-**Goal:** one implementation for PRF bytes and unlock ceremony options; expose device-bound passkey
-eligibility on the vault status snapshot.
+**Goal:** one implementation for PRF bytes and unlock ceremony options; **require** device-bound
+passkey eligibility on the vault status snapshot for all production multi-device integrations.
 
 1. **Delete** duplicates such as:
    - `normalize-prf-output.ts`, `extract-prf-from-extension-results.ts`
@@ -143,16 +299,18 @@ const prfOutput = extractPasskeyPrfOutput(credential.getClientExtensionResults()
 });
 ```
 
-4. Implement `VaultDeviceBindingStore` against your DB; return
-   `passkeyUnlockAvailableOnThisDevice` from the vault status API via
-   `resolvePasskeyUnlockAvailableOnDevice`. See
-   [examples/device-binding/README.md](./examples/device-binding/README.md).
+4. **Required:** implement the multi-device binding store, cookie, and status API field per §3.
+   Implement `VaultDeviceBindingStore` against your DB; return
+   `passkeyUnlockAvailableOnThisDevice` from `GET /api/vault/status` via
+   `resolvePasskeyUnlockAvailableOnDevice`. Pass `false` when this browser has no binding.
+   See [examples/device-binding/README.md](./examples/device-binding/README.md).
 
 5. Prefetch authentication options **before** dock expand when using passkey auto-start (consumer
    owns timing; package prepares shape only).
 
-**Keep in app:** challenge generation API, `@simplewebauthn/server` verification, cookie that stores
-device binding id (name is yours).
+**Keep in app:** challenge generation API, `@simplewebauthn/server` verification, httpOnly cookie
+that stores device binding id (name is yours), `bindPasskeyToDevice` after enroll,
+`resolveBindingForUser` on status and unlock routes.
 
 ---
 
@@ -213,13 +371,13 @@ const message = getDefaultPasskeyCryptoErrorMessage(kind);
 
 4. For dock redirect policy (cancel vs recoverable vs full unlock page), use
    `classifyPasskeyUnlockFailure` from `@tgoliveira/vault-core/react` — **not**
-   `classifyPasskeyCryptoError`. See §5.
+   `classifyPasskeyCryptoError`. See §6.
 
 **Keep in app:** localized strings, support links, analytics event names.
 
 ---
 
-## 4. Per-feature checklist
+## 5. Per-feature checklist
 
 ### Inner-key cache and passkey enroll after unlock
 
@@ -246,13 +404,14 @@ const message = getDefaultPasskeyCryptoErrorMessage(kind);
 | Delete | Local transport pinning and single-credential `eval` alignment |
 | Keep | API route that returns challenge + allowCredentials; `@simplewebauthn` verify |
 
-### Device binding
+### Device binding (**required** for production passkey PRF)
 
 | Action | Detail |
 | --- | --- |
 | Import | `VaultDeviceBindingStore`, `parseDeviceBindingId`, `scopeAuthenticationOptionsToDevice`, `resolvePasskeyUnlockAvailableOnDevice` from main |
+| Implement | App store: `resolveBindingForUser`, `bindPasskeyToDevice`, `touchLastUsed`; DB table + httpOnly cookie (§3) |
 | Delete | Ad hoc “only this credential id” filters duplicated from vault-core |
-| Keep | DB table, HTTP handlers, cookie/header names, setting `passkeyUnlockAvailableOnThisDevice` on status snapshot |
+| Keep | DB table, HTTP handlers, cookie names, explicit `passkeyUnlockAvailableOnThisDevice: false` when unbound |
 
 ### Legacy AAD / missing context
 
@@ -289,15 +448,16 @@ const message = getDefaultPasskeyCryptoErrorMessage(kind);
 
 ---
 
-## 5. Dock / React wiring
+## 6. Dock / React wiring
 
 When using `VaultStatusDock` + `VaultDockQuickUnlock` (1.0.1+ behavior, compatible with 1.1.0 helpers):
 
-### `passkeyUnlockAvailableOnThisDevice`
+### `passkeyUnlockAvailableOnThisDevice` (**required** with device binding)
 
 Set on `serverStatus` (and quick-unlock `serverStatus`) from your API using
-`resolvePasskeyUnlockAvailableOnDevice`. Without it, the dock may hide passkey even when an envelope
-exists.
+`resolvePasskeyUnlockAvailableOnDevice` and `resolveBindingForUser` (§3). Pass `false` when this
+browser has no binding. Without an explicit `false`, the dock may show passkey even when unlock
+cannot succeed on this device.
 
 ### `passkeyOptionsReady`
 
@@ -357,7 +517,7 @@ Reference: [apps/consumer-demo/src/components/vault/vault-status-dock-client.tsx
 
 ---
 
-## 6. Verification checklist (after migration)
+## 7. Verification checklist (after migration)
 
 - [ ] `@tgoliveira/vault-core` pinned to `^1.1.0`; no imports from `dist/*` or forked crypto files.
 - [ ] Password, recovery, and passkey unlock integration tests still pass.
@@ -367,7 +527,9 @@ Reference: [apps/consumer-demo/src/components/vault/vault-status-dock-client.tsx
 - [ ] iOS 18+ passkey unlock uses `prepareVaultUnlockAuthenticationOptions` (single-credential `eval`).
 - [ ] Legacy envelope fixtures decrypt without app-local legacy modules.
 - [ ] `isLegacyVaultKeyEnvelope` metrics captured; re-wrap path tested.
-- [ ] Vault status API returns `passkeyUnlockAvailableOnThisDevice` when device binding is enabled.
+- [ ] Multi-device binding implemented (§3): DB row, httpOnly cookie, `bindPasskeyToDevice` on enroll.
+- [ ] `GET /api/vault/status` returns `passkeyUnlockAvailableOnThisDevice: false` when unbound; `true` after bind on this browser.
+- [ ] Unlock path calls `scopeAuthenticationOptionsToDevice` before `prepareVaultUnlockAuthenticationOptions`.
 - [ ] Dock passkey auto-start waits for `passkeyOptionsReady`; cancel does not spuriously redirect.
 - [ ] `classifyPasskeyCryptoError` messages shown on crypto failure; dock uses `classifyPasskeyUnlockFailure`.
 - [ ] PRF output and UVK absent from network payloads, logs, localStorage, IndexedDB
@@ -376,12 +538,12 @@ Reference: [apps/consumer-demo/src/components/vault/vault-status-dock-client.tsx
 
 ---
 
-## 7. Related documentation
+## 8. Related documentation
 
 - [API_REFERENCE.md](../API_REFERENCE.md) — passkey PRF, device binding, legacy vault_key, dock exports
 - [IMPLEMENTATION_GUIDE.md](./IMPLEMENTATION_GUIDE.md) — end-to-end greenfield integration
 - [MIGRATION_LEGACY_VAULT_KEY.md](./MIGRATION_LEGACY_VAULT_KEY.md) — legacy AAD sunset
-- [examples/device-binding/README.md](./examples/device-binding/README.md) — device binding snapshot
+- [examples/device-binding/README.md](./examples/device-binding/README.md) — multi-device binding store, cookie, status API
 - [CONSUMER_SECURITY_REQUIREMENTS.md](./CONSUMER_SECURITY_REQUIREMENTS.md) — mandatory security checklist
 - [CHANGELOG.md](../CHANGELOG.md) `[1.1.0]` — complete release notes
 
