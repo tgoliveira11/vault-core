@@ -125,8 +125,8 @@ function resolveSingleCredentialId(
 }
 
 /**
- * When unlocking with a single allowCredential, iOS requires `prf.eval` instead of
- * `prf.evalByCredential` for parity with registration ceremonies.
+ * When a PRF authentication ceremony uses a single allowCredential, iOS requires `prf.eval`
+ * instead of `prf.evalByCredential` for parity with registration ceremonies.
  */
 export function alignPrfExtensionsForCredential<T extends PublicKeyCredentialRequestOptionsInput>(
   options: T,

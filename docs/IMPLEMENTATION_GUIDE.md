@@ -312,6 +312,102 @@ the first PRF result to vault-core. Use the browser helpers below to prepare aut
 (iOS `eval` parity, salt coercion, Apple mobile transport pinning) before calling
 `navigator.credentials.get`.
 
+### PRF authentication ceremonies (unlock **and** enroll/manage)
+
+Any client call to `navigator.credentials.get` that feeds PRF output into
+`createPasskeyPrfEnvelope*` or `unwrapVaultKeyFromPasskey*` **must** pass options through the
+vault-core PRF preparation pipeline. **`prepareAuthenticationOptions` from `@tgoliveira/secure-auth`
+(or similar JSON-only preparers) alone is insufficient** — ceremonies may complete and even return
+PRF extension results, but salt coercion and iOS `eval` alignment differ from vault-core prep, so
+envelopes created at enable time cannot be decrypted at unlock.
+
+| Ceremony | Requires full vault-core PRF prep |
+| --- | --- |
+| Vault unlock | Yes |
+| Passkey vault unlock **enable** (post-register) | Yes |
+| Passkey vault unlock **disable** (PRF proof) | Yes |
+| Envelope **re-wrap / rotate** on device | Yes |
+
+Use the same helper (or the same composed function) for every row in the table. Do not copy the
+unlock path correctly and leave enable/disable on raw server JSON prep.
+
+**Anti-pattern — enable/disable with JSON prep only:**
+
+```ts
+import { prepareAuthenticationOptions } from "@tgoliveira/secure-auth/client";
+
+// WRONG for PRF-gated ceremonies: missing vault-core PRF salt coercion and iOS eval alignment
+const publicKey = prepareAuthenticationOptions(serverOptionsJson);
+const credential = await navigator.credentials.get({ publicKey });
+```
+
+**Required pattern — shared PRF ceremony prep:**
+
+```ts
+import { prepareAuthenticationOptions } from "@tgoliveira/secure-auth/client";
+import {
+  buildPrfSaltBytes,
+  prepareVaultPasskeyPrfAuthenticationOptions,
+  resolveVaultUnlockUserAgent,
+} from "@tgoliveira/vault-core/browser";
+import { scopeAuthenticationOptionsToDevice } from "@tgoliveira/vault-core";
+
+const userAgent = resolveVaultUnlockUserAgent();
+
+// One function for unlock, enable, disable, and re-wrap ceremonies:
+const publicKey = await prepareVaultPasskeyPrfAuthenticationOptions({
+  userId,
+  prfSaltPrefix: "acme-passkey-prf-v1:",
+  serverOptions: serverOptionsJson,
+  prepareJson: prepareAuthenticationOptions,
+  credentialId,
+  userAgent,
+  scopeToDevice: true, // unlock on a bound device; omit for single-credential enable
+});
+
+const credential = await navigator.credentials.get({ publicKey });
+```
+
+**Manual composition** (when you need finer control):
+
+```ts
+import { prepareAuthenticationOptions } from "@tgoliveira/secure-auth/client";
+import {
+  buildPrfSaltBytes,
+  prepareVaultUnlockAuthenticationOptions,
+  resolveVaultUnlockUserAgent,
+} from "@tgoliveira/vault-core/browser";
+import { scopeAuthenticationOptionsToDevice } from "@tgoliveira/vault-core";
+
+const userAgent = resolveVaultUnlockUserAgent();
+const salt = await buildPrfSaltBytes("acme-passkey-prf-v1:", userId);
+
+let options = prepareAuthenticationOptions(serverOptionsJson);
+options = {
+  ...options,
+  extensions: {
+    ...options.extensions,
+    prf: {
+      evalByCredential: {
+        [credentialId]: { first: salt },
+      },
+    },
+  },
+};
+
+options = scopeAuthenticationOptionsToDevice(options, { credentialId });
+const publicKey = prepareVaultUnlockAuthenticationOptions(options, {
+  credentialId,
+  filterSingleCredential: true,
+  userAgent,
+});
+```
+
+**Troubleshooting:** If unlock fails immediately after enable with `decrypt_failed` or “Could not
+decrypt your vault with this passkey”, the enable ceremony likely used JSON-only prep while unlock
+used vault-core prep. Re-enable the passkey on each affected device (or re-wrap the envelope) after
+fixing the client prep.
+
 Use a stable, application-specific PRF salt:
 
 ```ts

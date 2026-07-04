@@ -32,8 +32,9 @@ function filterAllowCredentials(
 }
 
 /**
- * Prepares WebAuthn authentication options for vault unlock: PRF salt coercion, iOS PRF
- * extension alignment, optional single-credential filtering, and Apple mobile transport pinning.
+ * Prepares WebAuthn authentication options for PRF-gated passkey ceremonies (vault unlock,
+ * passkey enable/disable, envelope re-wrap, and other management flows): PRF salt coercion, iOS
+ * PRF extension alignment, optional single-credential filtering, and Apple mobile transport pinning.
  */
 export function prepareVaultUnlockAuthenticationOptions<
   T extends PublicKeyCredentialRequestOptionsInput,

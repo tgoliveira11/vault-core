@@ -19,8 +19,8 @@ export function resolveVaultUnlockUserAgent(userAgent?: string): string {
 }
 
 /**
- * Pins `internal` transport on Apple mobile devices so hybrid QR flows do not complete
- * WebAuthn without returning local PRF output.
+ * Pins `internal` transport on Apple mobile devices for PRF-gated authentication ceremonies so
+ * hybrid QR flows do not complete WebAuthn without returning local PRF output.
  */
 export function preferPlatformTransportsForVaultUnlock<T extends PublicKeyCredentialRequestOptionsInput>(
   options: T,

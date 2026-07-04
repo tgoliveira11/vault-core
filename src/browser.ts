@@ -1,5 +1,3 @@
-import { stringToBytes, toBufferSource } from "./crypto/encoding.js";
-
 export {
   extractPasskeyPrfOutput,
   prfBytesForAes256Import,
@@ -33,10 +31,12 @@ export {
   type PrepareVaultUnlockAuthenticationOptionsContext,
 } from "./browser/vault-unlock-auth-options.js";
 
-export async function buildPrfSaltBytes(prefix: string, userId: string): Promise<ArrayBuffer> {
-  const input = toBufferSource(stringToBytes(`${prefix}${userId}`));
-  return crypto.subtle.digest("SHA-256", input);
-}
+export {
+  prepareVaultPasskeyPrfAuthenticationOptions,
+  type PrepareVaultPasskeyPrfAuthenticationOptionsInput,
+} from "./browser/vault-passkey-prf-auth-options.js";
+
+export { buildPrfSaltBytes } from "./browser/prf-salt-bytes.js";
 
 export function createRecoveryKitDownload(
   content: string,

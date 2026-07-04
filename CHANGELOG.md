@@ -11,6 +11,8 @@ API changes increment the minor version.
 ### Added
 
 - Consumer adoption guide for 1.1.0: `docs/ADOPTING_VAULT_CORE_1_1_0.md` (package vs app responsibilities, phased duplicate removal, dock wiring).
+- `prepareVaultPasskeyPrfAuthenticationOptions` on `@tgoliveira/vault-core/browser` — composed PRF authentication prep for unlock, enable, disable, and re-wrap ceremonies (optional secure-auth JSON preparer injection).
+- Documentation: PRF ceremony prep applies to all PRF-gated `navigator.credentials.get` flows, not only vault unlock (`IMPLEMENTATION_GUIDE.md` §9, `ADOPTING_VAULT_CORE_1_1_0.md` §3.d, troubleshooting §8).
 
 ### Changed
 

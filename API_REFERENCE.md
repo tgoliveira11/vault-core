@@ -270,7 +270,8 @@ boolean aliases that fail closed.
 - `prepareWebAuthnPrfExtensions(extensions)` — coerce JSON PRF salts to `ArrayBuffer`
 - `alignPrfExtensionsForCredential(options, credentialId?)` — single-credential iOS `eval` parity
 - `preferPlatformTransportsForVaultUnlock(options, userAgent?)` — pin `internal` on Apple mobile
-- `prepareVaultUnlockAuthenticationOptions(options, { credentialId?, userAgent?, filterSingleCredential? })` — composed unlock ceremony prep
+- `prepareVaultUnlockAuthenticationOptions(options, { credentialId?, userAgent?, filterSingleCredential? })` — composed PRF ceremony prep (unlock, enable, disable, re-wrap)
+- `prepareVaultPasskeyPrfAuthenticationOptions({ userId, prfSaltPrefix, serverOptions, prepareJson?, credentialId?, userAgent?, filterSingleCredential?, scopeToDevice? })` — full pipeline: optional JSON preparer → PRF salt merge → optional device scoping → ceremony prep
 - `isAppleMobileUserAgent(userAgent)`, `resolveVaultUnlockUserAgent(userAgent?)`
 - `createRecoveryKitText`, `buildRecoveryKitContent`
 
