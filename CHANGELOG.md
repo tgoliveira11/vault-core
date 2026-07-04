@@ -12,6 +12,10 @@ API changes increment the minor version.
 
 - Consumer adoption guide for 1.1.0: `docs/ADOPTING_VAULT_CORE_1_1_0.md` (package vs app responsibilities, phased duplicate removal, dock wiring).
 
+### Changed
+
+- **Docs:** multi-device passkey binding is **required** for production integrations — `docs/ADOPTING_VAULT_CORE_1_1_0.md` §3; `docs/examples/device-binding/README.md` expanded with binding store pseudocode.
+
 ## [1.1.0] - 2026-07-03
 
 ### Added
