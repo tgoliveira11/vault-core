@@ -2,7 +2,7 @@
 
 Living inventory of what `@tgoliveira/vault-core` exposes today. Update this file when exports, admin screens, published artifacts, or shipped/planned status changes.
 
-Last reviewed: **2026-07-03** (package version **1.0.1**, vault-key envelope helpers export)
+Last reviewed: **2026-07-04** (package version **1.1.0**, PRF ceremony prep docs + composed helper)
 
 ## Package entry points (shipped)
 
@@ -27,8 +27,9 @@ Last reviewed: **2026-07-03** (package version **1.0.1**, vault-key envelope hel
 - Argon2id password and recovery envelopes (`kdf-v1` legacy, `kdf-v2` recommended)
 - Passkey PRF envelope wrap/unwrap (no WebAuthn ceremony)
 - Robust `extractPasskeyPrfOutput` with Safari `evalByCredential` preference and byte coercion
-- WebAuthn unlock ceremony prep (`prepareWebAuthnPrfExtensions`, `alignPrfExtensionsForCredential`,
-  `preferPlatformTransportsForVaultUnlock`, `prepareVaultUnlockAuthenticationOptions`)
+- WebAuthn PRF ceremony prep (`prepareWebAuthnPrfExtensions`, `alignPrfExtensionsForCredential`,
+  `preferPlatformTransportsForVaultUnlock`, `prepareVaultUnlockAuthenticationOptions`,
+  `prepareVaultPasskeyPrfAuthenticationOptions`)
 - iOS PRF capability gate (`isPrfExtensionSupported` with `userAgent` / `minAppleMobileMajorVersion`,
   `parseAppleMobileOsMajorVersion`, `DEFAULT_APPLE_MOBILE_PRF_MIN_MAJOR_VERSION`)
 - BIP39 12/24-word recovery phrases and recovery kit text

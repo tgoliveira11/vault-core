@@ -18,7 +18,7 @@ logic that many consumers copied locally now ships as stable public APIs. Highli
 | --- | --- | --- |
 | Passkey enroll after unlock | Export UVK or hand-roll inner blob re-wrap | `createPasskeyPrfEnvelopeWithSessionCache`, browser inner-key cache |
 | PRF byte extraction | App-local Safari `evalByCredential` shims | `extractPasskeyPrfOutput`, `prfBytesForAes256Import` |
-| WebAuthn option prep | App-local iOS `eval` / transport pinning | `prepareVaultUnlockAuthenticationOptions` and helpers on browser entry |
+| WebAuthn option prep | App-local iOS `eval` / transport pinning | `prepareVaultUnlockAuthenticationOptions`, `prepareVaultPasskeyPrfAuthenticationOptions`, and helpers on browser entry |
 | iOS PRF capability | Often over-reported on iOS &lt; 18 | `isPrfExtensionSupported({ userAgent })` gates Apple mobile below major 18 |
 | Legacy `vault_key` AAD | App-local multi-AAD unlock shims | `isLegacyVaultKeyEnvelope`, `unwrapVaultKeyWithLegacyAadFallback`, profile `legacyVaultKeyUnlock` |
 | Missing envelope `aad.context` | App-local normalize before unwrap | `normalizeEnvelopeAadContext` |
@@ -148,9 +148,15 @@ return {
 Pass `false` when there is no binding on this browser. The dock and
 `resolvePasskeyDockAvailability` use this field to hide passkey quick-unlock on unbound devices.
 
-#### d. Before WebAuthn authenticate (unlock)
+#### d. Before WebAuthn authenticate (unlock **and** PRF-gated management)
 
-On the unlock API route or client prefetch path:
+Any `navigator.credentials.get` that feeds PRF output into vault envelope wrap/unwrap must use the
+**same** preparation pipeline — not only vault unlock. That includes passkey enable (post-register),
+disable (PRF proof), and on-device envelope re-wrap. See
+[IMPLEMENTATION_GUIDE.md](./IMPLEMENTATION_GUIDE.md) §9 (“PRF authentication ceremonies”) for the
+full ceremony table and anti-patterns.
+
+**Unlock** on a device-bound credential:
 
 1. `resolveBindingForUser(userId)` — abort or fall back if `null`.
 2. `scopeAuthenticationOptionsToDevice(serverOptions, { credentialId })`.
@@ -158,6 +164,50 @@ On the unlock API route or client prefetch path:
    `userAgent`.
 4. Run `navigator.credentials.get` in the browser.
 5. `touchLastUsed(bindingId)` after successful verification.
+
+**Enable, disable, re-wrap** — same PRF prep as unlock; device scoping is optional when the server
+already returns a single credential (typical post-register enable). Prefer one shared client helper
+for all ceremonies:
+
+```ts
+import { prepareAuthenticationOptions } from "@tgoliveira/secure-auth/client";
+import {
+  prepareVaultPasskeyPrfAuthenticationOptions,
+  resolveVaultUnlockUserAgent,
+} from "@tgoliveira/vault-core/browser";
+import {
+  resolvePasskeyUnlockAvailableOnDevice,
+  scopeAuthenticationOptionsToDevice,
+} from "@tgoliveira/vault-core";
+
+const userAgent = resolveVaultUnlockUserAgent();
+
+// Unlock (bound device):
+const binding = await vaultDeviceBindingStore.resolveBindingForUser(userId);
+if (!binding) throw new Error("passkey_not_bound_on_device");
+
+const unlockPublicKey = await prepareVaultPasskeyPrfAuthenticationOptions({
+  userId,
+  prfSaltPrefix: "acme-passkey-prf-v1:",
+  serverOptions: serverOptionsFromApi,
+  prepareJson: prepareAuthenticationOptions,
+  credentialId: binding.credentialId,
+  userAgent,
+  scopeToDevice: true,
+});
+
+// Enable / disable / re-wrap (same helper — do not use prepareAuthenticationOptions alone):
+const managePublicKey = await prepareVaultPasskeyPrfAuthenticationOptions({
+  userId,
+  prfSaltPrefix: "acme-passkey-prf-v1:",
+  serverOptions: serverOptionsFromApi,
+  prepareJson: prepareAuthenticationOptions,
+  credentialId,
+  userAgent,
+});
+```
+
+Manual unlock composition (equivalent to the composed helper when `scopeToDevice: true`):
 
 ```ts
 import {
@@ -274,6 +324,7 @@ passkey eligibility on the vault status snapshot for all production multi-device
 import {
   buildPrfSaltBytes,
   extractPasskeyPrfOutput,
+  prepareVaultPasskeyPrfAuthenticationOptions,
   prepareVaultUnlockAuthenticationOptions,
   isPasskeySupported,
   isPrfExtensionSupported,
@@ -525,11 +576,14 @@ Reference: [apps/consumer-demo/src/components/vault/vault-status-dock-client.tsx
 - [ ] Safari and Chrome passkey unlock extract PRF via `extractPasskeyPrfOutput`.
 - [ ] iOS 17 (or below) reports `isPrfExtensionSupported() === false`; password/recovery still offered.
 - [ ] iOS 18+ passkey unlock uses `prepareVaultUnlockAuthenticationOptions` (single-credential `eval`).
+- [ ] Passkey **enable**, **disable**, and **re-wrap** ceremonies use the same PRF prep helper as unlock (shared function or `prepareVaultPasskeyPrfAuthenticationOptions`).
+- [ ] Re-enable passkey on each device after fixing client prep if envelopes were created with wrong PRF bytes.
 - [ ] Legacy envelope fixtures decrypt without app-local legacy modules.
 - [ ] `isLegacyVaultKeyEnvelope` metrics captured; re-wrap path tested.
 - [ ] Multi-device binding implemented (§3): DB row, httpOnly cookie, `bindPasskeyToDevice` on enroll.
 - [ ] `GET /api/vault/status` returns `passkeyUnlockAvailableOnThisDevice: false` when unbound; `true` after bind on this browser.
 - [ ] Unlock path calls `scopeAuthenticationOptionsToDevice` before `prepareVaultUnlockAuthenticationOptions`.
+- [ ] Enable/disable/rewrap paths do **not** call `prepareAuthenticationOptions` (or similar) without vault-core PRF prep.
 - [ ] Dock passkey auto-start waits for `passkeyOptionsReady`; cancel does not spuriously redirect.
 - [ ] `classifyPasskeyCryptoError` messages shown on crypto failure; dock uses `classifyPasskeyUnlockFailure`.
 - [ ] PRF output and UVK absent from network payloads, logs, localStorage, IndexedDB
@@ -538,7 +592,17 @@ Reference: [apps/consumer-demo/src/components/vault/vault-status-dock-client.tsx
 
 ---
 
-## 8. Related documentation
+## 8. Troubleshooting
+
+| Symptom | Likely cause | Fix |
+| --- | --- | --- |
+| “Could not decrypt your vault with this passkey” immediately after enable | Enable used JSON-only WebAuthn prep (`prepareAuthenticationOptions` alone); unlock used vault-core PRF prep → different PRF bytes | Use `prepareVaultPasskeyPrfAuthenticationOptions` (or the same manual pipeline) for **all** PRF ceremonies; re-enable passkey or re-wrap envelope on affected devices |
+| Passkey ceremony succeeds but PRF output does not decrypt envelope | Missing `prepareVaultUnlockAuthenticationOptions` / salt coercion / iOS `eval` alignment | See [IMPLEMENTATION_GUIDE.md](./IMPLEMENTATION_GUIDE.md) §9 |
+| Dock shows passkey on a browser that cannot unlock | Missing or omitted `passkeyUnlockAvailableOnThisDevice: false` when unbound | Implement device binding per §3 |
+
+---
+
+## 9. Related documentation
 
 - [API_REFERENCE.md](../API_REFERENCE.md) — passkey PRF, device binding, legacy vault_key, dock exports
 - [IMPLEMENTATION_GUIDE.md](./IMPLEMENTATION_GUIDE.md) — end-to-end greenfield integration
