@@ -227,6 +227,7 @@ New code should use the canonical APIs. Deprecated unlock aliases use the curren
 - `configureVaultSession(config)`
 - `await unlockVaultSession(vaultKey)` / `lockVaultSession()` — session UVK must be **non-extractable** (keys from envelope unlock satisfy this; do not pass `createUserVaultKey()` output directly)
 - `lockVaultSessionManually()` / `isVaultManuallyLocked()`
+- `registerVaultLockCleanup(handler)` — sync app cleanup on lock (returns unregister); invoked after UVK and inner-key cache are cleared
 - `touchVaultSession()` / `scheduleVaultAutoLock()` / `clearVaultAutoLockTimer()`
 - `getVaultAutoLockRemainingMs()`
 - `getVaultAutoLockMinutes()` — resolved session auto-lock duration in minutes
@@ -355,6 +356,12 @@ Import styles once (includes `vc-vault-protected-gate*` and `vc-vault-lock-overl
 - `VaultProtectedGate` / `VaultProtectedGateProps` — wraps vault-protected page content; when the
   vault is locked, renders children under fixed blur overlay panel(s) that block interaction while
   excluded chrome (`VaultLockOverlayExclude`) and the status dock (`vc-status-dock-host`) stay usable.
+  Optional `lockedContentStrategy`: `"overlay"` (default, children stay mounted) or `"unmount"` (replace
+  with `lockedFallback` while locked).
+- `VaultSensitiveRegion` / `VaultSensitiveRegionProps` — renders `children` only while unlocked;
+  unmounts sensitive subtree on lock (pair with gate overlay for page UX).
+- `useOnVaultLocked(callback)` — registers a lock cleanup handler from React (wraps
+  `registerVaultLockCleanup`).
 - `VaultLockOverlayExclude` / `VaultLockOverlayExcludeProps` — wrap app chrome (header, nav, dock
   host) that must remain visible and clickable while the vault is locked. Mount as a **sibling**
   outside the gate's inert content. Sets `data-vault-lock-overlay-exclude="true"`.
@@ -372,7 +379,9 @@ decrypt, persist, or render secrets). Do not rely on the overlay or `inert` alon
 
 Props:
 
-- `children` — protected page content (stays mounted while locked).
+- `children` — protected page content (stays mounted while locked unless `lockedContentStrategy="unmount"`).
+- `lockedContentStrategy?` — `"overlay"` (default) or `"unmount"`.
+- `lockedFallback?` — shown while locked when strategy is `"unmount"`.
 - `configured?: boolean | null` — when `false`, redirects to `redirectToSetup`; when `null`, shows
   `loadingFallback`; when omitted or `true`, only lock overlay applies.
 - `redirectToSetup?` / `onRedirectToSetup?(path)` — setup redirect (no redirect on lock).

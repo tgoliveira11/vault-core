@@ -13,6 +13,8 @@ export {
 
 export { useVaultSession, type UseVaultSessionOptions } from "./session/use-vault-session.js";
 
+export { useOnVaultLocked } from "./session/use-on-vault-locked.js";
+
 export {
   VaultSessionProvider,
   type VaultSessionProviderProps,

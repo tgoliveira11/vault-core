@@ -18,7 +18,14 @@ export const INNER_VAULT_KEY_CACHE_MISMATCH_MESSAGE =
 
 let cachedEntry: VaultInnerKeyMaterialCacheEntry | null = null;
 
+function zeroSensitiveBytes(bytes: Uint8Array): void {
+  bytes.fill(0);
+}
+
 export function clearVaultInnerKeyMaterialCache(): void {
+  if (cachedEntry?.inner) {
+    zeroSensitiveBytes(cachedEntry.inner);
+  }
   cachedEntry = null;
 }
 

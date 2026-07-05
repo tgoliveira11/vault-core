@@ -39,8 +39,43 @@ Before marking vault integration complete, verify every item below.
 - [ ] **`VaultProtectedGate` is UX only** (blur + pointer blocking). It is not a security boundary.
 - [ ] Before decrypting or rendering secrets, check **`useVaultUnlocked()`** / **`getSessionVaultKey()`**
   in application logic.
-- [ ] Do not render decrypted vault payload in the React tree while locked; clear sensitive UI state on lock.
+- [ ] **Do not render decrypted vault payload in the React tree while locked** — use
+  **`VaultSensitiveRegion`**, `lockedContentStrategy="unmount"` on the gate, or conditional rendering
+  (`{unlocked ? <Secrets /> : null}`).
+- [ ] Register **`registerVaultLockCleanup()`** or **`useOnVaultLocked()`** to clear app-owned state
+  (React stores, TanStack Query caches, form fields) when `lockVaultSession()` runs.
+- [ ] After lock, integration tests should pass **`assertNoVaultPlaintextInDocument()`** from
+  `@tgoliveira/vault-core/testing` when using sentinel strings in fixtures.
 - [ ] Only pass **non-extractable** UVKs to **`unlockVaultSession()`** (keys from envelope unlock are non-extractable).
+
+**Anti-pattern:** Relying on blur/`inert` while keeping decrypted notes or form values mounted in the DOM.
+
+**Recommended pattern:**
+
+```tsx
+import {
+  VaultProtectedGate,
+  VaultSensitiveRegion,
+  useOnVaultLocked,
+  useVaultUnlocked,
+} from "@tgoliveira/vault-core/react";
+import { registerVaultLockCleanup } from "@tgoliveira/vault-core/browser";
+
+// Module-level store cleanup (non-React)
+registerVaultLockCleanup(() => queryClient.removeQueries({ queryKey: ["vault-plaintext"] }));
+
+function VaultNotesPage() {
+  useOnVaultLocked(() => setLocalDraft(null));
+
+  return (
+    <VaultProtectedGate configured overlayBackground="...">
+      <VaultSensitiveRegion lockedFallback={<p>Unlock the vault to view notes.</p>}>
+        <DecryptedNotes />
+      </VaultSensitiveRegion>
+    </VaultProtectedGate>
+  );
+}
+```
 
 ### 4. Browser hardening
 

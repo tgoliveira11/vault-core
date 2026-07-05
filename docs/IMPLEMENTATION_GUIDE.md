@@ -546,6 +546,7 @@ import {
   configureVaultSession,
   getSessionVaultKey,
   lockVaultSession,
+  registerVaultLockCleanup,
   registerVaultActivityGuard,
   registerVaultUnloadGuard,
   unlockVaultSession,
@@ -563,6 +564,7 @@ const currentKey = getSessionVaultKey();
 
 // On explicit lock or logout:
 lockVaultSession();
+registerVaultLockCleanup(() => clearDecryptedPayloadCache());
 
 // On application teardown:
 // removeActivityGuard?.();
@@ -650,6 +652,51 @@ element instead of the wrapper component.
 but it is not a security boundary. Always check vault unlock status in application code before
 decrypting, persisting, or rendering secrets (`useVaultUnlocked()`, `useVaultSession()`, or
 equivalent). Mount `VaultStatusDock` inside an excluded header region for quick unlock while locked.
+
+#### Lock hygiene (required for production)
+
+`lockVaultSession()` clears the in-memory UVK and inner-key cache. **Consumers must also remove
+decrypted plaintext from the React tree and app-owned stores.**
+
+| Mechanism | Entry | Purpose |
+| --- | --- | --- |
+| Lock cleanup registry | `registerVaultLockCleanup()` (`/browser`) | Sync handlers on every lock (stores, query cache) |
+| React hook | `useOnVaultLocked()` (`/react`) | Register cleanup from components |
+| Sensitive subtree | `VaultSensitiveRegion` (`/react`) | Unmount children while locked |
+| Gate unmount mode | `VaultProtectedGate` `lockedContentStrategy="unmount"` | Replace page content while locked (optional) |
+| Post-lock test | `assertNoVaultPlaintextInDocument()` (`/testing`) | Assert DOM has no sentinel strings |
+
+Default gate behavior remains **`lockedContentStrategy="overlay"`** (children stay mounted). Use
+**overlay for shell UX** + **`VaultSensitiveRegion` for secrets**, or opt into gate unmount for
+whole-page sensitive routes.
+
+```tsx
+import {
+  registerVaultLockCleanup,
+  lockVaultSession,
+} from "@tgoliveira/vault-core/browser";
+import {
+  VaultProtectedGate,
+  VaultSensitiveRegion,
+  useOnVaultLocked,
+} from "@tgoliveira/vault-core/react";
+
+registerVaultLockCleanup(() => {
+  appStore.clearDecryptedVault();
+});
+
+function ProtectedVaultRoute({ children }: { children: React.ReactNode }) {
+  useOnVaultLocked(() => appStore.clearDecryptedVault());
+
+  return (
+    <VaultProtectedGate configured>
+      <VaultSensitiveRegion>{children}</VaultSensitiveRegion>
+    </VaultProtectedGate>
+  );
+}
+```
+
+See [docs/CONSUMER_SECURITY_REQUIREMENTS.md](./CONSUMER_SECURITY_REQUIREMENTS.md) §3.
 
 ### Vault unlock page
 

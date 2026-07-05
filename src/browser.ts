@@ -201,4 +201,9 @@ export {
   type VaultSessionConfig,
 } from "./session/auto-lock.js";
 
+export {
+  registerVaultLockCleanup,
+  type VaultLockCleanupHandler,
+} from "./session/vault-lock-cleanup.js";
+
 export { createRecoveryKitText, buildRecoveryKitContent } from "./recovery/kit.js";

@@ -1,7 +1,12 @@
 export {
   VaultProtectedGate,
   type VaultProtectedGateProps,
+  type VaultLockedContentStrategy,
 } from "./vault-protected-gate.js";
+export {
+  VaultSensitiveRegion,
+  type VaultSensitiveRegionProps,
+} from "./vault-sensitive-region.js";
 export {
   VaultLockOverlayExclude,
   type VaultLockOverlayExcludeProps,

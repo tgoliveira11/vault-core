@@ -7,8 +7,17 @@ import { useVaultUnlocked } from "../session/use-vault-unlocked.js";
 import { shouldVaultLockOverlayExpandDock } from "./should-vault-lock-overlay-expand-dock.js";
 import { useVaultLockOverlayPanels } from "./use-vault-lock-overlay-panels.js";
 
+export type VaultLockedContentStrategy = "overlay" | "unmount";
+
 export type VaultProtectedGateProps = {
   children: ReactNode;
+  /**
+   * When `"overlay"` (default), locked children stay mounted behind blur + `inert`.
+   * When `"unmount"`, `lockedFallback` replaces `children` while locked so sensitive DOM is removed.
+   */
+  lockedContentStrategy?: VaultLockedContentStrategy;
+  /** Shown while locked when `lockedContentStrategy` is `"unmount"`. Defaults to `null`. */
+  lockedFallback?: ReactNode;
   /**
    * Vault setup state. When `false`, redirects to `redirectToSetup`.
    * When `null`, shows `loadingFallback` (use while resolving setup status).
@@ -45,6 +54,8 @@ const DEFAULT_LOADING = (
 /** Wraps vault-protected page content; shows a blur overlay while the vault is locked. */
 export function VaultProtectedGate({
   children,
+  lockedContentStrategy = "overlay",
+  lockedFallback = null,
   configured,
   redirectToSetup,
   onRedirectToSetup,
@@ -125,19 +136,25 @@ export function VaultProtectedGate({
         )
       : null;
 
+  const gateContent =
+    locked && lockedContentStrategy === "unmount" ? lockedFallback : children;
+
   return (
     <div
       className={cn("vc-vault-protected-gate", className)}
       data-vault-protected-locked={locked ? "true" : "false"}
+      data-vault-locked-content-strategy={lockedContentStrategy}
     >
       <div
         className={cn(
           "vc-vault-protected-gate__content",
-          locked && "vc-vault-protected-gate__content--locked"
+          locked && lockedContentStrategy === "overlay" && "vc-vault-protected-gate__content--locked"
         )}
-        {...(locked ? { inert: true as const, "aria-hidden": true } : {})}
+        {...(locked && lockedContentStrategy === "overlay"
+          ? { inert: true as const, "aria-hidden": true }
+          : {})}
       >
-        {children}
+        {gateContent}
       </div>
       {overlay}
     </div>
