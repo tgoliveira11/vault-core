@@ -8,6 +8,18 @@ API changes increment the minor version.
 
 ## [Unreleased]
 
+### Added
+
+- `registerVaultLockCleanup()` on `@tgoliveira/vault-core/browser` — sync app cleanup handlers on `lockVaultSession()`.
+- `useOnVaultLocked()` and `VaultSensitiveRegion` on `@tgoliveira/vault-core/react` — unmount sensitive UI and register lock cleanup from components.
+- `VaultProtectedGate` `lockedContentStrategy` (`"overlay"` default | `"unmount"`) and optional `lockedFallback`.
+- `assertNoVaultPlaintextInDocument()` and `scanDocumentForVaultPlaintextSentinels()` on `@tgoliveira/vault-core/testing` for post-lock DOM checks.
+
+### Changed
+
+- Inner-key material cache zeroes cached `Uint8Array` bytes on `clearVaultInnerKeyMaterialCache()`.
+- Documentation: lock hygiene requirements in `CONSUMER_SECURITY_REQUIREMENTS.md`, `IMPLEMENTATION_GUIDE.md` §12, and `ADOPTING_VAULT_CORE_1_1_0.md` §6.1.
+
 ## [1.1.1] - 2026-07-04
 
 ### Added

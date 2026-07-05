@@ -6,6 +6,7 @@ import {
 } from "./user-auto-lock-preference.js";
 import { isVaultUnlocked, lockVault, setSessionVaultKey } from "./memory-session.js";
 import { clearVaultInnerKeyMaterialCache } from "./inner-key-material-cache.js";
+import { runVaultLockCleanupHandlers } from "./vault-lock-cleanup.js";
 
 export type VaultSessionConfig = {
   autoLockMinutes?: number;
@@ -102,6 +103,7 @@ export function lockVaultSession(): void {
   clearVaultInnerKeyMaterialCache();
   lockVault();
   manuallyLocked = true;
+  runVaultLockCleanupHandlers();
   notifyVaultSessionChange();
 }
 

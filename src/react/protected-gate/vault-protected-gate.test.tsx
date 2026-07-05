@@ -57,6 +57,30 @@ describe("VaultProtectedGate", () => {
     expect(screen.getByText("Protected content").closest("[aria-hidden='true']")).toBeTruthy();
   });
 
+  it("unmounts children when lockedContentStrategy is unmount", () => {
+    render(
+      <VaultProtectedGate configured lockedContentStrategy="unmount">
+        <p>Protected content</p>
+      </VaultProtectedGate>
+    );
+    expect(screen.queryByText("Protected content")).toBeNull();
+    expect(screen.getByTestId("vault-lock-overlay")).toBeTruthy();
+  });
+
+  it("shows lockedFallback when unmount strategy is active", () => {
+    render(
+      <VaultProtectedGate
+        configured
+        lockedContentStrategy="unmount"
+        lockedFallback={<p>Vault is locked</p>}
+      >
+        <p>Protected content</p>
+      </VaultProtectedGate>
+    );
+    expect(screen.getByText("Vault is locked")).toBeTruthy();
+    expect(screen.queryByText("Protected content")).toBeNull();
+  });
+
   it("carves out VaultLockOverlayExclude regions from the overlay", () => {
     const rectSpy = vi
       .spyOn(HTMLElement.prototype, "getBoundingClientRect")

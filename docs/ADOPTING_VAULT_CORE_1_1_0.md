@@ -568,6 +568,27 @@ Reference: [apps/consumer-demo/src/components/vault/vault-status-dock-client.tsx
 
 ---
 
+## 6.1 Lock hygiene (required)
+
+`lockVaultSession()` clears the UVK and inner-key cache in the package. **Consumers must remove
+decrypted plaintext from React state, caches, and the DOM.**
+
+| Mechanism | Entry | Use |
+| --- | --- | --- |
+| `registerVaultLockCleanup` | `@tgoliveira/vault-core/browser` | Clear stores/query cache on lock |
+| `useOnVaultLocked` | `@tgoliveira/vault-core/react` | Same from components |
+| `VaultSensitiveRegion` | `@tgoliveira/vault-core/react` | Unmount secrets subtree while locked |
+| `VaultProtectedGate` `lockedContentStrategy="unmount"` | react | Optional whole-page unmount |
+| `assertNoVaultPlaintextInDocument` | `@tgoliveira/vault-core/testing` | Post-lock integration tests |
+
+Default gate mode remains **overlay** (blur only). Use **overlay + `VaultSensitiveRegion`** for
+typical apps, or gate **unmount** for routes where the entire page is sensitive.
+
+See [IMPLEMENTATION_GUIDE.md](./IMPLEMENTATION_GUIDE.md) §12 and
+[CONSUMER_SECURITY_REQUIREMENTS.md](./CONSUMER_SECURITY_REQUIREMENTS.md) §3.
+
+---
+
 ## 7. Verification checklist (after migration)
 
 - [ ] `@tgoliveira/vault-core` pinned to `^1.1.0`; no imports from `dist/*` or forked crypto files.
@@ -586,6 +607,8 @@ Reference: [apps/consumer-demo/src/components/vault/vault-status-dock-client.tsx
 - [ ] Enable/disable/rewrap paths do **not** call `prepareAuthenticationOptions` (or similar) without vault-core PRF prep.
 - [ ] Dock passkey auto-start waits for `passkeyOptionsReady`; cancel does not spuriously redirect.
 - [ ] `classifyPasskeyCryptoError` messages shown on crypto failure; dock uses `classifyPasskeyUnlockFailure`.
+- [ ] Lock clears app state via `registerVaultLockCleanup` / `useOnVaultLocked`; secrets unmounted via `VaultSensitiveRegion` or gate `unmount`.
+- [ ] Post-lock tests pass `assertNoVaultPlaintextInDocument()` when using testing sentinels.
 - [ ] PRF output and UVK absent from network payloads, logs, localStorage, IndexedDB
       ([CONSUMER_SECURITY_REQUIREMENTS.md](./CONSUMER_SECURITY_REQUIREMENTS.md)).
 - [ ] `npm run validate` / app test suite green.

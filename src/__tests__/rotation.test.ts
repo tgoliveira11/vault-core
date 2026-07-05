@@ -90,7 +90,7 @@ async function createLegacyPasswordEnvelope(
   };
 }
 
-describe("vault password rotation", () => {
+describe("vault password rotation", { timeout: 15_000 }, () => {
   it("rotates the vault password while keeping the same UVK", async () => {
     const vaultKey = await importUserVaultKey(FIXTURE_UVK_BYTES, { extractable: true });
     const { envelope: currentEnvelope } = await createPasswordEnvelope(

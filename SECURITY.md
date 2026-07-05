@@ -21,7 +21,8 @@ objects and arrays and safely handles cyclic in-memory objects.
 
 - Decrypted vault payload in localStorage or IndexedDB
 
-Browser session helpers clear UVK on lock and `pagehide`. Envelope unlock restores a
+Browser session helpers clear UVK on lock and `pagehide`, run registered lock cleanup handlers,
+and zero inner-key cache bytes before dropping references. Envelope unlock restores a
 **non-extractable** session UVK; envelope wrap uses AES-KW (Web Crypto `wrapKey` / `unwrapKey`) so
 raw key bytes are not exported during re-wrap when the inner blob is reused. Legacy envelopes that
 store 32 raw bytes after the outer decrypt remain unlockable. React session helpers also renew the

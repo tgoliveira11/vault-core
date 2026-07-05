@@ -2,7 +2,7 @@
 
 Living inventory of what `@tgoliveira/vault-core` exposes today. Update this file when exports, admin screens, published artifacts, or shipped/planned status changes.
 
-Last reviewed: **2026-07-04** (package version **1.1.0**, PRF ceremony prep docs + composed helper)
+Last reviewed: **2026-07-05** (package version **1.1.1**, lock hygiene APIs)
 
 ## Package entry points (shipped)
 
@@ -119,6 +119,21 @@ on `lockVaultSession()` / `lockVaultSessionManually()` — never persisted to st
 | `createPasskeyPrfEnvelopeWithSessionCache` | Create passkey envelope using cache when `innerVaultKeyBlob` omitted |
 | `INNER_VAULT_KEY_CACHE_MISMATCH_MESSAGE` | Actionable error when cached material is stale |
 
+Inner-key `Uint8Array` bytes are zeroed before the cache entry is dropped on clear.
+
+## Browser lock cleanup (shipped)
+
+| Export | Purpose |
+| --- | --- |
+| `registerVaultLockCleanup` | Register sync handlers invoked on `lockVaultSession()` after UVK/cache clear |
+
+## Testing lock hygiene (shipped)
+
+| Export | Purpose |
+| --- | --- |
+| `assertNoVaultPlaintextInDocument` | Throws when testing sentinels appear in DOM text after lock |
+| `scanDocumentForVaultPlaintextSentinels` | Non-throwing scan for integration tests |
+
 ## Vault status dock (shipped)
 
 Exported from `@tgoliveira/vault-core/react` (styles: `vc-status-dock-*` in `vault-admin.css`):
@@ -144,7 +159,9 @@ in `vault-admin.css`):
 
 | Export | Purpose |
 | --- | --- |
-| `VaultProtectedGate` | Blur overlay on protected pages while locked; blocks interaction; Enter expands dock |
+| `VaultProtectedGate` | Blur overlay on protected pages while locked; optional `lockedContentStrategy="unmount"` |
+| `VaultSensitiveRegion` | Unmount sensitive subtree while locked |
+| `useOnVaultLocked` | React hook wrapping lock cleanup registry |
 | `VaultLockOverlayExclude` | Marks header/nav chrome that stays above the overlay while locked |
 | `shouldVaultLockOverlayExpandDock` | Enter-key guard (skips editable fields) |
 | `computeVaultLockOverlayPanels` | Viewport overlay geometry minus exclusion holes |
@@ -152,7 +169,8 @@ in `vault-admin.css`):
 | `VAULT_LOCK_OVERLAY_EXCLUDE_SELECTOR` | Query selector for registered exclusion regions |
 
 Props: `configured?`, `redirectToSetup?`, `onRedirectToSetup?`, `onExpandDock?`, `loadingFallback?`,
-`overlayClassName?`, `overlayBackground?` (sets `--vc-vault-lock-overlay-color`).
+`overlayClassName?`, `overlayBackground?`, `lockedContentStrategy?` (`"overlay"` default | `"unmount"`),
+`lockedFallback?`.
 Redirect applies only when the vault is not configured — not when locked. Wrap app chrome in
 `VaultLockOverlayExclude` (sibling above the gate); mount `VaultStatusDock` inside that excluded header.
 

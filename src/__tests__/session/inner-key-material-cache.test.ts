@@ -64,6 +64,34 @@ describe("inner-key-material-cache", () => {
     expect(getCachedVaultInnerKeyMaterial()).toBeNull();
   });
 
+  it("zeroes cached inner bytes on clear", async () => {
+    clearVaultInnerKeyMaterialCache();
+    const vaultKey = await createUserVaultKey();
+    const { envelope } = await createPasswordEnvelope(
+      vaultKey,
+      FIXTURE_VAULT_PASSWORD,
+      LIQSENSE_COMPAT_SCOPE,
+      LIQSENSE_COMPAT_PROFILE,
+      FIXTURE_ARGON2_SALT
+    );
+    const keys = await deriveVaultPasswordKeyPairFromMetadata(
+      FIXTURE_VAULT_PASSWORD,
+      envelope.kdfMetadata
+    );
+    const inner = await extractInnerVaultKeyBlob(
+      envelope.encryptedVaultKey,
+      keys.encryptionKey
+    );
+
+    await cacheVaultInnerKeyMaterialFromEnvelopeDecrypt(
+      inner,
+      keys.wrappingKey,
+      vaultKey
+    );
+    clearVaultInnerKeyMaterialCache();
+    expect([...inner]).toEqual(new Array(inner.length).fill(0));
+  });
+
   it("resolveInnerVaultKeyBlobForWrap returns cached inner when valid", async () => {
     const vaultKey = await createUserVaultKey();
     const { envelope } = await createPasswordEnvelope(
