@@ -8,6 +8,8 @@ API changes increment the minor version.
 
 ## [Unreleased]
 
+## [1.1.2] - 2026-07-05
+
 ### Added
 
 - `registerVaultLockCleanup()` on `@tgoliveira/vault-core/browser` — sync app cleanup handlers on `lockVaultSession()`.
