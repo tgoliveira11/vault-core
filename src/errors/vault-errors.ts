@@ -87,6 +87,13 @@ export class VaultPayloadValidationError extends Error {
   }
 }
 
+export class VaultEmergencyDecryptError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = "VaultEmergencyDecryptError";
+  }
+}
+
 export type VaultCoreError =
   | VaultPlaintextRejectionError
   | VaultConflictError
@@ -99,4 +106,5 @@ export type VaultCoreError =
   | VaultRateLimitError
   | VaultKeyNotExtractableError
   | VaultPayloadSizeError
-  | VaultPayloadValidationError;
+  | VaultPayloadValidationError
+  | VaultEmergencyDecryptError;

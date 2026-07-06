@@ -1,7 +1,7 @@
 "use client";
 
 import { useRouter, useSearchParams } from "next/navigation";
-import { Suspense, useCallback, useEffect, useState } from "react";
+import { Suspense, useCallback, useEffect, useRef, useState } from "react";
 import {
   VaultUnlockPanel,
   readVaultUnlockReturnPath,
@@ -9,11 +9,13 @@ import {
 } from "@tgoliveira/vault-core/react";
 import { AppShell } from "@/components/app-shell";
 import {
+  hydrateDemoEmergencyFromServer,
   isDemoPasskeyUnlockAvailable,
   unlockDemoVault,
   unlockDemoVaultWithPasskey,
   unlockDemoVaultWithRecoveryPhrase,
 } from "@/lib/vault-demo-crypto";
+import { getDemoServerStatusSnapshot } from "@/lib/vault-demo-emergency-store";
 import { getDemoPasskeySupport } from "@/lib/vault-demo-passkey";
 import { isVaultConfigured, loadVaultRecord } from "@/lib/vault-demo-store";
 import { getDemoVaultUnlockRateLimiter } from "@/lib/vault-rate-limit";
@@ -23,16 +25,23 @@ function VaultUnlockForm() {
   const searchParams = useSearchParams();
   const returnPath = readVaultUnlockReturnPath(searchParams, { defaultPath: "/vault" });
   const [configured, setConfigured] = useState<boolean | null>(null);
-  const [hasPasskeyEnvelope, setHasPasskeyEnvelope] = useState(false);
+  const [serverStatus, setServerStatus] = useState(
+    getDemoServerStatusSnapshot(false, false)
+  );
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  const duressSignaledRef = useRef(false);
   const passkeySupport = getDemoPasskeySupport();
   const passkeyReady = isDemoPasskeyUnlockAvailable();
 
   useEffect(() => {
-    setConfigured(isVaultConfigured());
+    hydrateDemoEmergencyFromServer();
+    const vaultConfigured = isVaultConfigured();
+    setConfigured(vaultConfigured);
     const record = loadVaultRecord();
-    setHasPasskeyEnvelope(Boolean(record?.passkeyPrfEnvelope));
+    setServerStatus(
+      getDemoServerStatusSnapshot(vaultConfigured, Boolean(record?.passkeyPrfEnvelope))
+    );
   }, []);
 
   useVaultUnlockPageNavigation({
@@ -72,7 +81,10 @@ function VaultUnlockForm() {
   );
 
   const handleUnlockPasskey = useCallback(
-    () => runUnlock(() => unlockDemoVaultWithPasskey()),
+    () =>
+      runUnlock(() =>
+        unlockDemoVaultWithPasskey({ duressSignaled: duressSignaledRef.current })
+      ),
     [runUnlock]
   );
 
@@ -95,10 +107,7 @@ function VaultUnlockForm() {
           error={error}
           unlockRateLimiter={getDemoVaultUnlockRateLimiter()}
           rateLimitScopeKey="demo"
-          serverStatus={{
-            configured,
-            hasPasskeyPrfEnvelope: hasPasskeyEnvelope,
-          }}
+          serverStatus={serverStatus}
           prfSupported={passkeySupport.prf}
           passkeyReady={passkeyReady}
           onUnlockPassword={handleUnlockPassword}

@@ -11,6 +11,7 @@ import {
 } from "../../rate-limit/vault-unlock-rate-limit.js";
 import { resolveVaultDockPasskeyAvailability } from "./resolve-passkey-dock-availability.js";
 import type { VaultServerStatusSnapshot } from "../status/resolve-vault-client-status.js";
+import { useLongPressDuressSignal } from "../emergency/use-long-press-duress-signal.js";
 
 export type VaultDockQuickUnlockLabels = {
   vaultPassword: string;
@@ -62,6 +63,12 @@ export type VaultDockQuickUnlockProps = {
    * On iOS, expand-click auto-start may still fail; the explicit passkey button is reliable.
    */
   autoStartPasskey?: boolean;
+  /** Latched duress signal from dock handle long-press (combined with button long-press). */
+  duressSignaled?: boolean;
+  /** Called when combined duress latch changes. */
+  onDuressSignalChange?: (signaled: boolean) => void;
+  /** Reset duress latch from parent after unlock attempt. */
+  resetDuressSignal?: () => void;
   unlockRateLimiter?: VaultUnlockRateLimiter;
   rateLimitScopeKey?: string;
   /** Optional alert slot for styled error output. */
@@ -92,6 +99,9 @@ export function VaultDockQuickUnlock({
   bindAutoStartPasskey,
   autoFocusPassword = true,
   autoStartPasskey = true,
+  duressSignaled: externalDuressSignaled = false,
+  onDuressSignalChange,
+  resetDuressSignal: externalResetDuressSignal,
   unlockRateLimiter,
   rateLimitScopeKey = "default",
   renderError = (message) => <DefaultError message={message} />,
@@ -102,6 +112,8 @@ export function VaultDockQuickUnlock({
   const passwordInputRef = useRef<HTMLInputElement>(null);
   const { hasEnvelope, showPasskey, prfExplicitlyUnsupported } =
     resolveVaultDockPasskeyAvailability(serverStatus);
+  const passkeyDuress = useLongPressDuressSignal();
+  const combinedDuressSignaled = externalDuressSignaled || passkeyDuress.duressSignaled;
   const passwordId = `${idPrefix}-vault-password`;
   const usePasskeyPrimary = hasEnvelope;
   const displayedError = rateLimitError ?? error;
@@ -129,6 +141,10 @@ export function VaultDockQuickUnlock({
       throw caught;
     }
   }
+
+  useLayoutEffect(() => {
+    onDuressSignalChange?.(combinedDuressSignaled);
+  }, [combinedDuressSignaled, onDuressSignalChange]);
 
   async function submitPassword() {
     if (!vaultPassword) return;
@@ -208,6 +224,10 @@ export function VaultDockQuickUnlock({
           className="vc-status-dock__action vc-status-dock__action--subtle vc-status-dock-unlock__submit"
           disabled={loading || !passkeyReady}
           onClick={() => void submitPasskey()}
+          onPointerDown={passkeyDuress.onPointerDown}
+          onPointerUp={passkeyDuress.onPointerUp}
+          onPointerLeave={passkeyDuress.onPointerLeave}
+          onPointerCancel={passkeyDuress.onPointerCancel}
         >
           {loading ? labels.unlocking : labels.unlockWithPasskey}
         </button>

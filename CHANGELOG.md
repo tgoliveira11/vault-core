@@ -8,6 +8,29 @@ API changes increment the minor version.
 
 ## [Unreleased]
 
+### Added
+
+- **Emergency / duress mode** — cryptographic decoy vault with session pinning, constant-time duress
+  sequence detection, emergency-aware unlock routing, and recovery-gated exit.
+- Core: `vaultDecoyRecordSchema`, `vaultSetupWithDecoySchema`, `vaultEmergencyServerMetadataSchema`,
+  `containsDuressSequence()`, `createDecoyVaultSetup()`, `resolveVaultUnlockTarget()`,
+  `decryptVaultPayloadForSession()`, `DuressPasswordMissingSequenceError`, `VaultEmergencyDecryptError`.
+- Browser: `VaultSessionMode`, `getVaultSessionMode()`, `isVaultEmergencyMode()`,
+  `enterVaultEmergencyMode()`, `unlockVaultWithPasswordRouting()`, `unlockVaultWithPasskeyRouting()`,
+  `exitEmergencyMode()`, `hydrateVaultEmergencyModeFromServer()`.
+- React: `useLongPressDuressSignal`, `VaultServerStatusSnapshot` emergency fields,
+  `emergency_locked` / `emergency_unlocked` client status, dock long-press + 2 s passkey auto-start delay.
+- Testing: `assertVaultSessionMode`, `createPrimaryDecoyVaultFixture`, honey/primary sentinels.
+- Rate limit action key: `emergency_exit`.
+- Consumer-demo: decoy enrollment, emergency exit flow, honey templates, hydration wiring.
+- Docs: [`docs/INTEGRATING_EMERGENCY_DURESS_MODE.md`](docs/INTEGRATING_EMERGENCY_DURESS_MODE.md) —
+  phased consumer integration guide (enrollment, routing, dock, exit, testing).
+
+### Security
+
+- Primary `encryptedBlob` decrypt is refused while emergency mode is active.
+- Exit emergency mode requires primary recovery phrase (optional consumer-validated email OTP).
+
 ## [1.1.2] - 2026-07-05
 
 ### Added

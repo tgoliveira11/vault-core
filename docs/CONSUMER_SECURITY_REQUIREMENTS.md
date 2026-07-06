@@ -33,6 +33,13 @@ Before marking vault integration complete, verify every item below.
 - [ ] Keep **account login** and **vault unlock** as separate security domains.
 - [ ] Validate decrypted vault JSON with **`decryptVaultPayloadWithSchema()`** and an app-owned Zod
   schema — do not trust ciphertext shape after schema migrations or tampering.
+- [ ] When emergency/duress mode is enabled, use **`unlockVaultWithPasswordRouting()`** /
+  **`unlockVaultWithPasskeyRouting()`** and **`decryptVaultPayloadForSession()`** — never decrypt the
+  primary `encryptedBlob` while `emergencyModeActive` is set.
+- [ ] Persist **`emergencyModeActive`** server-side; hydrate with **`hydrateVaultEmergencyModeFromServer()`**
+  on authenticated load. Clear the flag only through **`exitEmergencyMode()`** (primary recovery phrase).
+- [ ] Rate-limit **`emergency_exit`** unlock action separately from password/passkey unlock.
+- [ ] Wire dock **`onDuressSignalChange`** / long-press latch into passkey unlock orchestration.
 
 ### 3. Locked vs unlocked access in application code
 

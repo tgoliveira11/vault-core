@@ -68,6 +68,7 @@ function renderDock(overrides: Partial<ComponentProps<typeof VaultStatusDock>> =
         pathname="/vault"
         unlockPath="/vault/unlock"
         autoLockMinutes={15}
+        passkeyAutoStartDelayMs={0}
         collapsedPreferenceKey="test:dock:collapsed"
         renderQuickUnlock={({
           loading,
@@ -121,6 +122,23 @@ describe("VaultStatusDock", () => {
     expect(time).toBeTruthy();
     expect(time?.className).toContain("vc-status-dock-handle__time--reserved");
     expect(time?.getAttribute("aria-hidden")).toBe("true");
+  });
+
+  it("renders emergency locked state from server snapshot", () => {
+    renderDock({
+      serverStatus: { configured: true, emergencyModeActive: true, decoyConfigured: true },
+    });
+    expect(screen.getByText("Vault locked")).toBeTruthy();
+  });
+
+  it("renders unlocked panel when emergency unlocked", async () => {
+    const key = await createNonExtractableSessionVaultKey();
+    await unlockVaultSession(key, { role: "decoy" });
+    renderDock({
+      serverStatus: { configured: true, emergencyModeActive: true, decoyConfigured: true },
+    });
+    fireEvent.click(screen.getByTestId("vault-status-dock-handle"));
+    expect(screen.getAllByText("Vault open").length).toBeGreaterThan(0);
   });
 
   it("expands locked panel with quick unlock", () => {
@@ -523,6 +541,56 @@ describe("VaultStatusDock", () => {
       expect(onNavigateToUnlock).toHaveBeenCalledWith("/vault/unlock?next=%2Fvault");
     });
     vi.restoreAllMocks();
+  });
+
+  it("delays passkey auto-start by passkeyAutoStartDelayMs", async () => {
+    vi.useFakeTimers();
+    try {
+      vi.spyOn(browser, "isPrfExtensionSupported").mockReturnValue(true);
+      const onUnlockPasskey = vi.fn().mockResolvedValue(undefined);
+
+      render(
+        <div className="vc-status-dock-host">
+          <VaultStatusDock
+            serverStatus={{ configured: true, hasPasskeyPrfEnvelope: true }}
+            prfSupported
+            pathname="/vault"
+            unlockPath="/vault/unlock"
+            autoLockMinutes={15}
+            passkeyAutoStartDelayMs={2000}
+            collapsedPreferenceKey="test:dock:delay"
+            renderQuickUnlock={({
+              bindAutoStartPasskey,
+              onPasskeyUnlockFailed,
+              onPasskeyUnlockCancelled,
+            }) => (
+              <VaultDockQuickUnlock
+                serverStatus={{ configured: true, hasPasskeyPrfEnvelope: true }}
+                onUnlockPassword={vi.fn()}
+                onUnlockPasskey={onUnlockPasskey}
+                passkeyReady
+                passkeyOptionsReady
+                bindAutoStartPasskey={bindAutoStartPasskey}
+                onPasskeyUnlockFailed={onPasskeyUnlockFailed}
+                onPasskeyUnlockCancelled={onPasskeyUnlockCancelled}
+              />
+            )}
+          />
+        </div>
+      );
+
+      fireEvent.click(screen.getByTestId("vault-status-dock-handle"));
+      expect(onUnlockPasskey).not.toHaveBeenCalled();
+
+      await act(async () => {
+        vi.advanceTimersByTime(2000);
+      });
+
+      expect(onUnlockPasskey).toHaveBeenCalledTimes(1);
+    } finally {
+      vi.useRealTimers();
+      vi.restoreAllMocks();
+    }
   });
 
   it("dedupes passkey auto-start across quick-unlock remount", async () => {

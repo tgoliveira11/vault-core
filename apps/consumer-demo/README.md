@@ -59,7 +59,8 @@ Open http://localhost:3013
 | `/vault/setup` | Client vault setup (password + recovery phrase) |
 | `/vault/unlock` | Unlock vault (password, recovery phrase, or passkey when linked); honors `?next=` return path |
 | `/vault` | Client vault — notes demo; requires unlocked session |
-| `/vault/settings` | Change password, rotate recovery phrase, link passkey, KDF upgrade |
+| `/vault/settings` | Change password, rotate recovery phrase, link passkey, KDF upgrade, decoy enrollment |
+| `/vault/emergency-exit` | Exit emergency mode (primary recovery phrase + optional mock email OTP) |
 | `/admin/vault` | `VaultAdminPanelPage` (requires mock admin sign-in) |
 | `/admin/login` | Mock admin email gate (`DEMO_ADMIN_EMAIL`) |
 | `/admin/vault/config` | `VaultAdminConfigPage` |
@@ -92,6 +93,10 @@ Decrypted vault payloads use `decryptVaultPayloadWithSchema()` with `demoVaultPa
 
 See [docs/CONSUMER_SECURITY_REQUIREMENTS.md](../../docs/CONSUMER_SECURITY_REQUIREMENTS.md) for
 production integration requirements.
+
+Emergency / duress mode wiring is documented in
+[docs/INTEGRATING_EMERGENCY_DURESS_MODE.md](../../docs/INTEGRATING_EMERGENCY_DURESS_MODE.md) §10
+(consumer-demo file map).
 
 Admin pages are thin re-exports in `src/app/admin/vault/*` using `getVaultAdminPageProps()` from `src/lib/vault-admin-page-props.ts`.
 

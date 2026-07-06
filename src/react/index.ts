@@ -35,3 +35,9 @@ export * from "./password/index.js";
 export * from "./protected-gate/index.js";
 export * from "./status-dock/index.js";
 export * from "./unlock/index.js";
+
+export {
+  useLongPressDuressSignal,
+  type UseLongPressDuressSignalOptions,
+  type UseLongPressDuressSignalResult,
+} from "./emergency/use-long-press-duress-signal.js";

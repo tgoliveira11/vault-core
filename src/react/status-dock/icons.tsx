@@ -67,8 +67,10 @@ export function VaultStatusIcon({ status }: { status: VaultClientStatus }) {
       return <VaultStatusIconError />;
     case "locked":
     case "unsupported_prf":
+    case "emergency_locked":
       return <VaultStatusIconLocked />;
     case "unlocked":
+    case "emergency_unlocked":
       return <VaultStatusIconUnlocked />;
   }
 }

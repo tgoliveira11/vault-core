@@ -26,6 +26,7 @@ import {
   upgradeDemoRecoveryEnvelope,
   type VaultSecuritySnapshot,
 } from "@/lib/vault-demo-security";
+import { DecoyEnrollmentSection } from "@/components/vault/decoy-enrollment-section";
 
 function formatSecurityError(error: unknown): string {
   if (error instanceof Error) {
@@ -147,6 +148,14 @@ function VaultSettingsContent({
           </section>
 
           <AutoLockSection adminAutoLockMinutes={adminAutoLockMinutes} />
+
+          <DecoyEnrollmentSection
+            busy={busy}
+            onComplete={() => {
+              refresh();
+              setMessage("Decoy vault configured.");
+            }}
+          />
 
           <PasswordChangeSection
             busy={busy}

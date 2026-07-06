@@ -55,6 +55,9 @@ import {
 import { buildVaultUnlockHref } from "../unlock/vault-unlock-routes.js";
 import { navigateToVaultFullUnlock } from "./navigate-to-full-unlock.js";
 import { tryConsumePasskeyAutoStart } from "./passkey-auto-start-dedupe.js";
+import { useLongPressDuressSignal } from "../emergency/use-long-press-duress-signal.js";
+
+const DEFAULT_PASSKEY_AUTO_START_DELAY_MS = 2000;
 
 const DEFAULT_PASSKEY_REDIRECT_KINDS: PasskeyUnlockFailureKind[] = ["redirect_to_full_unlock"];
 
@@ -119,6 +122,13 @@ export type VaultStatusDockProps = {
   onNavigateToUnlock?: (href: string) => void;
   /** Invoked when dock passkey unlock is cancelled (no redirect by default). */
   onPasskeyUnlockCancelled?: (error: unknown) => void;
+  /**
+   * Delay (ms) before passkey auto-start after dock expand. Default 2000 ms so long-press on the
+   * handle can complete before the ceremony starts. Set to 0 for immediate auto-start (tests).
+   */
+  passkeyAutoStartDelayMs?: number;
+  /** Notified when the long-press duress latch changes (handle or passkey button). */
+  onDuressSignalChange?: (signaled: boolean) => void;
   /** Custom quick-unlock slot; defaults to none (link to full unlock only). */
   renderQuickUnlock?: (context: {
     loading: boolean;
@@ -137,6 +147,9 @@ export type VaultStatusDockProps = {
     bindAutoStartPasskey: (handler: (() => void) | null) => void;
     /** Whether passkey auto-start was already consumed for this expand (dedupe). */
     autoStartConsumed: boolean;
+    /** Latched long-press duress signal for this expand/unlock attempt. */
+    duressSignaled: boolean;
+    resetDuressSignal: () => void;
   }) => ReactNode;
 };
 
@@ -147,8 +160,10 @@ function cn(...parts: Array<string | false | null | undefined>): string {
 function iconToneClass(clientStatus: VaultClientStatus): string {
   switch (clientStatus) {
     case "unlocked":
+    case "emergency_unlocked":
       return "vc-status-dock__icon--open";
     case "locked":
+    case "emergency_locked":
     case "unsupported_prf":
       return "vc-status-dock__icon--closed";
     default:
@@ -159,8 +174,10 @@ function iconToneClass(clientStatus: VaultClientStatus): string {
 function handleToneClass(clientStatus: VaultClientStatus): string {
   switch (clientStatus) {
     case "unlocked":
+    case "emergency_unlocked":
       return "vc-status-dock-handle--open";
     case "locked":
+    case "emergency_locked":
     case "unsupported_prf":
       return "vc-status-dock-handle--closed";
     default:
@@ -204,6 +221,8 @@ export function VaultStatusDock({
   shouldRedirectOnPasskeyUnlockFailure,
   onNavigateToUnlock,
   onPasskeyUnlockCancelled,
+  passkeyAutoStartDelayMs = DEFAULT_PASSKEY_AUTO_START_DELAY_MS,
+  onDuressSignalChange,
   renderQuickUnlock,
 }: VaultStatusDockProps) {
   const labels = { ...DEFAULT_VAULT_STATUS_DOCK_LABELS, ...labelOverrides };
@@ -213,7 +232,7 @@ export function VaultStatusDock({
   const matchesFullUnlockPage =
     isFullUnlockPage ?? createVaultFullUnlockPageMatcher(unlockPath);
   const onFullUnlockPage = matchesFullUnlockPage(pathname);
-  const isOpen = clientStatus === "unlocked";
+  const isOpen = clientStatus === "unlocked" || clientStatus === "emergency_unlocked";
   const resolvedAutoLockMinutes = useVaultAutoLockMinutes(autoLockMinutes);
   const countdown = useVaultAutoLockCountdown(isOpen, resolvedAutoLockMinutes);
   const lockFraction = useVaultAutoLockFraction(isOpen, resolvedAutoLockMinutes);
@@ -223,7 +242,9 @@ export function VaultStatusDock({
   const autoStartHandlerRef = useRef<(() => void) | null>(null);
   const pendingAutoStartRef = useRef(false);
   const autoStartConsumedRef = useRef(false);
+  const autoStartTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const autoStartScopeKey = `${collapsedPreferenceKey}:passkey-auto-start`;
+  const handleDuress = useLongPressDuressSignal();
   const [expansion, setExpansion] = useState<{
     status: VaultClientStatus;
     expanded: boolean;
@@ -242,7 +263,12 @@ export function VaultStatusDock({
 
   const expanded = useMemo(() => {
     if (clientStatus === "not_setup" || clientStatus === "error") return false;
-    if (onFullUnlockPage && (clientStatus === "locked" || clientStatus === "unsupported_prf")) {
+    if (
+      onFullUnlockPage &&
+      (clientStatus === "locked" ||
+        clientStatus === "unsupported_prf" ||
+        clientStatus === "emergency_locked")
+    ) {
       return false;
     }
     if (expansion?.status === clientStatus) return expansion.expanded;
@@ -256,8 +282,17 @@ export function VaultStatusDock({
     writeVaultStatusDockCollapsedPreference(true, collapsedPreferenceKey);
     autoStartConsumedRef.current = false;
     pendingAutoStartRef.current = false;
+    if (autoStartTimerRef.current) {
+      clearTimeout(autoStartTimerRef.current);
+      autoStartTimerRef.current = null;
+    }
+    handleDuress.resetDuressSignal();
     handleRef.current?.focus();
-  }, [clientStatus, collapsedPreferenceKey]);
+  }, [clientStatus, collapsedPreferenceKey, handleDuress]);
+
+  useEffect(() => {
+    onDuressSignalChange?.(handleDuress.duressSignaled);
+  }, [handleDuress.duressSignaled, onDuressSignalChange]);
 
   const triggerPasskeyAutoStart = useCallback(() => {
     if (autoStartConsumedRef.current) return;
@@ -267,19 +302,34 @@ export function VaultStatusDock({
     }
     autoStartConsumedRef.current = true;
     pendingAutoStartRef.current = true;
-    if (autoStartHandlerRef.current) {
+
+    const fire = () => {
+      if (!autoStartHandlerRef.current) return;
       pendingAutoStartRef.current = false;
       autoStartHandlerRef.current();
+    };
+
+    if (passkeyAutoStartDelayMs <= 0) {
+      fire();
+      return;
     }
-  }, [autoStartScopeKey]);
+
+    if (autoStartTimerRef.current) {
+      clearTimeout(autoStartTimerRef.current);
+    }
+    autoStartTimerRef.current = setTimeout(() => {
+      autoStartTimerRef.current = null;
+      fire();
+    }, passkeyAutoStartDelayMs);
+  }, [autoStartScopeKey, passkeyAutoStartDelayMs]);
 
   const bindAutoStartPasskey = useCallback((handler: (() => void) | null) => {
     autoStartHandlerRef.current = handler;
-    if (handler && pendingAutoStartRef.current) {
+    if (handler && pendingAutoStartRef.current && passkeyAutoStartDelayMs <= 0) {
       pendingAutoStartRef.current = false;
       handler();
     }
-  }, []);
+  }, [passkeyAutoStartDelayMs]);
 
   const expand = useCallback(() => {
     suppressVaultActivity();
@@ -292,7 +342,13 @@ export function VaultStatusDock({
 
   useLayoutEffect(() => {
     if (!expanded || onFullUnlockPage) return;
-    if (clientStatus !== "locked" && clientStatus !== "unsupported_prf") return;
+    if (
+      clientStatus !== "locked" &&
+      clientStatus !== "unsupported_prf" &&
+      clientStatus !== "emergency_locked"
+    ) {
+      return;
+    }
     if (!quickUnlockEnabled || serverStatus?.configured !== true) return;
     triggerPasskeyAutoStart();
   }, [
@@ -308,7 +364,9 @@ export function VaultStatusDock({
     if (
       !expanded ||
       !panelRef.current ||
-      (clientStatus !== "locked" && clientStatus !== "unsupported_prf") ||
+      (clientStatus !== "locked" &&
+        clientStatus !== "unsupported_prf" &&
+        clientStatus !== "emergency_locked") ||
       onFullUnlockPage
     ) {
       return;
@@ -327,14 +385,18 @@ export function VaultStatusDock({
     if (!expanded) return;
     if (
       previous === "unlocked" &&
-      (clientStatus === "locked" || clientStatus === "unsupported_prf")
+      (clientStatus === "locked" ||
+        clientStatus === "unsupported_prf" ||
+        clientStatus === "emergency_locked")
     ) {
       collapse();
       return;
     }
     if (
-      (previous === "locked" || previous === "unsupported_prf") &&
-      clientStatus === "unlocked"
+      (previous === "locked" ||
+        previous === "unsupported_prf" ||
+        previous === "emergency_locked") &&
+      (clientStatus === "unlocked" || clientStatus === "emergency_unlocked")
     ) {
       collapse();
     }
@@ -393,7 +455,9 @@ export function VaultStatusDock({
   const passkeyAvailability = resolveVaultDockPasskeyAvailability(serverStatus);
   const showQuickUnlock =
     quickUnlockEnabled &&
-    (status === "locked" || status === "unsupported_prf") &&
+    (status === "locked" ||
+      status === "unsupported_prf" ||
+      status === "emergency_locked") &&
     serverStatus?.configured === true;
   const fullUnlockLinkLabel =
     passkeyAvailability.hasEnvelope && !passkeyAvailability.showPasskey
@@ -430,6 +494,10 @@ export function VaultStatusDock({
         aria-expanded={handleExpanded}
         aria-label={handleExpanded ? labels.collapseAriaLabel : labels.expandAriaLabel}
         onClick={handleExpanded ? undefined : expand}
+        onPointerDown={handleDuress.onPointerDown}
+        onPointerUp={handleDuress.onPointerUp}
+        onPointerLeave={handleDuress.onPointerLeave}
+        onPointerCancel={handleDuress.onPointerCancel}
       >
         <span className={cn("vc-status-dock-handle__icon", iconToneClass(status))}>
           <VaultStatusIcon status={status} />
@@ -454,7 +522,7 @@ export function VaultStatusDock({
     return renderHandle(false);
   }
 
-  if (status === "unlocked") {
+  if (status === "unlocked" || status === "emergency_unlocked") {
     const ringCircumference = 2 * Math.PI * 16;
     const ringOffset = lockFraction === null ? 0 : ringCircumference * (1 - lockFraction);
     const stayMinutes = resolvedAutoLockMinutes;
@@ -552,6 +620,8 @@ export function VaultStatusDock({
             onPasskeyUnlockCancelled: handlePasskeyUnlockCancelled,
             bindAutoStartPasskey,
             autoStartConsumed: autoStartConsumedRef.current,
+            duressSignaled: handleDuress.duressSignaled,
+            resetDuressSignal: handleDuress.resetDuressSignal,
           })}
           <p className="vc-status-dock-panel__fallback">
             <Link

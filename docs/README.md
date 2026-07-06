@@ -10,6 +10,8 @@ Use this page as the documentation router for `@tgoliveira/vault-core`.
   migration for an application that already has vault code or stored ciphertext.
 - [`ADOPTING_VAULT_CORE_1_1_0.md`](ADOPTING_VAULT_CORE_1_1_0.md): upgrade from 1.0.x — passkey PRF
   epic (#8–#16), duplicate removal, dock wiring, legacy AAD sunset.
+- [`INTEGRATING_EMERGENCY_DURESS_MODE.md`](INTEGRATING_EMERGENCY_DURESS_MODE.md): emergency / duress
+  mode — decoy vault enrollment, unlock routing, dock long-press, exit flow.
 - [`../apps/consumer-demo/README.md`](../apps/consumer-demo/README.md): runnable local reference app
   (not published to npm).
 - [`../API_REFERENCE.md`](../API_REFERENCE.md): public entry points and their security preconditions.
@@ -25,6 +27,12 @@ Use this page as the documentation router for `@tgoliveira/vault-core`.
 - [`RELEASING.md`](RELEASING.md): redirect to `publishing.md`.
 - [`../CHANGELOG.md`](../CHANGELOG.md): released and unreleased consumer-visible changes.
 - [`../ARCHITECTURE.md`](../ARCHITECTURE.md): package layers and cryptographic data flow.
+
+## Architecture decisions
+
+- [`adr/README.md`](adr/README.md): ADR index and format.
+- [`adr/0001-emergency-duress-mode.md`](adr/0001-emergency-duress-mode.md): emergency / duress mode
+  (accepted) — crypto decoy vault, activation triggers, session lifecycle.
 
 ## Topic references
 
