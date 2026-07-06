@@ -8,6 +8,8 @@ API changes increment the minor version.
 
 ## [Unreleased]
 
+## [1.2.0] - 2026-07-06
+
 ### Added
 
 - **Emergency / duress mode** — cryptographic decoy vault with session pinning, constant-time duress
