@@ -24,4 +24,26 @@ describe("resolveVaultClientStatus", () => {
       )
     ).toBe("unsupported_prf");
   });
+
+  it("returns emergency_locked when server emergency flag is set", () => {
+    expect(
+      resolveVaultClientStatus({ configured: true, emergencyModeActive: true }, false, true)
+    ).toBe("emergency_locked");
+  });
+
+  it("returns emergency_unlocked when emergency active and session unlocked", () => {
+    expect(
+      resolveVaultClientStatus({ configured: true, emergencyModeActive: true }, true, true)
+    ).toBe("emergency_unlocked");
+  });
+
+  it("returns locked copy for emergency_locked expanded state", async () => {
+    const { getVaultStatusDockExpandedCopy } = await import(
+      "../status-dock/copy.js"
+    );
+    const copy = getVaultStatusDockExpandedCopy("emergency_locked", null);
+    expect(copy.title).toContain("locked");
+    const unlockedCopy = getVaultStatusDockExpandedCopy("emergency_unlocked", "1:00");
+    expect(unlockedCopy.countdownInline).toContain("1:00");
+  });
 });

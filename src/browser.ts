@@ -198,12 +198,30 @@ export {
   getVaultAutoLockMinutes,
   getSessionVaultKey,
   isVaultUnlocked,
+  getVaultSessionMode,
+  isVaultEmergencyMode,
+  enterVaultEmergencyMode,
+  isEmergencyModePinned,
+  getSessionKeyRole,
+  clearEmergencyModePin,
   type VaultSessionConfig,
+  type VaultSessionMode,
+  type VaultSessionKeyRole,
 } from "./session/auto-lock.js";
 
 export {
   registerVaultLockCleanup,
   type VaultLockCleanupHandler,
 } from "./session/vault-lock-cleanup.js";
+
+export {
+  unlockVaultWithPasswordRouting,
+  unlockVaultWithPasskeyRouting,
+  exitEmergencyMode,
+  hydrateVaultEmergencyModeFromServer,
+  type EmergencyUnlockPasswordInput,
+  type EmergencyUnlockPasskeyInput,
+  type ExitEmergencyModeInput,
+} from "./emergency/browser-emergency.js";
 
 export { createRecoveryKitText, buildRecoveryKitContent } from "./recovery/kit.js";

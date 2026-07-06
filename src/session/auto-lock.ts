@@ -4,7 +4,20 @@ import {
   clampVaultAutoLockMinutes,
   VAULT_USER_AUTO_LOCK_MIN_MINUTES,
 } from "./user-auto-lock-preference.js";
-import { isVaultUnlocked, lockVault, setSessionVaultKey } from "./memory-session.js";
+import {
+  isVaultUnlocked,
+  lockVault,
+  setSessionVaultKey,
+  setSessionKeyRole,
+  getVaultSessionMode,
+  isVaultEmergencyMode,
+  enterVaultEmergencyMode,
+  clearEmergencyModePin,
+  isEmergencyModePinned,
+  getSessionKeyRole,
+  type VaultSessionMode,
+  type VaultSessionKeyRole,
+} from "./memory-session.js";
 import { clearVaultInnerKeyMaterialCache } from "./inner-key-material-cache.js";
 import { runVaultLockCleanupHandlers } from "./vault-lock-cleanup.js";
 
@@ -89,9 +102,15 @@ export function touchVaultSession(): void {
   }
 }
 
-export async function unlockVaultSession(vaultKey: CryptoKey): Promise<void> {
+export async function unlockVaultSession(
+  vaultKey: CryptoKey,
+  options?: { role?: VaultSessionKeyRole }
+): Promise<void> {
   await assertUserVaultKeyNonExtractable(vaultKey);
   manuallyLocked = false;
+  if (options?.role) {
+    setSessionKeyRole(options.role);
+  }
   setSessionVaultKey(vaultKey);
   scheduleVaultAutoLock();
   notifyVaultSessionChange();
@@ -184,4 +203,12 @@ export function getVaultAutoLockRemainingMs(): number | null {
 export {
   getSessionVaultKey,
   isVaultUnlocked,
+  getVaultSessionMode,
+  isVaultEmergencyMode,
+  enterVaultEmergencyMode,
+  isEmergencyModePinned,
+  getSessionKeyRole,
+  clearEmergencyModePin,
+  type VaultSessionMode,
+  type VaultSessionKeyRole,
 } from "./memory-session.js";

@@ -1,31 +1,42 @@
 import {
+  createDecoyVaultSetup,
   createPasswordEnvelope,
   createRecoveryEnvelope,
   createRecoveryPhrase,
   createUserVaultKey,
-  decryptVaultPayloadWithSchema,
+  decryptVaultPayloadForSession,
   encryptVaultPayload,
-  passkeyPrfEnvelopeSchema,
-  passwordEnvelopeSchema,
   recoveryPhraseEnvelopeSchema,
   unlockWithPasswordEnvelope,
-  unlockWithPasskeyPrfEnvelope,
   unlockWithRecoveryEnvelope,
-  vaultSetupEnvelopeFieldsSchema,
+  vaultSetupWithDecoySchema,
   withVaultUnlockRateLimit,
   type EncryptedVaultPayload,
 } from "@tgoliveira/vault-core";
 import { z } from "zod";
-import { unlockVaultSession, getSessionVaultKey } from "@tgoliveira/vault-core/browser";
+import {
+  exitEmergencyMode,
+  getSessionVaultKey,
+  hydrateVaultEmergencyModeFromServer,
+  isVaultEmergencyMode,
+  unlockVaultSession,
+  unlockVaultWithPasswordRouting,
+  unlockVaultWithPasskeyRouting,
+} from "@tgoliveira/vault-core/browser";
 import { DEMO_USER_ID, VAULT_PROFILE, vaultScope } from "@/lib/vault-profile";
 import { authenticateDemoPasskey, loadPasskeyCredentialId } from "@/lib/vault-demo-passkey";
 import { getDemoVaultUnlockRateLimiter } from "@/lib/vault-rate-limit";
+import {
+  loadDemoEmergencyMetadata,
+  saveDemoEmergencyMetadata,
+  setDemoEmergencyModeActive,
+} from "@/lib/vault-demo-emergency-store";
 import { loadVaultRecord, saveVaultRecord, type StoredVaultRecord } from "@/lib/vault-demo-store";
 
 const DEMO_UNLOCK_SCOPE = "demo";
 
 function runDemoUnlockAttempt<T>(
-  action: "password" | "recovery_phrase" | "passkey_prf",
+  action: "password" | "recovery_phrase" | "passkey_prf" | "emergency_exit",
   attempt: () => Promise<T>
 ): Promise<T> {
   return withVaultUnlockRateLimit(
@@ -34,6 +45,27 @@ function runDemoUnlockAttempt<T>(
     action,
     attempt
   );
+}
+
+function getEmergencyContext() {
+  const meta = loadDemoEmergencyMetadata();
+  return {
+    emergencyModeActive: meta.emergencyModeActive,
+    duressSequence: meta.duressSequence,
+    decoyConfigured: meta.decoyConfigured,
+    emergencyExitEmailRequired: meta.emergencyExitEmailRequired ?? false,
+  };
+}
+
+function onEmergencyEntered() {
+  setDemoEmergencyModeActive(true);
+}
+
+export function hydrateDemoEmergencyFromServer(): void {
+  const meta = loadDemoEmergencyMetadata();
+  if (meta.emergencyModeActive) {
+    hydrateVaultEmergencyModeFromServer(true);
+  }
 }
 
 export type DemoVaultPayload = z.infer<typeof demoVaultPayloadSchema>;
@@ -85,7 +117,7 @@ export async function createDemoVault(input: {
     VAULT_PROFILE
   );
 
-  const record = vaultSetupEnvelopeFieldsSchema.parse({
+  const record = vaultSetupWithDecoySchema.parse({
     cryptoVersion: "vault-v1",
     encryptedBlob,
     passwordEnvelope,
@@ -100,9 +132,38 @@ export async function createDemoVault(input: {
     scope,
     VAULT_PROFILE
   );
-  await unlockVaultSession(sessionKey);
+  await unlockVaultSession(sessionKey, { role: "primary" });
 
   return { recoveryPhrase, record };
+}
+
+export async function enrollDemoDecoyVault(input: {
+  duressSequence: string;
+  duressPassword: string;
+  honeyPayload: DemoVaultPayload;
+}): Promise<void> {
+  const record = loadVaultRecord();
+  if (!record) {
+    throw new Error("Vault is not configured");
+  }
+
+  const scope = vaultScope(DEMO_USER_ID);
+  const { decoy } = await createDecoyVaultSetup({
+    duressPassword: input.duressPassword,
+    duressSequence: input.duressSequence,
+    honeyPayload: input.honeyPayload,
+    scope,
+    profile: VAULT_PROFILE,
+    recoveryWordCount: 12,
+  });
+
+  saveVaultRecord({ ...record, decoy });
+  const meta = loadDemoEmergencyMetadata();
+  saveDemoEmergencyMetadata({
+    ...meta,
+    decoyConfigured: true,
+    duressSequence: input.duressSequence,
+  });
 }
 
 export async function unlockDemoVault(vaultPassword: string): Promise<DemoVaultPayload> {
@@ -113,24 +174,25 @@ export async function unlockDemoVault(vaultPassword: string): Promise<DemoVaultP
     }
 
     const scope = vaultScope(DEMO_USER_ID);
-    const envelope = passwordEnvelopeSchema.parse(record.passwordEnvelope);
-    const vaultKey = await unlockWithPasswordEnvelope(
-      vaultPassword,
-      envelope,
-      scope,
-      VAULT_PROFILE
-    );
+    const emergency = getEmergencyContext();
 
-    const payload = await decryptVaultPayloadWithSchema(
-      record.encryptedBlob,
-      vaultKey,
+    await unlockVaultWithPasswordRouting({
+      record,
+      password: vaultPassword,
+      duressSequence: emergency.duressSequence,
+      emergencyModeActive: emergency.emergencyModeActive,
       scope,
-      VAULT_PROFILE,
-      demoVaultPayloadSchema
-    );
+      profile: VAULT_PROFILE,
+      onEmergencyEntered,
+    });
 
-    await unlockVaultSession(vaultKey);
-    return payload;
+    return decryptVaultPayloadForSession({
+      record,
+      vaultKey: getSessionVaultKey()!,
+      scope,
+      profile: VAULT_PROFILE,
+      schema: demoVaultPayloadSchema,
+    });
   });
 }
 
@@ -152,20 +214,22 @@ export async function unlockDemoVaultWithRecoveryPhrase(
       VAULT_PROFILE
     );
 
-    const payload = await decryptVaultPayloadWithSchema(
-      record.encryptedBlob,
+    const payload = await decryptVaultPayloadForSession({
+      record,
       vaultKey,
       scope,
-      VAULT_PROFILE,
-      demoVaultPayloadSchema
-    );
+      profile: VAULT_PROFILE,
+      schema: demoVaultPayloadSchema,
+    });
 
-    await unlockVaultSession(vaultKey);
+    await unlockVaultSession(vaultKey, { role: "primary" });
     return payload;
   });
 }
 
-export async function unlockDemoVaultWithPasskey(): Promise<DemoVaultPayload> {
+export async function unlockDemoVaultWithPasskey(options?: {
+  duressSignaled?: boolean;
+}): Promise<DemoVaultPayload> {
   return runDemoUnlockAttempt("passkey_prf", async () => {
     const record = loadVaultRecord();
     if (!record?.passkeyPrfEnvelope) {
@@ -179,25 +243,57 @@ export async function unlockDemoVaultWithPasskey(): Promise<DemoVaultPayload> {
 
     const prfOutput = await authenticateDemoPasskey(credentialId);
     const scope = vaultScope(DEMO_USER_ID);
-    const envelope = passkeyPrfEnvelopeSchema.parse(record.passkeyPrfEnvelope);
-    const vaultKey = await unlockWithPasskeyPrfEnvelope(
-      envelope,
+    const emergency = getEmergencyContext();
+
+    await unlockVaultWithPasskeyRouting({
+      record,
       prfOutput,
+      duressSignaled: options?.duressSignaled,
+      emergencyModeActive: emergency.emergencyModeActive,
       scope,
-      VAULT_PROFILE
-    );
+      profile: VAULT_PROFILE,
+      onEmergencyEntered,
+    });
 
-    const payload = await decryptVaultPayloadWithSchema(
-      record.encryptedBlob,
-      vaultKey,
+    return decryptVaultPayloadForSession({
+      record,
+      vaultKey: getSessionVaultKey()!,
       scope,
-      VAULT_PROFILE,
-      demoVaultPayloadSchema
-    );
-
-    await unlockVaultSession(vaultKey);
-    return payload;
+      profile: VAULT_PROFILE,
+      schema: demoVaultPayloadSchema,
+    });
   });
+}
+
+export async function exitDemoEmergencyMode(input: {
+  recoveryPhrase: string;
+  emailOtp?: string;
+}): Promise<void> {
+  return runDemoUnlockAttempt("emergency_exit", async () => {
+    const record = loadVaultRecord();
+    if (!record) {
+      throw new Error("Vault is not configured");
+    }
+
+    const emergency = getEmergencyContext();
+    const scope = vaultScope(DEMO_USER_ID);
+
+    await exitEmergencyMode({
+      recoveryPhrase: input.recoveryPhrase,
+      emailOtp: input.emailOtp,
+      scope,
+      profile: VAULT_PROFILE,
+      primaryRecoveryEnvelope: record.recoveryEnvelope,
+      emailOtpRequired: emergency.emergencyExitEmailRequired,
+    });
+
+    setDemoEmergencyModeActive(false);
+  });
+}
+
+/** Demo-only mock OTP verification. */
+export function verifyDemoEmergencyExitOtp(otp: string): boolean {
+  return otp === "123456";
 }
 
 export function isDemoPasskeyUnlockAvailable(): boolean {
@@ -214,13 +310,13 @@ export async function loadDecryptedDemoPayload(): Promise<DemoVaultPayload | nul
   if (!vaultKey) return null;
 
   const scope = vaultScope(DEMO_USER_ID);
-  return decryptVaultPayloadWithSchema(
-    record.encryptedBlob,
+  return decryptVaultPayloadForSession({
+    record,
     vaultKey,
     scope,
-    VAULT_PROFILE,
-    demoVaultPayloadSchema
-  );
+    profile: VAULT_PROFILE,
+    schema: demoVaultPayloadSchema,
+  });
 }
 
 export async function saveDemoPayload(
@@ -244,10 +340,21 @@ export async function saveDemoPayload(
     VAULT_PROFILE
   );
 
-  saveVaultRecord({
-    ...record,
-    encryptedBlob,
-  });
+  if (isVaultEmergencyMode() && record.decoy) {
+    saveVaultRecord({
+      ...record,
+      decoy: { ...record.decoy, encryptedBlob },
+    });
+  } else {
+    saveVaultRecord({
+      ...record,
+      encryptedBlob,
+    });
+  }
 
   return encryptedBlob;
+}
+
+export function isDemoEmergencyMode(): boolean {
+  return isVaultEmergencyMode();
 }

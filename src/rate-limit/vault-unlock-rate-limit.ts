@@ -14,7 +14,11 @@ export const DEFAULT_VAULT_UNLOCK_RATE_LIMIT: VaultUnlockRateLimitConfig = {
   lockoutMs: 30 * 60 * 1000,
 };
 
-export type VaultUnlockRateLimitAction = "password" | "recovery_phrase" | "passkey_prf";
+export type VaultUnlockRateLimitAction =
+  | "password"
+  | "recovery_phrase"
+  | "passkey_prf"
+  | "emergency_exit";
 
 export type VaultUnlockRateLimiter = {
   limiter: FixedWindowRateLimiter;

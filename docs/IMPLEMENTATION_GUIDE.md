@@ -963,3 +963,101 @@ Never make missing AAD context a permanent high-level fallback.
 - [ ] Rotation and recovery updates are atomic and authorization-protected.
 - [ ] Wrong-AAD, tamper, leak, storage, and auto-lock tests pass.
 - [ ] The application pins a compatible package version and reviews `CHANGELOG.md` before upgrades.
+
+## 20. Emergency / duress mode
+
+See [INTEGRATING_EMERGENCY_DURESS_MODE.md](./INTEGRATING_EMERGENCY_DURESS_MODE.md) for the full
+consumer integration guide (phased checklist, dock wiring, server metadata, testing). See
+[ADR 0001](./adr/0001-emergency-duress-mode.md) for the threat model and design decisions.
+
+### Enrollment (trusted session)
+
+```ts
+import {
+  createDecoyVaultSetup,
+  containsDuressSequence,
+  vaultSetupWithDecoySchema,
+} from "@tgoliveira/vault-core";
+import { buildHoneyPayloadFromTemplates } from "./honey-templates";
+
+const { decoy } = await createDecoyVaultSetup({
+  duressPassword,
+  duressSequence,
+  honeyPayload: buildHoneyPayloadFromTemplates(),
+  scope,
+  profile,
+});
+
+await saveVaultRecord(vaultSetupWithDecoySchema.parse({ ...primaryRecord, decoy }));
+await saveEmergencyMetadata({ decoyConfigured: true, duressSequence });
+```
+
+### Unlock routing
+
+```ts
+import {
+  unlockVaultWithPasswordRouting,
+  unlockVaultWithPasskeyRouting,
+  decryptVaultPayloadForSession,
+  hydrateVaultEmergencyModeFromServer,
+} from "@tgoliveira/vault-core/browser";
+
+hydrateVaultEmergencyModeFromServer(serverSnapshot.emergencyModeActive);
+
+await unlockVaultWithPasswordRouting({
+  record,
+  password,
+  duressSequence: serverMetadata.duressSequence,
+  emergencyModeActive: serverMetadata.emergencyModeActive,
+  scope,
+  profile,
+  onEmergencyEntered: () => persistEmergencyModeActive(true),
+});
+
+const payload = await decryptVaultPayloadForSession({
+  record,
+  vaultKey: getSessionVaultKey()!,
+  scope,
+  profile,
+  schema: appPayloadSchema,
+});
+```
+
+### Exit (recovery phrase + optional OTP)
+
+```ts
+import { exitEmergencyMode } from "@tgoliveira/vault-core/browser";
+
+await exitEmergencyMode({
+  recoveryPhrase,
+  emailOtp: emailRequired ? verifiedOtp : undefined,
+  scope,
+  profile,
+  primaryRecoveryEnvelope: record.recoveryEnvelope,
+  emailOtpRequired: serverMetadata.emergencyExitEmailRequired,
+});
+await persistEmergencyModeActive(false);
+```
+
+### Dock integration
+
+- Wire `VaultStatusDock.onDuressSignalChange` and pass `duressSignaled` into passkey unlock.
+- Default `passkeyAutoStartDelayMs={2000}` allows 1 s handle long-press before auto-start.
+- Use `useLongPressDuressSignal` on custom unlock UIs when not using the dock.
+
+### Testing
+
+```ts
+import {
+  assertVaultSessionMode,
+  createPrimaryDecoyVaultFixture,
+  HONEY_VAULT_SENTINEL_NOTE,
+} from "@tgoliveira/vault-core/testing";
+```
+
+Consumer checklist:
+
+- [ ] Persist `emergencyModeActive` atomically on decoy entry; clear only via exit flow.
+- [ ] Rate-limit `emergency_exit` with `withVaultUnlockRateLimit(..., "emergency_exit", ...)`.
+- [ ] Never decrypt primary `encryptedBlob` while emergency mode is active.
+- [ ] Normal vault password does not exit emergency mode.

@@ -1,9 +1,9 @@
-import { vaultSetupEnvelopeFieldsSchema } from "@tgoliveira/vault-core";
+import { vaultSetupWithDecoySchema } from "@tgoliveira/vault-core";
 import type { z } from "zod";
 
 const STORAGE_KEY = "vault-core-demo:record";
 
-export type StoredVaultRecord = z.infer<typeof vaultSetupEnvelopeFieldsSchema>;
+export type StoredVaultRecord = z.infer<typeof vaultSetupWithDecoySchema>;
 
 export function isVaultConfigured(): boolean {
   if (typeof window === "undefined") return false;
@@ -15,14 +15,14 @@ export function loadVaultRecord(): StoredVaultRecord | null {
   const raw = localStorage.getItem(STORAGE_KEY);
   if (!raw) return null;
   try {
-    return vaultSetupEnvelopeFieldsSchema.parse(JSON.parse(raw));
+    return vaultSetupWithDecoySchema.parse(JSON.parse(raw));
   } catch {
     return null;
   }
 }
 
 export function saveVaultRecord(record: StoredVaultRecord): void {
-  const parsed = vaultSetupEnvelopeFieldsSchema.parse(record);
+  const parsed = vaultSetupWithDecoySchema.parse(record);
   localStorage.setItem(STORAGE_KEY, JSON.stringify(parsed));
 }
 

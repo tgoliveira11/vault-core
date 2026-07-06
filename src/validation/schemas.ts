@@ -81,6 +81,16 @@ export type PasskeyPrfEnvelope = z.infer<typeof passkeyPrfEnvelopeSchema>;
 
 export { VAULT_CRYPTO_VERSION } from "../constants.js";
 
+export const vaultDecoyRecordSchema = z.object({
+  cryptoVersion: z.literal("vault-v1"),
+  encryptedBlob: encryptedPayloadSchema,
+  passwordEnvelope: passwordEnvelopeSchema,
+  recoveryEnvelope: recoveryPhraseEnvelopeSchema,
+  passkeyPrfEnvelope: passkeyPrfEnvelopeSchema.nullable().optional(),
+});
+
+export type VaultDecoyRecord = z.infer<typeof vaultDecoyRecordSchema>;
+
 export const vaultSetupEnvelopeFieldsSchema = z.object({
   cryptoVersion: z.literal("vault-v1"),
   encryptedBlob: encryptedPayloadSchema,
@@ -88,3 +98,19 @@ export const vaultSetupEnvelopeFieldsSchema = z.object({
   recoveryEnvelope: recoveryPhraseEnvelopeSchema,
   passkeyPrfEnvelope: passkeyPrfEnvelopeSchema.nullable().optional(),
 });
+
+export const vaultSetupWithDecoySchema = vaultSetupEnvelopeFieldsSchema.extend({
+  decoy: vaultDecoyRecordSchema.nullable().optional(),
+});
+
+export type VaultSetupWithDecoy = z.infer<typeof vaultSetupWithDecoySchema>;
+
+export const vaultEmergencyServerMetadataSchema = z.object({
+  emergencyModeActive: z.boolean(),
+  emergencyModeEnteredAt: z.string().datetime().nullable().optional(),
+  duressSequence: z.string().nullable().optional(),
+  decoyConfigured: z.boolean(),
+  emergencyExitEmailRequired: z.boolean().optional(),
+});
+
+export type VaultEmergencyServerMetadata = z.infer<typeof vaultEmergencyServerMetadataSchema>;

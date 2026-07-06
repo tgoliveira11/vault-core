@@ -2,14 +2,20 @@
 
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import {
   VaultDockQuickUnlock,
   VaultStatusDock,
   buildVaultUnlockHref,
   type VaultStatusDockLinkProps,
 } from "@tgoliveira/vault-core/react";
-import { isDemoPasskeyUnlockAvailable, unlockDemoVault, unlockDemoVaultWithPasskey } from "@/lib/vault-demo-crypto";
+import {
+  hydrateDemoEmergencyFromServer,
+  isDemoPasskeyUnlockAvailable,
+  unlockDemoVault,
+  unlockDemoVaultWithPasskey,
+} from "@/lib/vault-demo-crypto";
+import { getDemoServerStatusSnapshot } from "@/lib/vault-demo-emergency-store";
 import { getDemoPasskeySupport } from "@/lib/vault-demo-passkey";
 import { isVaultConfigured, loadVaultRecord } from "@/lib/vault-demo-store";
 import { getDemoVaultUnlockRateLimiter } from "@/lib/vault-rate-limit";
@@ -28,15 +34,22 @@ function VaultStatusDockClientInner() {
   const router = useRouter();
   const pathname = usePathname();
   const [configured, setConfigured] = useState(false);
-  const [hasPasskeyEnvelope, setHasPasskeyEnvelope] = useState(false);
+  const [serverStatus, setServerStatus] = useState(
+    getDemoServerStatusSnapshot(false, false)
+  );
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const duressSignaledRef = useRef(false);
   const passkeySupport = getDemoPasskeySupport();
 
   useEffect(() => {
-    setConfigured(isVaultConfigured());
+    hydrateDemoEmergencyFromServer();
+    const vaultConfigured = isVaultConfigured();
+    setConfigured(vaultConfigured);
     const record = loadVaultRecord();
-    setHasPasskeyEnvelope(Boolean(record?.passkeyPrfEnvelope));
+    setServerStatus(
+      getDemoServerStatusSnapshot(vaultConfigured, Boolean(record?.passkeyPrfEnvelope))
+    );
   }, [pathname]);
 
   const handleUnlockPassword = useCallback(async (password: string) => {
@@ -49,6 +62,7 @@ function VaultStatusDockClientInner() {
       throw new Error("unlock failed");
     } finally {
       setLoading(false);
+      duressSignaledRef.current = false;
     }
   }, []);
 
@@ -56,12 +70,15 @@ function VaultStatusDockClientInner() {
     setError(null);
     setLoading(true);
     try {
-      await unlockDemoVaultWithPasskey();
+      await unlockDemoVaultWithPasskey({
+        duressSignaled: duressSignaledRef.current,
+      });
     } catch (caught) {
       setError(caught instanceof Error ? caught.message : "Passkey unlock failed.");
       throw caught;
     } finally {
       setLoading(false);
+      duressSignaledRef.current = false;
     }
   }, []);
 
@@ -75,15 +92,15 @@ function VaultStatusDockClientInner() {
   return (
     <VaultStatusDock
       visible={configured}
-      serverStatus={{
-        configured,
-        hasPasskeyPrfEnvelope: hasPasskeyEnvelope,
-      }}
+      serverStatus={serverStatus}
       prfSupported={passkeySupport.prf}
       pathname={pathname}
       unlockPath={UNLOCK_PATH}
       buildUnlockHref={(returnPath) => buildVaultUnlockHref(UNLOCK_PATH, returnPath)}
       onNavigateToUnlock={handleNavigateToUnlock}
+      onDuressSignalChange={(signaled) => {
+        duressSignaledRef.current = signaled;
+      }}
       loading={loading}
       unlockError={error}
       LinkComponent={DemoLink}
@@ -93,16 +110,15 @@ function VaultStatusDockClientInner() {
         onPasskeyUnlockFailed,
         onPasskeyUnlockCancelled,
         bindAutoStartPasskey,
+        duressSignaled,
+        resetDuressSignal,
       }) => (
         <VaultDockQuickUnlock
           loading={quickLoading}
           error={quickError}
           unlockRateLimiter={getDemoVaultUnlockRateLimiter()}
           rateLimitScopeKey="demo"
-          serverStatus={{
-            configured,
-            hasPasskeyPrfEnvelope: hasPasskeyEnvelope,
-          }}
+          serverStatus={serverStatus}
           onUnlockPassword={handleUnlockPassword}
           onUnlockPasskey={
             isDemoPasskeyUnlockAvailable() ? handleUnlockPasskey : undefined
@@ -112,6 +128,11 @@ function VaultStatusDockClientInner() {
           bindAutoStartPasskey={bindAutoStartPasskey}
           onPasskeyUnlockFailed={onPasskeyUnlockFailed}
           onPasskeyUnlockCancelled={onPasskeyUnlockCancelled}
+          duressSignaled={duressSignaled}
+          onDuressSignalChange={(signaled) => {
+            duressSignaledRef.current = signaled;
+          }}
+          resetDuressSignal={resetDuressSignal}
         />
       )}
     />

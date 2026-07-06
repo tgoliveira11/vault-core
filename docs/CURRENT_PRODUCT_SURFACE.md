@@ -2,7 +2,8 @@
 
 Living inventory of what `@tgoliveira/vault-core` exposes today. Update this file when exports, admin screens, published artifacts, or shipped/planned status changes.
 
-Last reviewed: **2026-07-05** (package version **1.1.1**, lock hygiene APIs)
+Last reviewed: **2026-07-06** (package version **1.1.2**, emergency / duress mode)
+
 
 ## Package entry points (shipped)
 
@@ -51,6 +52,21 @@ Last reviewed: **2026-07-05** (package version **1.1.1**, lock hygiene APIs)
   `resolvePasskeyUnlockAvailableOnDevice`, `parseDeviceBindingId`; `docs/examples/device-binding/`)
 - Passkey crypto failure classifier (`classifyPasskeyCryptoError`, `getDefaultPasskeyCryptoErrorMessage`, `PasskeyCryptoFailureKind`)
 
+## Emergency / duress mode (shipped)
+
+- Decoy vault record schemas (`vaultDecoyRecordSchema`, `vaultSetupWithDecoySchema`)
+- Server metadata schema (`vaultEmergencyServerMetadataSchema`)
+- Constant-time duress detection (`containsDuressSequence`)
+- Decoy enrollment (`createDecoyVaultSetup`)
+- Emergency unlock routing (`resolveVaultUnlockTarget`, `decryptVaultPayloadForSession`)
+- Browser session mode (`VaultSessionMode`, `getVaultSessionMode`, `isVaultEmergencyMode`)
+- Emergency unlock/exit (`unlockVaultWithPasswordRouting`, `unlockVaultWithPasskeyRouting`, `exitEmergencyMode`)
+- React long-press hook (`useLongPressDuressSignal`)
+- Dock 2 s passkey auto-start delay (`passkeyAutoStartDelayMs`)
+- Testing fixtures (`assertVaultSessionMode`, `createPrimaryDecoyVaultFixture`)
+
+See [ADR 0001](./adr/0001-emergency-duress-mode.md).
+
 ## Admin config helpers (shipped)
 
 Exported from main entry — app maps `process.env`; package never reads env directly:
@@ -87,7 +103,8 @@ decryption in admin pages.
 ## React session helpers (shipped)
 
 - `VaultSessionProvider`, `useVaultSession`, `useVaultUnlocked`, `useVaultLockState`
-- `resolveVaultClientStatus`, `useVaultClientStatus`
+- `resolveVaultClientStatus`, `useVaultClientStatus` — includes `emergency_locked` / `emergency_unlocked`
+- `useLongPressDuressSignal` — 1 s long-press duress latch for dock and passkey button
 - `VaultAutoLockPreferenceField`, `useVaultAutoLockPreference` — per-user auto-lock slider (1 min …
   admin ceiling); priority **user → admin → env → default**
 - `VaultPasswordStrengthFeedback` — read-only current-password strength (settings / awareness)
@@ -140,8 +157,8 @@ Exported from `@tgoliveira/vault-core/react` (styles: `vc-status-dock-*` in `vau
 
 | Export | Purpose |
 | --- | --- |
-| `VaultStatusDock` | Header-attached collapsible lock/unlock handle and expanded panel |
-| `VaultDockQuickUnlock` | Compact password or passkey primary unlock for the dock (auto-focus password, expand-sync passkey auto-start via `bindAutoStartPasskey`, `passkeyOptionsReady`) |
+| `VaultStatusDock` | Header-attached collapsible lock/unlock handle and expanded panel (`passkeyAutoStartDelayMs` default 2000, `onDuressSignalChange`, handle long-press) |
+| `VaultDockQuickUnlock` | Compact password or passkey primary unlock for the dock (auto-focus password, expand-sync passkey auto-start via `bindAutoStartPasskey`, `passkeyOptionsReady`, passkey button long-press) |
 | `classifyPasskeyUnlockFailure` / `PasskeyUnlockFailureKind` | Passkey failure classification for dock redirect and callbacks |
 | `tryConsumePasskeyAutoStart` / `resetPasskeyAutoStartDedupe` | Short-TTL sessionStorage dedupe for dock passkey auto-start |
 | `requestVaultDockExpand` / `subscribeVaultDockExpand` | Programmatic expand from locked-content gates |

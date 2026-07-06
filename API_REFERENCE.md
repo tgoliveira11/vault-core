@@ -169,9 +169,62 @@ Node/tests; the default is `navigator.userAgent` in the browser.
 | `passkeyPrfEnvelopeSchema` | Passkey PRF method plus null KDF metadata |
 | `storedEnvelopeSchema` | Method-discriminated union of all envelopes |
 | `vaultSetupEnvelopeFieldsSchema` | Complete encrypted setup record |
+| `vaultDecoyRecordSchema` | Decoy (emergency) vault crypto record |
+| `vaultSetupWithDecoySchema` | Primary record with optional `decoy` |
+| `vaultEmergencyServerMetadataSchema` | Consumer-owned server emergency metadata |
 
 Associated inferred types include `EncryptedVaultPayload`, `Argon2idKdfMetadata`, `VaultEnvelope`,
-`PasswordEnvelope`, `RecoveryPhraseEnvelope`, `PasskeyPrfEnvelope`, and `VaultEnvelopeMethod`.
+`PasswordEnvelope`, `RecoveryPhraseEnvelope`, `PasskeyPrfEnvelope`, `VaultEnvelopeMethod`,
+`VaultDecoyRecord`, `VaultSetupWithDecoy`, and `VaultEmergencyServerMetadata`.
+
+### Emergency / duress mode
+
+| Export | Purpose |
+| --- | --- |
+| `containsDuressSequence(password, sequence)` | Constant-time substring check (bounded by `MAX_DURESS_PASSWORD_LENGTH`) |
+| `createDecoyVaultSetup(input)` | Generate decoy UVK, honey payload, duress password envelope |
+| `resolveVaultUnlockTarget(input)` | Select `primary` vs `decoy` unlock routing |
+| `decryptVaultPayloadForSession(input)` | Decrypt correct blob; refuses primary in emergency |
+| `assertSessionPayloadDecryptAllowed(input)` | Guard primary blob decrypt in emergency mode |
+| `DuressPasswordMissingSequenceError` | Enrollment rejected when duress password lacks sequence |
+| `VaultEmergencyDecryptError` | Primary decrypt attempted while emergency active |
+
+**Browser (`@tgoliveira/vault-core/browser`):**
+
+| Export | Purpose |
+| --- | --- |
+| `VaultSessionMode` | `"normal"` \| `"emergency"` |
+| `getVaultSessionMode()` / `isVaultEmergencyMode()` | Read session mode (includes server pin while locked) |
+| `enterVaultEmergencyMode()` | Pin session to emergency routing |
+| `clearEmergencyModePin()` | Clear pin after recovery-gated exit |
+| `unlockVaultWithPasswordRouting(input)` | Password unlock with duress sequence routing |
+| `unlockVaultWithPasskeyRouting(input)` | Passkey unlock with long-press latch routing |
+| `exitEmergencyMode(input)` | Primary recovery phrase gate (+ optional OTP param) |
+| `hydrateVaultEmergencyModeFromServer(flag)` | Apply server `emergencyModeActive` on load |
+
+**React (`@tgoliveira/vault-core/react`):**
+
+| Export | Purpose |
+| --- | --- |
+| `useLongPressDuressSignal(options?)` | 1 s long-press latch for dock/passkey duress |
+| `VaultServerStatusSnapshot.emergencyModeActive` | Server-persisted emergency flag |
+| `VaultServerStatusSnapshot.decoyConfigured` | Decoy enrollment completed |
+| `VaultStatusDock.passkeyAutoStartDelayMs` | Default `2000` — delay before dock passkey auto-start |
+| `VaultStatusDock.onDuressSignalChange` | Duress latch callback |
+| `resolveVaultClientStatus` | Returns `emergency_locked` / `emergency_unlocked` when applicable |
+
+**Testing (`@tgoliveira/vault-core/testing`):**
+
+- `assertVaultSessionMode(expected)`
+- `createPrimaryDecoyVaultFixture(input)` — deterministic primary + decoy pair
+- `HONEY_VAULT_SENTINEL_NOTE`, `PRIMARY_VAULT_SENTINEL_NOTE`
+
+**Security preconditions:** Never decrypt primary `encryptedBlob` in emergency mode. Exit requires
+primary recovery phrase; normal password does not exit. Duress sequence is a signal, not a secret key.
+Consumer must persist `emergencyModeActive` atomically and rate-limit `emergency_exit`.
+
+**Integration guide:** [docs/INTEGRATING_EMERGENCY_DURESS_MODE.md](docs/INTEGRATING_EMERGENCY_DURESS_MODE.md)
+
 
 ### AAD and plaintext validation
 

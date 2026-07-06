@@ -37,7 +37,12 @@ export function getDefaultVaultStatusDockExpanded(_clientStatus: VaultClientStat
 
 /** Whether outside-click / Escape auto-collapse applies when expanded. */
 export function vaultStatusDockAutoCollapseWhenExpanded(clientStatus: VaultClientStatus): boolean {
-  return clientStatus === "locked" || clientStatus === "unlocked";
+  return (
+    clientStatus === "locked" ||
+    clientStatus === "unlocked" ||
+    clientStatus === "emergency_locked" ||
+    clientStatus === "emergency_unlocked"
+  );
 }
 
 export function resolveVaultStatusDockExpanded(
@@ -45,7 +50,12 @@ export function resolveVaultStatusDockExpanded(
   preference: boolean | null,
   onFullUnlockPage: boolean
 ): boolean {
-  if (onFullUnlockPage && (clientStatus === "locked" || clientStatus === "unsupported_prf")) {
+  if (
+    onFullUnlockPage &&
+    (clientStatus === "locked" ||
+      clientStatus === "unsupported_prf" ||
+      clientStatus === "emergency_locked")
+  ) {
     return false;
   }
   if (preference !== null) {
@@ -65,8 +75,10 @@ export function getVaultStatusDockHandleLabel(
 ): string {
   switch (clientStatus) {
     case "unlocked":
+    case "emergency_unlocked":
       return countdown ?? "Open";
     case "locked":
+    case "emergency_locked":
     case "unsupported_prf":
     case "not_setup":
     case "error":
@@ -86,7 +98,14 @@ export function getVaultStatusDockExpandedCopy(
         body: "",
         countdownInline: countdown ? labels.autoLocksIn(countdown) : null,
       };
+    case "emergency_unlocked":
+      return {
+        title: labels.handleOpen,
+        body: "",
+        countdownInline: countdown ? labels.autoLocksIn(countdown) : null,
+      };
     case "locked":
+    case "emergency_locked":
     case "unsupported_prf":
       return {
         title: labels.handleLocked,
