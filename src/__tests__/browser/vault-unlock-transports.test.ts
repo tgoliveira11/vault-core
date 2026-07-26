@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
+  applyVaultUnlockTransportPolicy,
   isAppleMobileUserAgent,
   preferPlatformTransportsForVaultUnlock,
   resolveVaultUnlockUserAgent,
@@ -31,6 +32,48 @@ describe("preferPlatformTransportsForVaultUnlock", () => {
 
     const prepared = preferPlatformTransportsForVaultUnlock(options, DESKTOP_UA);
     expect(prepared.allowCredentials?.[0]?.transports).toEqual(["hybrid", "internal"]);
+  });
+
+  it("preserves stored transports by default", () => {
+    const options = {
+      allowCredentials: [
+        { id: "cred-1", type: "public-key" as const, transports: ["hybrid", "usb"] as const },
+      ],
+    };
+    expect(applyVaultUnlockTransportPolicy(options)).toBe(options);
+    expect(applyVaultUnlockTransportPolicy(options, "preserve", IPHONE_UA)).toBe(options);
+  });
+
+  it("supports explicit platform-only and discoverable policies", () => {
+    const options = {
+      allowCredentials: [
+        { id: "cred-1", type: "public-key" as const, transports: ["hybrid"] as const },
+      ],
+    };
+    expect(
+      applyVaultUnlockTransportPolicy(options, "platform-only").allowCredentials?.[0]?.transports
+    ).toEqual(["internal"]);
+    expect(
+      applyVaultUnlockTransportPolicy(options, "discoverable").allowCredentials
+    ).toEqual([]);
+    expect(
+      applyVaultUnlockTransportPolicy({ allowCredentials: [] as const }, "platform-only")
+    ).toEqual({ allowCredentials: [] });
+  });
+
+  it("applies the Apple workaround only when explicitly selected", () => {
+    const options = {
+      allowCredentials: [
+        { id: "cred-1", type: "public-key" as const, transports: ["hybrid"] as const },
+      ],
+    };
+    expect(
+      applyVaultUnlockTransportPolicy(options, "apple-mobile-internal-workaround", IPHONE_UA)
+        .allowCredentials?.[0]?.transports
+    ).toEqual(["internal"]);
+    expect(
+      applyVaultUnlockTransportPolicy(options, "apple-mobile-internal-workaround", DESKTOP_UA)
+    ).toBe(options);
   });
 
   it("resolveVaultUnlockUserAgent prefers explicit userAgent", () => {

@@ -33,6 +33,31 @@ export class PasskeyUnlockError extends Error {
   }
 }
 
+export type PasskeyCredentialScopeFailureCode =
+  | "invalid_credential_id"
+  | "conflicting_credential_selection"
+  | "discoverable_credentials_not_allowed"
+  | "invalid_credential_descriptor"
+  | "duplicate_credential_descriptor"
+  | "credential_not_found";
+
+/** Fail-closed WebAuthn credential scoping failure. */
+export class PasskeyCredentialScopeError extends Error {
+  readonly code: PasskeyCredentialScopeFailureCode;
+  readonly descriptorIndex: number | null;
+
+  constructor(
+    code: PasskeyCredentialScopeFailureCode,
+    message: string,
+    descriptorIndex: number | null = null
+  ) {
+    super(message);
+    this.name = "PasskeyCredentialScopeError";
+    this.code = code;
+    this.descriptorIndex = descriptorIndex;
+  }
+}
+
 export class RecoveryPhraseConfirmationError extends Error {
   constructor(message: string) {
     super(message);
@@ -100,6 +125,7 @@ export type VaultCoreError =
   | VaultNotFoundError
   | PasskeyPrfRequiredError
   | PasskeyUnlockError
+  | PasskeyCredentialScopeError
   | RecoveryPhraseConfirmationError
   | VaultAuthorizationError
   | VaultPasswordUnchangedError

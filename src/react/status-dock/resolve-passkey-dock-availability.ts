@@ -1,5 +1,5 @@
-import { isPrfExtensionSupported } from "../../browser.js";
-import { resolvePasskeyUnlockAvailableOnDevice } from "../../passkey/device-binding/resolve-availability.js";
+import { isPrfExtensionHeuristicallyAvailable } from "../../browser.js";
+import { resolvePasskeyUnlockAvailable } from "../../passkey/device-binding/resolve-availability.js";
 import type { VaultServerStatusSnapshot } from "../status/resolve-vault-client-status.js";
 
 export type VaultDockPasskeyAvailability = {
@@ -18,11 +18,15 @@ export function resolveVaultDockPasskeyAvailability(
     return { hasEnvelope: false, showPasskey: false, prfExplicitlyUnsupported: false };
   }
 
-  if (!resolvePasskeyUnlockAvailableOnDevice({ hasPasskeyPrfEnvelope: true, passkeyUnlockAvailableOnThisDevice: serverStatus?.passkeyUnlockAvailableOnThisDevice })) {
+  if (!resolvePasskeyUnlockAvailable({
+    hasPasskeyPrfEnvelope: true,
+    passkeyUnlockAvailableOnThisBrowser: serverStatus?.passkeyUnlockAvailableOnThisBrowser,
+    passkeyUnlockAvailableOnThisDevice: serverStatus?.passkeyUnlockAvailableOnThisDevice,
+  })) {
     return { hasEnvelope: true, showPasskey: false, prfExplicitlyUnsupported: false };
   }
 
-  if (!isPrfExtensionSupported()) {
+  if (!isPrfExtensionHeuristicallyAvailable()) {
     return { hasEnvelope: true, showPasskey: false, prfExplicitlyUnsupported: true };
   }
 

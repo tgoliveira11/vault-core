@@ -8,6 +8,10 @@ import {
   wrapUserVaultKeyWithPrfOutput,
   unwrapUserVaultKeyWithPrfOutput,
   extractPasskeyPrfOutput,
+  resolvePasskeyPrfCapability,
+  scopeAuthenticationOptionsToCredential,
+  unlockWithPasskeyPrfEnvelopeCandidates,
+  vaultPasskeyCredentialStateSchema,
   prfBytesForAes256Import,
   type WrapUserVaultKeyOptions,
 } from "../index.js";
@@ -22,7 +26,16 @@ describe("public vault-key envelope exports", () => {
     expect(typeof wrapUserVaultKeyWithPrfOutput).toBe("function");
     expect(typeof unwrapUserVaultKeyWithPrfOutput).toBe("function");
     expect(typeof extractPasskeyPrfOutput).toBe("function");
+    expect(typeof resolvePasskeyPrfCapability).toBe("function");
+    expect(typeof scopeAuthenticationOptionsToCredential).toBe("function");
+    expect(typeof unlockWithPasskeyPrfEnvelopeCandidates).toBe("function");
+    expect(typeof vaultPasskeyCredentialStateSchema.parse).toBe("function");
     expect(typeof prfBytesForAes256Import).toBe("function");
+  });
+
+  it("exports WebAuthn response sanitization from the browser entry", async () => {
+    const browserEntry = await import("../browser.js");
+    expect(typeof browserEntry.sanitizeWebAuthnResponseForServer).toBe("function");
   });
 
   it("exports WrapUserVaultKeyOptions as a type", () => {

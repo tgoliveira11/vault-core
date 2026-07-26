@@ -31,10 +31,17 @@ export function isPasskeySupported(): boolean {
 
 export {
   DEFAULT_APPLE_MOBILE_PRF_MIN_MAJOR_VERSION,
+  isPrfExtensionHeuristicallyAvailable,
   isPrfExtensionSupported,
   parseAppleMobileOsMajorVersion,
   type PrfExtensionSupportOptions,
 } from "./passkey-prf-support.js";
+
+export {
+  resolvePasskeyPrfCapability,
+  type PasskeyPrfCapability,
+  type ResolvePasskeyPrfCapabilityInput,
+} from "./passkey-prf-capability.js";
 
 async function importPrfAsAesKey(prfOutput: Uint8Array): Promise<CryptoKey> {
   const keyBytes = prfOutput.byteLength === 32 ? prfOutput : prfOutput.slice(0, 32);

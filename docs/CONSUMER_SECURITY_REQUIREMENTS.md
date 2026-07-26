@@ -24,17 +24,31 @@ Before marking vault integration complete, verify every item below.
 ### 2. Client unlock flows
 
 - [ ] Wrap **every** code path that calls `unlockWithPasswordEnvelope`, `unlockWithRecoveryEnvelope`,
-  or `unlockWithPasskeyPrfEnvelope` with **`withVaultUnlockRateLimit()`** (or equivalent) — not only
+  `unlockWithPasskeyPrfEnvelope`, or `unlockWithPasskeyPrfEnvelopeCandidates` with
+  **`withVaultUnlockRateLimit()`** (or equivalent) — not only
   `VaultUnlockPanel` / `VaultDockQuickUnlock`. UI rate limits are bypassable via DevTools or direct
   API calls. Use action **`recovery_phrase`** for recovery-phrase unlock, KDF upgrade, and rotation
   flows that verify the phrase.
 - [ ] Use **`readVaultUnlockReturnPath()`** / **`resolveVaultUnlockReturnPath()`** for post-unlock
   navigation — never pass raw `searchParams.get("next")` to the router.
 - [ ] Keep **account login** and **vault unlock** as separate security domains.
+- [ ] Keep each logical WebAuthn credential distinct from opaque browser bindings and PRF envelope
+  variants. A binding is routing metadata, not an authentication factor or authorization grant.
+- [ ] Scope bound credential requests fail closed. Use an explicit exact, allow-list, or discoverable
+  selection and preserve stored transports unless a documented compatibility policy requires otherwise.
+- [ ] Verify the WebAuthn assertion server-side before returning at most five active variants for that
+  credential. Extract PRF output and match candidates only in the trusted client.
+- [ ] Never send or log raw PRF output, a PRF hash, or WebAuthn PRF extension results. Call
+  **`sanitizeWebAuthnResponseForServer()`** (or an equally strict app-owned serializer) before every
+  registration/authentication request. Candidate results may contain only a matched opaque variant ID
+  and the in-memory non-extractable UVK.
+- [ ] On candidate no-match, preserve all variants and require password/recovery locally before adding
+  another variant. A binding alone must not authorize envelope creation, replacement, or deletion.
 - [ ] Validate decrypted vault JSON with **`decryptVaultPayloadWithSchema()`** and an app-owned Zod
   schema — do not trust ciphertext shape after schema migrations or tampering.
 - [ ] When emergency/duress mode is enabled, use **`unlockVaultWithPasswordRouting()`** /
-  **`unlockVaultWithPasskeyRouting()`** and **`decryptVaultPayloadForSession()`** — never decrypt the
+  **`unlockVaultWithPasskeyRouting()`** (or **`unlockVaultWithPasskeyCandidateRouting()`** for
+  variants) and **`decryptVaultPayloadForSession()`** — never decrypt the
   primary `encryptedBlob` while `emergencyModeActive` is set.
 - [ ] Persist **`emergencyModeActive`** server-side; hydrate with **`hydrateVaultEmergencyModeFromServer()`**
   on authenticated load. Clear the flag only through **`exitEmergencyMode()`** (primary recovery phrase).

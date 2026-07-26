@@ -4,8 +4,13 @@ export type VaultCryptoProfile = {
   cryptoVersion: VaultCryptoVersion;
   aadContextVault: string;
   aadContextEnvelope: string;
-  /** When `false`, disables multi-AAD legacy vault_key unlock (default `true`). */
+  /** When `false`, disables missing/null and allowlisted legacy vault_key contexts (default `true`). */
   legacyVaultKeyUnlock?: boolean;
+  /**
+   * Explicit non-canonical vault_key AAD contexts accepted while legacy unlock is enabled.
+   * Missing and null contexts are handled separately and do not belong in this list.
+   */
+  legacyVaultKeyAadContexts?: readonly string[];
 };
 
 export type VaultAadField = "vault_key" | "vault_payload" | "vault_index";

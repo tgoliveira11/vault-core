@@ -3,10 +3,62 @@
 All notable changes to this project are documented in this file.
 
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and versions follow
-[Semantic Versioning](https://semver.org/spec/v2.0.0.html). Because the package is pre-1.0, breaking
-API changes increment the minor version.
+[Semantic Versioning](https://semver.org/spec/v2.0.0.html). Breaking public API changes require a
+major version; compatible corrections should retain explicit deprecation and migration paths.
 
 ## [Unreleased]
+
+### Added
+
+- Portable passkey state schemas/types for one logical WebAuthn credential with zero-or-many opaque
+  browser bindings and one-or-more PRF envelope variants: `vaultPasskeyCredentialMetadataSchema`,
+  `vaultPasskeyBindingMetadataSchema`, `vaultPasskeyEnvelopeVariantSchema`, and
+  `vaultPasskeyCredentialStateSchema`. Metadata supports stored transports, SimpleWebAuthn-compatible
+  device type, backup eligibility/state, opaque variant IDs, and an optional binding-selected variant.
+- Fail-closed credential selection: `scopeAuthenticationOptionsToCredential()`,
+  `selectAuthenticationCredentials()`, `PasskeyCredentialSelection`, and
+  `PasskeyCredentialScopeError` with deterministic failure codes.
+- Typed PRF capability via `resolvePasskeyPrfCapability()` (`unavailable`, `heuristic`, registration-
+  confirmed, authentication-confirmed, or incompatible) without returning PRF material.
+  Authentication confirmation requires the verified credential ID.
+- `sanitizeWebAuthnResponseForServer()` on the browser entry removes the complete PRF client-extension
+  result from registration/authentication JSON without mutating the browser-owned response.
+- Bounded local candidate unwrap via `unlockWithPasskeyPrfEnvelopeCandidates()` (maximum 5 variants),
+  returning matched opaque variant ID + non-extractable UVK or typed no-match/malformed/crypto states.
+- Explicit transport policies through `applyVaultUnlockTransportPolicy()`: preserve stored transports
+  (default), platform-only, discoverable, or the versioned Apple-mobile compatibility workaround.
+- `unlockVaultWithPasskeyCandidateRouting()` on the browser entry preserves emergency/decoy target,
+  session role, and callback behavior while selecting among envelope variants.
+- `VaultPasskeyBindingStore`, `VaultPasskeyBindingTarget`, `parsePasskeyBindingId()`,
+  `resolvePasskeyUnlockAvailable()`, and `passkeyUnlockAvailableOnThisBrowser` terminology.
+- Migration guide: [`docs/MIGRATING_PASSKEYS_FROM_1_2_0.md`](docs/MIGRATING_PASSKEYS_FROM_1_2_0.md).
+
+### Changed
+
+- **Security behavior change:** credential scoping now fails closed for missing, mismatched, duplicate,
+  or malformed `allowCredentials`. Empty/absent allow-lists require an explicit discoverable flow.
+- `prepareVaultUnlockAuthenticationOptions()` and `prepareVaultPasskeyPrfAuthenticationOptions()`
+  preserve stored transports by default; Apple `internal` pinning is opt-in.
+- `resolvePasskeyUnlockAvailableOnDevice()` now returns `false` when binding availability is omitted.
+  Explicit “use an existing passkey” discovery/rebinding remains a separate consumer flow.
+- Legacy vault-key AAD routing now accepts missing/null contexts by default and explicit non-canonical
+  strings only through `VaultCryptoProfile.legacyVaultKeyAadContexts`; arbitrary contexts fail closed.
+
+### Deprecated
+
+- `scopeAuthenticationOptionsToDevice()` (use credential terminology), `parseDeviceBindingId()`
+  (binding IDs are opaque), `VaultDeviceBindingStore`, `resolvePasskeyUnlockAvailableOnDevice()`,
+  `preferPlatformTransportsForVaultUnlock()`, and `isPrfExtensionSupported()` (heuristic-only name).
+
+### Security
+
+- Candidate unwrap validates one verified credential, candidate count, runtime envelope schema, unique
+  variant IDs, expected AAD scope/profile (with only missing/null or explicitly allowlisted legacy
+  contexts), and bounded
+  ciphertext before crypto work. It has no
+  persistence, revocation, cache, or session side effects and never serializes PRF bytes/hashes.
+- Recovery-authorized consumers can add a compatibility variant without overwriting a known-good
+  envelope; authorization and persistence remain application-owned.
 
 ## [1.2.0] - 2026-07-06
 

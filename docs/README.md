@@ -10,6 +10,9 @@ Use this page as the documentation router for `@tgoliveira/vault-core`.
   migration for an application that already has vault code or stored ciphertext.
 - [`ADOPTING_VAULT_CORE_1_1_0.md`](ADOPTING_VAULT_CORE_1_1_0.md): upgrade from 1.0.x — passkey PRF
   epic (#8–#16), duplicate removal, dock wiring, legacy AAD sunset.
+- [`MIGRATING_PASSKEYS_FROM_1_2_0.md`](MIGRATING_PASSKEYS_FROM_1_2_0.md): correct 1.2.0 passkey
+  integrations for synced credentials, opaque bindings, envelope variants, strict scoping, typed PRF
+  capability, and explicit transports.
 - [`INTEGRATING_EMERGENCY_DURESS_MODE.md`](INTEGRATING_EMERGENCY_DURESS_MODE.md): emergency / duress
   mode — decoy vault enrollment, unlock routing, dock long-press, exit flow.
 - [`../apps/consumer-demo/README.md`](../apps/consumer-demo/README.md): runnable local reference app
@@ -43,4 +46,3 @@ Use this page as the documentation router for `@tgoliveira/vault-core`.
 
 If documentation and implementation disagree, treat the TypeScript declarations and runtime tests as
 the immediate source of truth, then fix the documentation in the same change.
-

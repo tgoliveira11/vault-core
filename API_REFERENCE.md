@@ -14,7 +14,7 @@ For complete workflows, use [`docs/IMPLEMENTATION_GUIDE.md`](docs/IMPLEMENTATION
 | `ENCRYPTION_ALG` | Stored algorithm identifier, currently `AES-GCM` |
 | `VAULT_CRYPTO_VERSION` | Vault protocol version, currently `vault-v1` |
 | `DEFAULT_VAULT_AUTO_LOCK_MINUTES` | Default browser inactivity timeout |
-| `VaultCryptoProfile` | Stable application AAD contexts (`legacyVaultKeyUnlock?` defaults true) |
+| `VaultCryptoProfile` | Stable AAD contexts; legacy missing/null routing plus explicit `legacyVaultKeyAadContexts?` allowlist |
 | `VaultAadScope`, `VaultAadField` | Authenticated user/resource/field scope |
 | `RecoveryPhraseWordCount` | `12 | 24` |
 | `resolveAadContext(scope, profile)` | Resolves explicit or profile-derived AAD context |
@@ -135,22 +135,31 @@ provided.
 - `createPasskeyPrfEnvelope(vaultKey, prfOutput, scope, profile, publicMetadata?, options?)` — optional `WrapUserVaultKeyOptions` for re-wrap with `innerVaultKeyBlob`
 - `createPasskeyPrfEnvelopeWithSessionCache(...)` — uses in-memory inner-key cache when `innerVaultKeyBlob` is omitted
 - `unlockWithPasskeyPrfEnvelope(envelope, prfOutput, expectedScope, profile, options?)`
+- `unlockWithPasskeyPrfEnvelopeCandidates(input)` — tries at most
+  `MAX_PASSKEY_PRF_ENVELOPE_CANDIDATES` (5) variants for one verified credential; returns matched
+  opaque ID + non-extractable UVK or typed no-match/malformed/crypto status
 - `unwrapVaultKeyFromPasskey(encryptedVaultKey, prfOutput, expectedScope, profile)`
-- `isLegacyVaultKeyEnvelope(payload, profile)` / `unwrapVaultKeyWithLegacyAadFallback(...)` / `unlockVaultKeyEnvelopeWithAadRouting(...)`
+- `isLegacyVaultKeyEnvelope(payload, profile)` / `isVaultKeyAadContextAllowed(context, profile)` / `unwrapVaultKeyWithLegacyAadFallback(...)` / `unlockVaultKeyEnvelopeWithAadRouting(...)`
 - `normalizeEnvelopeAadContext(payload, profile)`
 - `extractPasskeyPrfOutput(extensionResults, options?)` — prefers `evalByCredential[credentialId]` on Safari; coerces ArrayBuffer, views, base64url, and number arrays
 - `prfBytesForAes256Import(bytes)` — normalizes PRF output to 32 bytes for AES import
-- `isPasskeySupported()` / `isPrfExtensionSupported(options?)` — gates Apple mobile iOS &lt; 18
+- `resolvePasskeyPrfCapability(input?)` — typed heuristic, registration-confirmed,
+  authentication-confirmed, unavailable, or incompatible state; never returns PRF material
+- `isPasskeySupported()` / `isPrfExtensionHeuristicallyAvailable(options?)` — preliminary API/UA
+  heuristic; `isPrfExtensionSupported()` is a deprecated alias
 - `parseAppleMobileOsMajorVersion(userAgent)`, `DEFAULT_APPLE_MOBILE_PRF_MIN_MAJOR_VERSION`
 
-### Passkey device binding
+### Passkey credential, binding, and envelope variants
 
 | Export | Purpose |
 | --- | --- |
-| `VaultDeviceBindingStore` | App-owned persistence contract |
-| `parseDeviceBindingId(raw)` | Parses `v1.<credentialId>` or raw credential id |
-| `scopeAuthenticationOptionsToDevice(options, { credentialId })` | Filters `allowCredentials` to the bound credential |
-| `resolvePasskeyUnlockAvailableOnDevice(...)` | Server helper for status APIs |
+| `VaultPasskeyBindingStore` / `VaultPasskeyBindingTarget` | App-owned opaque binding → credential/selected variant contract |
+| `parsePasskeyBindingId(raw)` | Parses an opaque `v1.<bindingId>` or raw binding ID |
+| `PasskeyCredentialSelection` | Explicit `exact`, `allow-list`, or `discoverable` selection |
+| `scopeAuthenticationOptionsToCredential(...)` | Strictly filters to one credential or throws `PasskeyCredentialScopeError` |
+| `selectAuthenticationCredentials(...)` | Applies explicit selection mode |
+| `resolvePasskeyUnlockAvailable(...)` | Bound-browser quick-unlock status; missing binding fails closed |
+| Deprecated device-named aliases | Compatibility only; see migration guide |
 
 Example: [`docs/examples/device-binding/README.md`](docs/examples/device-binding/README.md).
 
@@ -167,6 +176,10 @@ Node/tests; the default is `navigator.userAgent` in the browser.
 | `passwordEnvelopeSchema` | Password method plus required Argon2id metadata |
 | `recoveryPhraseEnvelopeSchema` | Recovery method plus required Argon2id metadata |
 | `passkeyPrfEnvelopeSchema` | Passkey PRF method plus null KDF metadata |
+| `vaultPasskeyCredentialMetadataSchema` | Credential ID, stored transports, device/backup metadata |
+| `vaultPasskeyBindingMetadataSchema` | Opaque binding → credential + optional selected variant |
+| `vaultPasskeyEnvelopeVariantSchema` | Opaque variant + credential + PRF envelope |
+| `vaultPasskeyCredentialStateSchema` | One credential with many bindings and one-or-more variants |
 | `storedEnvelopeSchema` | Method-discriminated union of all envelopes |
 | `vaultSetupEnvelopeFieldsSchema` | Complete encrypted setup record |
 | `vaultDecoyRecordSchema` | Decoy (emergency) vault crypto record |
@@ -175,7 +188,9 @@ Node/tests; the default is `navigator.userAgent` in the browser.
 
 Associated inferred types include `EncryptedVaultPayload`, `Argon2idKdfMetadata`, `VaultEnvelope`,
 `PasswordEnvelope`, `RecoveryPhraseEnvelope`, `PasskeyPrfEnvelope`, `VaultEnvelopeMethod`,
-`VaultDecoyRecord`, `VaultSetupWithDecoy`, and `VaultEmergencyServerMetadata`.
+`VaultPasskeyCredentialMetadata`, `VaultPasskeyBindingMetadata`, `VaultPasskeyEnvelopeVariant`,
+`VaultPasskeyCredentialState`, `VaultDecoyRecord`, `VaultSetupWithDecoy`, and
+`VaultEmergencyServerMetadata`.
 
 ### Emergency / duress mode
 
@@ -199,6 +214,7 @@ Associated inferred types include `EncryptedVaultPayload`, `Argon2idKdfMetadata`
 | `clearEmergencyModePin()` | Clear pin after recovery-gated exit |
 | `unlockVaultWithPasswordRouting(input)` | Password unlock with duress sequence routing |
 | `unlockVaultWithPasskeyRouting(input)` | Passkey unlock with long-press latch routing |
+| `unlockVaultWithPasskeyCandidateRouting(input)` | Bounded variant matching with the same primary/decoy session routing |
 | `exitEmergencyMode(input)` | Primary recovery phrase gate (+ optional OTP param) |
 | `hydrateVaultEmergencyModeFromServer(flag)` | Apply server `emergencyModeActive` on load |
 
@@ -250,6 +266,7 @@ are still required.
 - `VaultNotFoundError`
 - `PasskeyPrfRequiredError`
 - `PasskeyUnlockError`
+- `PasskeyCredentialScopeError` — fail-closed selection error with typed `code` and descriptor index
 - `RecoveryPhraseConfirmationError`
 - `VaultAuthorizationError`
 - `VaultPasswordUnchangedError`
@@ -315,7 +332,9 @@ boolean aliases that fail closed.
 - `buildPrfSaltBytes(prefix, userId)`
 - `createRecoveryKitDownload(content, filename)`
 - `printRecoveryKitContent(content)`
-- `extractPasskeyPrfOutput`, `isPasskeySupported`, `isPrfExtensionSupported`
+- `extractPasskeyPrfOutput`, `isPasskeySupported`, `isPrfExtensionHeuristicallyAvailable`,
+  `resolvePasskeyPrfCapability`
+- `unlockWithPasskeyPrfEnvelopeCandidates`, `MAX_PASSKEY_PRF_ENVELOPE_CANDIDATES`
 - `createPasskeyPrfEnvelopeWithSessionCache`, `CreatePasskeyPrfEnvelopeOptions`
 - `VaultInnerKeyMaterialCache` — memory-only inner-key cache (`clear`, `getCached`, `cacheFromEnvelopeDecrypt`, `cacheFromPasskeyEnvelope`)
 - `cacheVaultInnerKeyMaterialAfterPasswordUnlock`, `cacheVaultInnerKeyMaterialAfterRecoveryUnlock`, `cacheVaultInnerKeyMaterialFromPasskeyUnlock`
@@ -323,9 +342,14 @@ boolean aliases that fail closed.
 - `INNER_VAULT_KEY_CACHE_MISMATCH_MESSAGE` — actionable error when cached material is stale
 - `prepareWebAuthnPrfExtensions(extensions)` — coerce JSON PRF salts to `ArrayBuffer`
 - `alignPrfExtensionsForCredential(options, credentialId?)` — single-credential iOS `eval` parity
-- `preferPlatformTransportsForVaultUnlock(options, userAgent?)` — pin `internal` on Apple mobile
-- `prepareVaultUnlockAuthenticationOptions(options, { credentialId?, userAgent?, filterSingleCredential? })` — composed PRF ceremony prep (unlock, enable, disable, re-wrap)
-- `prepareVaultPasskeyPrfAuthenticationOptions({ userId, prfSaltPrefix, serverOptions, prepareJson?, credentialId?, userAgent?, filterSingleCredential?, scopeToDevice? })` — full pipeline: optional JSON preparer → PRF salt merge → optional device scoping → ceremony prep
+- `applyVaultUnlockTransportPolicy(options, policy?, userAgent?)` — preserve (default), platform-only,
+  discoverable, or explicit Apple-mobile workaround
+- `prepareVaultUnlockAuthenticationOptions(options, { credentialSelection?, transportPolicy?, ... })`
+  — composed PRF ceremony prep with fail-closed explicit selection
+- `prepareVaultPasskeyPrfAuthenticationOptions({ userId, prfSaltPrefix, serverOptions, prepareJson?, credentialSelection?, transportPolicy?, ... })`
+  — full pipeline for unlock, enable, disable, and re-wrap
+- `sanitizeWebAuthnResponseForServer(response)` — returns a non-mutating response copy without
+  `clientExtensionResults.prf`; call before JSON serialization to a server
 - `isAppleMobileUserAgent(userAgent)`, `resolveVaultUnlockUserAgent(userAgent?)`
 - `createRecoveryKitText`, `buildRecoveryKitContent`
 
@@ -336,7 +360,8 @@ boolean aliases that fail closed.
 - `useVaultUnlocked()` / `useVaultLockState()`
 - `resolveVaultClientStatus(status, unlocked, prfSupported)`
 - `useVaultClientStatus(serverStatus, prfSupported)`
-- `VaultClientStatus` / `VaultServerStatusSnapshot` (`passkeyUnlockAvailableOnThisDevice?`)
+- `VaultClientStatus` / `VaultServerStatusSnapshot` (`passkeyUnlockAvailableOnThisBrowser?`;
+  deprecated device field retained)
 
 Provider and session hook guard options are `registerActivityGuard` (defaults to `false`) and
 `registerUnloadGuard` (defaults to `true`). Set `registerActivityGuard` when the app should renew the

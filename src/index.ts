@@ -83,9 +83,12 @@ export * from "./payload/encrypted-payload.js";
 export * from "./envelopes/password.js";
 export * from "./envelopes/recovery.js";
 export * from "./envelopes/passkey-prf.js";
+export * from "./envelopes/passkey-prf-candidates.js";
+export * from "./passkey/model.js";
 export * from "./passkey/device-binding/index.js";
 export {
   isLegacyVaultKeyEnvelope,
+  isVaultKeyAadContextAllowed,
   unwrapVaultKeyWithLegacyAadFallback,
   unlockVaultKeyEnvelopeWithAadRouting,
 } from "./envelopes/legacy-vault-key-unlock.js";

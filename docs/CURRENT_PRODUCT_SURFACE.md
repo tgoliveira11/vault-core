@@ -2,7 +2,7 @@
 
 Living inventory of what `@tgoliveira/vault-core` exposes today. Update this file when exports, admin screens, published artifacts, or shipped/planned status changes.
 
-Last reviewed: **2026-07-06** (package version **1.1.2**, emergency / duress mode)
+Last reviewed: **2026-07-25** (package version **1.2.0**, passkey multi-device correction in Unreleased)
 
 
 ## Package entry points (shipped)
@@ -26,19 +26,21 @@ Last reviewed: **2026-07-06** (package version **1.1.2**, emergency / duress mod
 
 - AES-256-GCM encrypted payloads with canonical AAD
 - Argon2id password and recovery envelopes (`kdf-v1` legacy, `kdf-v2` recommended)
-- Passkey PRF envelope wrap/unwrap (no WebAuthn ceremony)
+- Passkey PRF envelope wrap/unwrap, including bounded local candidate-variant matching (no WebAuthn ceremony)
 - Robust `extractPasskeyPrfOutput` with Safari `evalByCredential` preference and byte coercion
+- Typed `sanitizeWebAuthnResponseForServer` removal of PRF extension results before server serialization
 - WebAuthn PRF ceremony prep (`prepareWebAuthnPrfExtensions`, `alignPrfExtensionsForCredential`,
-  `preferPlatformTransportsForVaultUnlock`, `prepareVaultUnlockAuthenticationOptions`,
+  `applyVaultUnlockTransportPolicy`, `prepareVaultUnlockAuthenticationOptions`,
   `prepareVaultPasskeyPrfAuthenticationOptions`)
-- iOS PRF capability gate (`isPrfExtensionSupported` with `userAgent` / `minAppleMobileMajorVersion`,
-  `parseAppleMobileOsMajorVersion`, `DEFAULT_APPLE_MOBILE_PRF_MIN_MAJOR_VERSION`)
+- Typed PRF capability (`resolvePasskeyPrfCapability`) separating heuristic/API availability from
+  registration `prf.enabled`, authentication `prf.results`, and incompatible/missing results
 - BIP39 12/24-word recovery phrases and recovery kit text
 - Password rotation (`rotateVaultPassword`)
 - Recovery phrase rotation (`rotateRecoveryPhrase`)
 - Vault deletion after authorization (`deleteVaultAfterAuthorization`, `deleteVaultWithPasswordAuthorization` on browser entry)
 - Runtime vault payload validation (`decryptVaultPayloadWithSchema`, `VaultPayloadValidationError`)
-- `normalizeEnvelopeAadContext` for passkey envelopes missing `aad.context`
+- `normalizeEnvelopeAadContext` for passkey envelopes missing `aad.context`, plus fail-closed legacy
+  AAD allowlisting through `legacyVaultKeyAadContexts`
 - Auto-upgrade legacy KDF on unlock
 - Plaintext rejection / sentinel validation
 - Canonical crypto policy (`VAULT_CRYPTO_POLICY`) + CI guard
@@ -48,8 +50,11 @@ Last reviewed: **2026-07-06** (package version **1.1.2**, emergency / duress mod
   `unwrapUserVaultKeyWithPrfOutput`, `WrapUserVaultKeyOptions`)
 - Passkey enroll after unlock: `createPasskeyPrfEnvelope` options, `createPasskeyPrfEnvelopeWithSessionCache`,
   browser `VaultInnerKeyMaterialCache` (memory-only, cleared on lock)
-- Passkey device binding (`VaultDeviceBindingStore`, `scopeAuthenticationOptionsToDevice`,
-  `resolvePasskeyUnlockAvailableOnDevice`, `parseDeviceBindingId`; `docs/examples/device-binding/`)
+- Passkey credential/binding/variant model (`VaultPasskeyBindingStore`, runtime state schemas,
+  `scopeAuthenticationOptionsToCredential`, `PasskeyCredentialSelection`,
+  `resolvePasskeyUnlockAvailable`, `parsePasskeyBindingId`; deprecated device aliases retained)
+- Passkey PRF envelope candidates (`unlockWithPasskeyPrfEnvelopeCandidates`, maximum 5) and
+  emergency-aware `unlockVaultWithPasskeyCandidateRouting`
 - Passkey crypto failure classifier (`classifyPasskeyCryptoError`, `getDefaultPasskeyCryptoErrorMessage`, `PasskeyCryptoFailureKind`)
 
 ## Emergency / duress mode (shipped)
@@ -163,7 +168,7 @@ Exported from `@tgoliveira/vault-core/react` (styles: `vc-status-dock-*` in `vau
 | `tryConsumePasskeyAutoStart` / `resetPasskeyAutoStartDedupe` | Short-TTL sessionStorage dedupe for dock passkey auto-start |
 | `requestVaultDockExpand` / `subscribeVaultDockExpand` | Programmatic expand from locked-content gates |
 | `useVaultAutoLockCountdown` / `useVaultAutoLockFraction` | Live auto-lock countdown and ring fraction |
-| `resolveVaultDockPasskeyAvailability` | Passkey PRF quick-unlock eligibility (envelope + PRF + device flag) |
+| `resolveVaultDockPasskeyAvailability` | Passkey PRF quick-unlock eligibility (envelope + PRF + bound-browser flag) |
 | Copy/preference helpers | `getVaultStatusDockExpandedCopy`, collapse `localStorage` preference |
 
 Apps inject routes (`unlockPath`, `buildUnlockHref`, `LinkComponent`), server status snapshot,

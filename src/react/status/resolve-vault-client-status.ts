@@ -11,6 +11,8 @@ export type VaultClientStatus =
 export type VaultServerStatusSnapshot = {
   configured: boolean;
   hasPasskeyPrfEnvelope?: boolean;
+  passkeyUnlockAvailableOnThisBrowser?: boolean;
+  /** @deprecated Use passkeyUnlockAvailableOnThisBrowser. */
   passkeyUnlockAvailableOnThisDevice?: boolean;
   emergencyModeActive?: boolean;
   decoyConfigured?: boolean;

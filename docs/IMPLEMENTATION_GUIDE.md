@@ -86,9 +86,9 @@ A minimal server record contains only encrypted structures and non-secret status
 ```ts
 import type {
   EncryptedVaultPayload,
-  PasskeyPrfEnvelope,
   PasswordEnvelope,
   RecoveryPhraseEnvelope,
+  VaultPasskeyCredentialState,
 } from "@tgoliveira/vault-core";
 
 export type StoredVaultRecord = {
@@ -96,9 +96,14 @@ export type StoredVaultRecord = {
   encryptedBlob: EncryptedVaultPayload;
   passwordEnvelope: PasswordEnvelope;
   recoveryEnvelope: RecoveryPhraseEnvelope;
-  passkeyPrfEnvelope?: PasskeyPrfEnvelope | null;
+  passkeyCredentials?: VaultPasskeyCredentialState[];
 };
 ```
+
+Each passkey state keeps three identities separate: one logical WebAuthn credential, zero or many
+opaque browser bindings, and one or more PRF envelope variants. A synced multi-device credential can
+be used from another device without creating a second credential. Treat bindings only as routing
+metadata; they are neither credential IDs nor authorization factors.
 
 The server may store these structures because ciphertext, IV, salt, bounded KDF metadata, and AAD are
 not plaintext secrets. The server must never receive the vault password, recovery phrase, UVK, PRF
@@ -113,7 +118,10 @@ const record = vaultSetupEnvelopeFieldsSchema.parse(untrustedDatabaseValue);
 ```
 
 The envelope schemas are discriminated by `method`. Password and recovery envelopes require
-Argon2id metadata; passkey PRF envelopes require `kdfMetadata: null`.
+Argon2id metadata; passkey PRF envelopes require `kdfMetadata: null`. Validate each portable passkey
+record with `vaultPasskeyCredentialStateSchema`. See
+[MIGRATING_PASSKEYS_FROM_1_2_0.md](./MIGRATING_PASSKEYS_FROM_1_2_0.md) before migrating existing
+single-binding records.
 
 ## 5. Initial vault setup
 
@@ -188,9 +196,12 @@ export async function createInitialVault<T>(input: {
 }
 ```
 
-Send only `serverRecord` to the server. Keep `recoveryPhrase` in the recovery confirmation UI and
-`clientOnlyVaultKey` in the in-memory session. Never serialize either value into analytics, logs,
-URLs, cookies, localStorage, IndexedDB, server actions, or API requests.
+`serverRecord` is the validated setup output. If it contains `passkeyPrfEnvelope`, persist that
+envelope as the first variant under the server-verified credential ID; do not use a browser binding
+ID as the credential or variant ID. Send only encrypted/public metadata to the server. Keep
+`recoveryPhrase` in the recovery confirmation UI and `clientOnlyVaultKey` in the in-memory session.
+Never serialize either value into analytics, logs, URLs, cookies, localStorage, IndexedDB, server
+actions, or API requests.
 
 Argon2id work is deliberately sequential in this example to avoid doubling peak browser memory.
 
@@ -309,8 +320,8 @@ what to import vs delete (inner-key cache, WebAuthn prep, legacy AAD, device bin
 
 The package does not run WebAuthn ceremonies. The application must request the PRF extension and pass
 the first PRF result to vault-core. Use the browser helpers below to prepare authentication options
-(iOS `eval` parity, salt coercion, Apple mobile transport pinning) before calling
-`navigator.credentials.get`.
+(iOS `eval` parity, salt coercion, fail-closed credential selection, and an explicit transport
+policy) before calling `navigator.credentials.get`. Stored transports are preserved by default.
 
 ### PRF authentication ceremonies (unlock **and** enroll/manage)
 
@@ -346,13 +357,8 @@ const credential = await navigator.credentials.get({ publicKey });
 ```ts
 import { prepareAuthenticationOptions } from "@tgoliveira/secure-auth/client";
 import {
-  buildPrfSaltBytes,
   prepareVaultPasskeyPrfAuthenticationOptions,
-  resolveVaultUnlockUserAgent,
 } from "@tgoliveira/vault-core/browser";
-import { scopeAuthenticationOptionsToDevice } from "@tgoliveira/vault-core";
-
-const userAgent = resolveVaultUnlockUserAgent();
 
 // One function for unlock, enable, disable, and re-wrap ceremonies:
 const publicKey = await prepareVaultPasskeyPrfAuthenticationOptions({
@@ -360,9 +366,8 @@ const publicKey = await prepareVaultPasskeyPrfAuthenticationOptions({
   prfSaltPrefix: "acme-passkey-prf-v1:",
   serverOptions: serverOptionsJson,
   prepareJson: prepareAuthenticationOptions,
-  credentialId,
-  userAgent,
-  scopeToDevice: true, // unlock on a bound device; omit for single-credential enable
+  credentialSelection: { mode: "exact", credentialId },
+  transportPolicy: "preserve",
 });
 
 const credential = await navigator.credentials.get({ publicKey });
@@ -375,11 +380,9 @@ import { prepareAuthenticationOptions } from "@tgoliveira/secure-auth/client";
 import {
   buildPrfSaltBytes,
   prepareVaultUnlockAuthenticationOptions,
-  resolveVaultUnlockUserAgent,
 } from "@tgoliveira/vault-core/browser";
-import { scopeAuthenticationOptionsToDevice } from "@tgoliveira/vault-core";
+import { scopeAuthenticationOptionsToCredential } from "@tgoliveira/vault-core";
 
-const userAgent = resolveVaultUnlockUserAgent();
 const salt = await buildPrfSaltBytes("acme-passkey-prf-v1:", userId);
 
 let options = prepareAuthenticationOptions(serverOptionsJson);
@@ -395,11 +398,10 @@ options = {
   },
 };
 
-options = scopeAuthenticationOptionsToDevice(options, { credentialId });
+options = scopeAuthenticationOptionsToCredential(options, { credentialId });
 const publicKey = prepareVaultUnlockAuthenticationOptions(options, {
-  credentialId,
-  filterSingleCredential: true,
-  userAgent,
+  credentialSelection: { mode: "exact", credentialId },
+  transportPolicy: "preserve",
 });
 ```
 
@@ -415,13 +417,15 @@ import {
   buildPrfSaltBytes,
   extractPasskeyPrfOutput,
   isPasskeySupported,
-  isPrfExtensionSupported,
   prepareVaultUnlockAuthenticationOptions,
+  resolvePasskeyPrfCapability,
+  sanitizeWebAuthnResponseForServer,
 } from "@tgoliveira/vault-core/browser";
 
 const salt = await buildPrfSaltBytes("acme-passkey-prf-v1:", userId);
 
-if (!isPasskeySupported() || !isPrfExtensionSupported()) {
+const preliminaryPrfCapability = resolvePasskeyPrfCapability();
+if (!isPasskeySupported() || preliminaryPrfCapability.state === "unavailable") {
   // Offer password or recovery phrase unlock instead.
 }
 
@@ -438,7 +442,10 @@ const publicKey = prepareVaultUnlockAuthenticationOptions(
       },
     },
   },
-  { credentialId, filterSingleCredential: true }
+  {
+    credentialSelection: { mode: "exact", credentialId },
+    transportPolicy: "preserve",
+  }
 );
 
 const credential = await navigator.credentials.get({ publicKey });
@@ -451,12 +458,39 @@ const prfOutput = extractPasskeyPrfOutput(
   credential.getClientExtensionResults(),
   { credentialId: credential.id }
 );
+
+// Give the app-owned WebAuthn JSON serializer only PRF-free extension results.
+const safeClientExtensionResults = sanitizeWebAuthnResponseForServer({
+  clientExtensionResults: credential.getClientExtensionResults(),
+}).clientExtensionResults;
+void safeClientExtensionResults;
+
+// After sending the sanitized assertion, use the credential id returned by successful
+// application-owned server verification.
+declare const verifiedCredentialId: string;
+if (verifiedCredentialId !== credential.id) {
+  throw new Error("Verified passkey credential mismatch");
+}
+const confirmedPrfCapability = resolvePasskeyPrfCapability({
+  ceremony: "authentication",
+  verifiedCredentialId,
+  clientExtensionResults: credential.getClientExtensionResults() as Record<string, unknown>,
+});
+
+if (!prfOutput || confirmedPrfCapability.state !== "confirmed_authentication") {
+  throw new Error("This passkey did not return a usable PRF result");
+}
 ```
+
+The preliminary result is only a heuristic. Treat PRF authentication as confirmed only when
+`confirmedPrfCapability.state === "confirmed_authentication"` and after the server returns the same
+verified credential ID. Never serialize extension results or PRF bytes to the server; send only the
+sanitized copy.
 
 Credential verification and server-side WebAuthn validation remain application-owned. Never send
 `prfOutput` to the server.
 
-Unlock after obtaining the PRF output:
+For a single already-selected envelope variant, unlock after obtaining the PRF output:
 
 ```ts
 import {
@@ -464,7 +498,7 @@ import {
   unlockWithPasskeyPrfEnvelope,
 } from "@tgoliveira/vault-core";
 
-const envelope = passkeyPrfEnvelopeSchema.parse(serverRecord.passkeyPrfEnvelope);
+const envelope = passkeyPrfEnvelopeSchema.parse(selectedEnvelopeVariant.envelope);
 const vaultKey = await unlockWithPasskeyPrfEnvelope(
   envelope,
   prfOutput,
@@ -474,6 +508,50 @@ const vaultKey = await unlockWithPasskeyPrfEnvelope(
 ```
 
 Treat PRF support as an optional unlock method. Always preserve password or recovery fallback.
+
+### Synced credentials, bindings, and envelope variants
+
+After the server verifies the assertion, return at most five active variants belonging to the
+verified credential. Try them locally in server order so a binding-selected variant can be first:
+
+```ts
+import {
+  cacheVaultInnerKeyMaterialFromPasskeyUnlock,
+  unlockVaultSession,
+  unlockWithPasskeyPrfEnvelopeCandidates,
+} from "@tgoliveira/vault-core/browser";
+
+const candidateResult = await unlockWithPasskeyPrfEnvelopeCandidates({
+  verifiedCredentialId,
+  candidates: serverCandidates,
+  prfOutput,
+  expectedScope: vaultScope(userId),
+  profile: VAULT_PROFILE,
+});
+
+if (candidateResult.status === "matched") {
+  await unlockVaultSession(candidateResult.vaultKey);
+  const matchedCandidate = serverCandidates.find(
+    (candidate) => candidate.envelopeVariantId === candidateResult.envelopeVariantId
+  );
+  if (!matchedCandidate) throw new Error("Matched passkey envelope variant is missing");
+  await cacheVaultInnerKeyMaterialFromPasskeyUnlock(
+    candidateResult.vaultKey,
+    matchedCandidate.envelope,
+    prfOutput
+  );
+  await persistOpaqueBinding({
+    credentialId: verifiedCredentialId,
+    selectedEnvelopeVariantId: candidateResult.envelopeVariantId,
+  });
+}
+```
+
+`no_match` must leave all variants intact and the vault locked. Require password or recovery locally
+before adding a compatibility variant. When emergency/duress mode is enabled, use
+`unlockVaultWithPasskeyCandidateRouting()` so candidate matching preserves primary/decoy routing and
+session roles. After either matched flow, populate the memory-only inner-key cache from the matched
+envelope when later passkey enrollment or re-wrap must work with the non-extractable session UVK.
 
 ### Passkey enroll after unlock (non-extractable session UVK)
 
@@ -958,6 +1036,11 @@ Never make missing AAD context a permanent high-level fallback.
 - [ ] Password, phrase, UVK, PRF output, and decrypted payload never reach the server or logs.
 - [ ] Decrypted data is absent from localStorage, IndexedDB, cookies, URLs, and analytics.
 - [ ] Password and recovery unlock remain available if passkey PRF is unsupported.
+- [ ] Credentials, opaque bindings, and envelope variants are persisted as separate identities.
+- [ ] Exact credential selection fails closed; discoverable authentication is explicitly requested.
+- [ ] Candidate variants are bounded, scoped to the server-verified credential and AAD, and matched locally.
+- [ ] PRF capability is confirmed from ceremony results; PRF extension results never reach the server.
+- [ ] Stored credential transports are preserved unless an explicit compatibility policy is selected.
 - [ ] Recovery confirmation and offline storage education are implemented.
 - [ ] In-memory sessions auto-lock and clear on `pagehide`.
 - [ ] Rotation and recovery updates are atomic and authorization-protected.

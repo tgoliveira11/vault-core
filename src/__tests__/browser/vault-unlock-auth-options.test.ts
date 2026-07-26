@@ -9,7 +9,7 @@ const IPHONE_UA =
   "Mozilla/5.0 (iPhone; CPU iPhone OS 18_0 like Mac OS X) AppleWebKit/605.1.15";
 
 describe("prepareVaultUnlockAuthenticationOptions", () => {
-  it("composes PRF alignment, salt coercion, filtering, and transport pinning", () => {
+  it("composes PRF alignment, salt coercion, strict filtering, and explicit transport policy", () => {
     const prepared = prepareVaultUnlockAuthenticationOptions(
       {
         challenge: new Uint8Array(32),
@@ -29,6 +29,7 @@ describe("prepareVaultUnlockAuthenticationOptions", () => {
         credentialId: CREDENTIAL_A,
         userAgent: IPHONE_UA,
         filterSingleCredential: true,
+        transportPolicy: "apple-mobile-internal-workaround",
       }
     );
 
@@ -39,8 +40,8 @@ describe("prepareVaultUnlockAuthenticationOptions", () => {
     expect(prepared.extensions?.prf?.evalByCredential).toBeUndefined();
   });
 
-  it("skips filtering when credentialId is not in allowCredentials", () => {
-    const prepared = prepareVaultUnlockAuthenticationOptions(
+  it("fails closed when credentialId is not in allowCredentials", () => {
+    expect(() => prepareVaultUnlockAuthenticationOptions(
       {
         challenge: new Uint8Array(32),
         allowCredentials: [
@@ -49,8 +50,11 @@ describe("prepareVaultUnlockAuthenticationOptions", () => {
         ],
       },
       { credentialId: "missing", filterSingleCredential: true, userAgent: IPHONE_UA }
-    );
-    expect(prepared.allowCredentials).toHaveLength(2);
+    )).toThrowError(expect.objectContaining({ code: "credential_not_found" }));
+    expect(() => prepareVaultUnlockAuthenticationOptions(
+      { challenge: new Uint8Array(32), allowCredentials: [] },
+      { filterSingleCredential: true }
+    )).toThrowError(expect.objectContaining({ code: "invalid_credential_id" }));
   });
 
   it("returns options unchanged when extensions are absent", () => {
@@ -60,6 +64,46 @@ describe("prepareVaultUnlockAuthenticationOptions", () => {
     };
     const prepared = prepareVaultUnlockAuthenticationOptions(options, { userAgent: IPHONE_UA });
     expect(prepared.extensions).toBeUndefined();
-    expect(prepared.allowCredentials?.[0]?.transports).toEqual(["internal"]);
+    expect(prepared.allowCredentials?.[0]?.transports).toBeUndefined();
+  });
+
+  it("supports explicit discoverable credential flow", () => {
+    const prepared = prepareVaultUnlockAuthenticationOptions(
+      {
+        challenge: new Uint8Array(32),
+        allowCredentials: [{ id: CREDENTIAL_A, type: "public-key" }],
+      },
+      {
+        credentialId: CREDENTIAL_A,
+        filterSingleCredential: true,
+        transportPolicy: "discoverable",
+      }
+    );
+    expect(prepared.allowCredentials).toEqual([]);
+  });
+
+  it("supports explicit credential selection and rejects legacy flag conflicts", () => {
+    const options = {
+      challenge: new Uint8Array(32),
+      allowCredentials: [
+        { id: CREDENTIAL_A, type: "public-key" as const },
+        { id: CREDENTIAL_B, type: "public-key" as const },
+      ],
+    };
+    expect(prepareVaultUnlockAuthenticationOptions(options, {
+      credentialSelection: { mode: "exact", credentialId: CREDENTIAL_B },
+    }).allowCredentials).toEqual([{ id: CREDENTIAL_B, type: "public-key" }]);
+    expect(() => prepareVaultUnlockAuthenticationOptions(options, {
+      credentialSelection: { mode: "allow-list" },
+      filterSingleCredential: true,
+    })).toThrowError(expect.objectContaining({ code: "conflicting_credential_selection" }));
+    expect(() => prepareVaultUnlockAuthenticationOptions(options, {
+      credentialSelection: { mode: "exact", credentialId: CREDENTIAL_A },
+      transportPolicy: "discoverable",
+    })).toThrowError(expect.objectContaining({ code: "conflicting_credential_selection" }));
+    expect(() => prepareVaultUnlockAuthenticationOptions(options, {
+      credentialSelection: { mode: "discoverable" },
+      transportPolicy: "platform-only",
+    })).toThrowError(expect.objectContaining({ code: "conflicting_credential_selection" }));
   });
 });

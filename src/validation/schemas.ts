@@ -18,7 +18,8 @@ export const encryptedPayloadSchema = z.object({
     userId: z.string().uuid(),
     resourceId: z.string().uuid(),
     field: aadFieldSchema,
-    context: z.string().optional(),
+    /** Null is accepted only as persisted legacy input; high-level scope checks remain strict. */
+    context: z.string().nullable().optional(),
   }),
 });
 
