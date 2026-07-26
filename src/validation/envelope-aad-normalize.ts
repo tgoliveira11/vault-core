@@ -13,7 +13,7 @@ export function normalizeEnvelopeAadContext(
     return payload;
   }
 
-  const context = payload.aad.context as string | null | undefined;
+  const context = payload.aad.context;
   if (context !== undefined && context !== null) {
     return payload;
   }

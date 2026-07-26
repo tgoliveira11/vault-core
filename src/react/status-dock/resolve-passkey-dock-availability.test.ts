@@ -1,10 +1,10 @@
 import { describe, expect, it, vi } from "vitest";
 
 vi.mock("../../browser.js", () => ({
-  isPrfExtensionSupported: vi.fn(() => true),
+  isPrfExtensionHeuristicallyAvailable: vi.fn(() => true),
 }));
 
-import { isPrfExtensionSupported } from "../../browser.js";
+import { isPrfExtensionHeuristicallyAvailable } from "../../browser.js";
 import { resolveVaultDockPasskeyAvailability } from "./resolve-passkey-dock-availability.js";
 
 describe("resolveVaultDockPasskeyAvailability", () => {
@@ -17,7 +17,7 @@ describe("resolveVaultDockPasskeyAvailability", () => {
   });
 
   it("hides passkey when device binding is inactive on this browser", () => {
-    vi.mocked(isPrfExtensionSupported).mockReturnValue(true);
+    vi.mocked(isPrfExtensionHeuristicallyAvailable).mockReturnValue(true);
     expect(
       resolveVaultDockPasskeyAvailability({
         configured: true,
@@ -32,11 +32,12 @@ describe("resolveVaultDockPasskeyAvailability", () => {
   });
 
   it("hides passkey when PRF is unsupported in the browser", () => {
-    vi.mocked(isPrfExtensionSupported).mockReturnValue(false);
+    vi.mocked(isPrfExtensionHeuristicallyAvailable).mockReturnValue(false);
     expect(
       resolveVaultDockPasskeyAvailability({
         configured: true,
         hasPasskeyPrfEnvelope: true,
+        passkeyUnlockAvailableOnThisBrowser: true,
       })
     ).toEqual({
       hasEnvelope: true,
@@ -46,11 +47,12 @@ describe("resolveVaultDockPasskeyAvailability", () => {
   });
 
   it("shows passkey when envelope exists and PRF is supported", () => {
-    vi.mocked(isPrfExtensionSupported).mockReturnValue(true);
+    vi.mocked(isPrfExtensionHeuristicallyAvailable).mockReturnValue(true);
     expect(
       resolveVaultDockPasskeyAvailability({
         configured: true,
         hasPasskeyPrfEnvelope: true,
+        passkeyUnlockAvailableOnThisBrowser: true,
       })
     ).toEqual({
       hasEnvelope: true,
@@ -60,7 +62,7 @@ describe("resolveVaultDockPasskeyAvailability", () => {
   });
 
   it("shows passkey when device binding is active", () => {
-    vi.mocked(isPrfExtensionSupported).mockReturnValue(true);
+    vi.mocked(isPrfExtensionHeuristicallyAvailable).mockReturnValue(true);
     expect(
       resolveVaultDockPasskeyAvailability({
         configured: true,

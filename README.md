@@ -7,7 +7,8 @@ Framework-independent vault crypto primitives extracted from LiqSense.
 - User Vault Key (UVK) generation
 - AES-GCM encrypted payloads with canonical AAD
 - Argon2id password and recovery phrase envelopes
-- Passkey PRF envelope wrap/unwrap (PRF bytes only — no WebAuthn ceremony)
+- Passkey PRF envelope wrap/unwrap, synced-credential metadata, and bounded local variant matching
+  (PRF bytes only — no WebAuthn ceremony)
 - BIP39 12/24-word recovery phrases
 - No-plaintext validation helpers
 
@@ -54,6 +55,8 @@ See [CONTRIBUTING.md](CONTRIBUTING.md) and [docs/contributing.md](docs/contribut
 ## Documentation
 
 - [Adopting 1.1.0](docs/ADOPTING_VAULT_CORE_1_1_0.md) — upgrade from 1.0.x; remove duplicate passkey/legacy code
+- [Migrating passkeys from 1.2.0](docs/MIGRATING_PASSKEYS_FROM_1_2_0.md) — synced credentials,
+  multiple bindings/envelope variants, strict scoping, PRF capability, and transport policy
 - [Complete implementation guide](docs/IMPLEMENTATION_GUIDE.md)
 - [Documentation index](docs/README.md)
 - [API reference](API_REFERENCE.md)

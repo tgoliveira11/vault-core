@@ -3,6 +3,7 @@ import { createUserVaultKey } from "../../keys/user-vault-key.js";
 import { encryptField, decryptField } from "../../crypto/aes-gcm.js";
 import {
   isLegacyVaultKeyEnvelope,
+  isVaultKeyAadContextAllowed,
   unwrapVaultKeyWithLegacyAadFallback,
   unlockVaultKeyEnvelopeWithAadRouting,
 } from "../../envelopes/legacy-vault-key-unlock.js";
@@ -13,6 +14,7 @@ const PROFILE: VaultCryptoProfile = {
   cryptoVersion: "vault-v1",
   aadContextVault: "acme:vault:v1",
   aadContextEnvelope: "acme:envelope:v1",
+  legacyVaultKeyAadContexts: ["acme:legacy-envelope:v0"],
 };
 
 const SCOPE = {
@@ -58,6 +60,17 @@ describe("normalizeEnvelopeAadContext", () => {
 });
 
 describe("legacy vault key unlock", () => {
+  it("allows only canonical, missing/null, and explicitly allowlisted contexts", () => {
+    expect(isVaultKeyAadContextAllowed(PROFILE.aadContextEnvelope, PROFILE)).toBe(true);
+    expect(isVaultKeyAadContextAllowed(undefined, PROFILE)).toBe(true);
+    expect(isVaultKeyAadContextAllowed(null, PROFILE)).toBe(true);
+    expect(isVaultKeyAadContextAllowed("acme:legacy-envelope:v0", PROFILE)).toBe(true);
+    expect(isVaultKeyAadContextAllowed("attacker:context", PROFILE)).toBe(false);
+    expect(
+      isVaultKeyAadContextAllowed(undefined, { ...PROFILE, legacyVaultKeyUnlock: false })
+    ).toBe(false);
+  });
+
   it("detects legacy envelopes with missing or mismatched context", () => {
     const missing = {
       version: "enc-v1" as const,
@@ -170,6 +183,67 @@ describe("legacy vault key unlock", () => {
     };
     const routed = await unlockVaultKeyEnvelopeWithAadRouting(
       legacyPayload,
+      SCOPE,
+      PROFILE,
+      (candidate) => decryptField(candidate, key).then(() => key)
+    );
+    expect(routed).toBe(key);
+  });
+
+  it("unwraps an explicitly allowlisted legacy context", async () => {
+    const key = await createUserVaultKey();
+    const legacyPayload = await encryptField(
+      "inner",
+      key,
+      {
+        ...SCOPE,
+        field: "vault_key",
+        context: "acme:legacy-envelope:v0",
+      },
+      PROFILE
+    );
+
+    const routed = await unlockVaultKeyEnvelopeWithAadRouting(
+      legacyPayload,
+      SCOPE,
+      PROFILE,
+      (candidate) => decryptField(candidate, key).then(() => key)
+    );
+    expect(routed).toBe(key);
+  });
+
+  it("rejects a valid ciphertext from a non-allowlisted AAD domain", async () => {
+    const key = await createUserVaultKey();
+    const foreignContextPayload = await encryptField(
+      "inner",
+      key,
+      { ...SCOPE, field: "vault_key", context: "foreign:envelope:v1" },
+      PROFILE
+    );
+
+    await expect(
+      unlockVaultKeyEnvelopeWithAadRouting(
+        foreignContextPayload,
+        SCOPE,
+        PROFILE,
+        (candidate) => decryptField(candidate, key).then(() => key)
+      )
+    ).rejects.toThrow("context mismatch");
+  });
+
+  it("preserves null as an authenticated legacy AAD candidate", async () => {
+    const key = await createUserVaultKey();
+    const nullContextPayload = await encryptField(
+      "inner",
+      key,
+      { ...SCOPE, field: "vault_key", context: null } as unknown as Parameters<
+        typeof encryptField
+      >[2],
+      PROFILE
+    );
+
+    const routed = await unlockVaultKeyEnvelopeWithAadRouting(
+      nullContextPayload,
       SCOPE,
       PROFILE,
       (candidate) => decryptField(candidate, key).then(() => key)

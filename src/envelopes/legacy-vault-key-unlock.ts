@@ -5,6 +5,29 @@ import { assertVaultKeyAad } from "../validation/aad-assert.js";
 
 type VaultKeyScope = Pick<VaultAadScope, "userId" | "resourceId">;
 
+type PersistedVaultKeyAadContext = string | null | undefined;
+
+/**
+ * Returns true only for the canonical context or a profile-authorized legacy context.
+ * Missing/null contexts remain compatible while legacy unlock is enabled. Explicit legacy
+ * strings must be allowlisted so compatibility cannot silently disable AAD domain separation.
+ */
+export function isVaultKeyAadContextAllowed(
+  context: PersistedVaultKeyAadContext,
+  profile: VaultCryptoProfile
+): boolean {
+  if (context === profile.aadContextEnvelope) {
+    return true;
+  }
+  if (profile.legacyVaultKeyUnlock === false) {
+    return false;
+  }
+  if (context === undefined || context === null) {
+    return true;
+  }
+  return profile.legacyVaultKeyAadContexts?.includes(context) === true;
+}
+
 export function isLegacyVaultKeyEnvelope(
   payload: EncryptedVaultPayload,
   profile: VaultCryptoProfile
@@ -13,7 +36,7 @@ export function isLegacyVaultKeyEnvelope(
     return false;
   }
 
-  const context = payload.aad.context as string | null | undefined;
+  const context = payload.aad.context;
   return context === undefined || context === null || context !== profile.aadContextEnvelope;
 }
 
@@ -21,19 +44,24 @@ function legacyVaultKeyPayloadCandidates(
   payload: EncryptedVaultPayload,
   profile: VaultCryptoProfile
 ): EncryptedVaultPayload[] {
-  const base = payload.aad;
-  const contexts = new Set<string | undefined>();
+  const { context: storedContext, ...baseWithoutContext } = payload.aad;
+  const contexts = new Set<PersistedVaultKeyAadContext>();
 
   contexts.add(profile.aadContextEnvelope);
   contexts.add(undefined);
-  if (base.context !== undefined && base.context !== null) {
-    contexts.add(base.context);
+  if (storedContext === null) {
+    contexts.add(null);
+  } else if (
+    typeof storedContext === "string" &&
+    profile.legacyVaultKeyAadContexts?.includes(storedContext)
+  ) {
+    contexts.add(storedContext);
   }
 
   return Array.from(contexts).map((context) => ({
     ...payload,
     aad: {
-      ...base,
+      ...baseWithoutContext,
       ...(context === undefined ? {} : { context }),
     },
   }));
@@ -63,6 +91,11 @@ export async function unwrapVaultKeyWithLegacyAadFallback(
   expectedScope: VaultKeyScope,
   profile: VaultCryptoProfile
 ): Promise<CryptoKey> {
+  assertVaultKeyScope(expectedScope, payload);
+  if (!isVaultKeyAadContextAllowed(payload.aad.context, profile)) {
+    throw new Error("Vault key AAD context mismatch");
+  }
+
   let lastError: unknown;
 
   for (const candidate of legacyVaultKeyPayloadCandidates(payload, profile)) {
@@ -86,6 +119,9 @@ export async function unlockVaultKeyEnvelopeWithAadRouting(
   const legacyEnabled = profile.legacyVaultKeyUnlock !== false;
 
   if (legacyEnabled && isLegacyVaultKeyEnvelope(payload, profile)) {
+    if (!isVaultKeyAadContextAllowed(payload.aad.context, profile)) {
+      throw new Error("Vault key AAD context mismatch");
+    }
     return unwrapVaultKeyWithLegacyAadFallback(payload, decryptFn, expectedScope, profile);
   }
 

@@ -57,3 +57,26 @@ Consuming applications must implement authentication, RBAC, CSP, mandatory unloc
 ## Logging
 
 Never log vault secrets, request bodies containing envelopes, or decrypted payloads.
+
+## Passkey credential and PRF boundaries
+
+A synced/multi-device WebAuthn credential is one logical credential, not one credential per physical
+device. Optional browser bindings are opaque routing/UX state; possession of a binding is not WebAuthn
+proof and cannot authorize envelope creation, replacement, or deletion.
+
+Treat API/user-agent PRF detection as preliminary only. Confirm credential capability from registration
+`prf.enabled` and confirm a usable authentication result from `prf.results`. PRF output and hashes stay
+client-only; note that serializing a `PublicKeyCredential` can include extension results, so remove PRF
+results with `sanitizeWebAuthnResponseForServer()` (or an equally strict app-owned serializer) before
+sending WebAuthn data to a server.
+
+When compatibility requires multiple envelopes for one verified credential, pass only that
+credential's bounded active candidates to `unlockWithPasskeyPrfEnvelopeCandidates()`. A no-match must
+preserve every candidate and require password/recovery authorization before adding another variant.
+Use `unlockVaultWithPasskeyCandidateRouting()` when emergency/duress mode is enabled so candidate
+selection cannot bypass primary/decoy session routing.
+
+Candidate AAD context checks use the exact profile when `legacyVaultKeyUnlock` is disabled. While
+legacy routing is enabled, only missing/null contexts and strings explicitly listed in
+`legacyVaultKeyAadContexts` are accepted. Arbitrary strings, user/resource mismatches, and non-
+`vault_key` fields fail closed.

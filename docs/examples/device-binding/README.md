@@ -1,175 +1,132 @@
-# Device binding example
+# Opaque browser binding example
 
-Production apps that ship passkey PRF vault unlock must implement **multi-device binding**:
-each browser/device needs an explicit binding after the user enrolls a passkey on that device.
-The package exports scoping and status helpers; persistence (DB rows, cookies) stays in the app.
+A binding is optional browser routing/UX state. It is not a passkey, device identity, authentication
+factor, or authorization grant. Zero or many opaque bindings may reference the same logical WebAuthn
+credential, including a credential synced across a user's devices.
 
-Reference consumer pattern: **SelahKeep** (`letter-to-god`).
+The package owns portable contracts and fail-closed selection. The application owns cookies, rows,
+WebAuthn verification, authorization, and persistence.
 
-## Package exports
-
-| Export | Role |
-| --- | --- |
-| `VaultDeviceBindingStore` | App-owned persistence contract |
-| `parseDeviceBindingId(raw)` | Parses `v1.<credentialId>` or raw credential id from cookie/header |
-| `resolvePasskeyUnlockAvailableOnDevice(...)` | Server helper for `GET /api/vault/status` |
-| `scopeAuthenticationOptionsToDevice(options, { credentialId })` | Filters `allowCredentials` before `navigator.credentials.get` |
-
-## App-owned binding store (pseudocode)
-
-Cookie name is **yours** (example: `selahkeep_vault_device_binding`). Store an opaque
-`bindingId`; resolve it server-side to the WebAuthn `credentialId` for this browser.
+## Consumer-owned schema sketch
 
 ```sql
--- Consumer-owned migration (PostgreSQL example)
-CREATE TABLE vault_device_bindings (
-  id            UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  user_id       UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-  credential_id TEXT NOT NULL,
-  binding_id    TEXT NOT NULL UNIQUE,
-  last_used_at  TIMESTAMPTZ,
-  created_at    TIMESTAMPTZ NOT NULL DEFAULT now(),
-  UNIQUE (user_id, credential_id)
+CREATE TABLE vault_passkey_bindings (
+  id                           UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  user_id                      UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  binding_id                   UUID NOT NULL UNIQUE,
+  credential_id                TEXT NOT NULL,
+  selected_envelope_variant_id UUID,
+  last_used_at                 TIMESTAMPTZ,
+  created_at                   TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 
-CREATE INDEX vault_device_bindings_user_id_idx ON vault_device_bindings (user_id);
+-- Intentionally not unique: several browsers may bind to one credential.
+CREATE INDEX vault_passkey_bindings_user_credential_idx
+  ON vault_passkey_bindings (user_id, credential_id);
 ```
 
+The optional selected variant is a routing hint after a successful local unwrap. It must reference a
+variant belonging to the same verified credential. Do not put `credentialId` inside `bindingId`.
+
+## Store adapter
+
 ```ts
-import {
-  parseDeviceBindingId,
-  resolvePasskeyUnlockAvailableOnDevice,
-  scopeAuthenticationOptionsToDevice,
-  type VaultDeviceBindingStore,
+import type {
+  VaultPasskeyBindingStore,
+  VaultPasskeyBindingTarget,
 } from "@tgoliveira/vault-core";
 
-const VAULT_DEVICE_BINDING_COOKIE = "myapp_vault_device_binding"; // app-owned
+declare function readBindingCookie(): string | null;
+declare function loadBindingTarget(input: {
+  userId: string;
+  bindingId: string;
+}): Promise<VaultPasskeyBindingTarget | null>;
+declare function insertBinding(input: {
+  userId: string;
+  bindingId: string;
+  target: VaultPasskeyBindingTarget;
+}): Promise<void>;
+declare function deleteBinding(input: { userId: string; bindingId: string }): Promise<void>;
 
-/** SelahKeep-style store; method names are app conventions, not package exports. */
-export const vaultDeviceBindingStore = {
-  async resolveBindingForUser(userId: string) {
-    const bindingId = readCookie(VAULT_DEVICE_BINDING_COOKIE);
-    if (!bindingId) return null;
-    const row = await db.vaultDeviceBindings.findFirst({
-      where: { userId, bindingId },
-    });
-    if (!row) return null;
-    return { bindingId: row.bindingId, credentialId: row.credentialId };
-  },
-
-  async bindPasskeyToDevice(input: { userId: string; credentialId: string }) {
-    const bindingId = crypto.randomUUID();
-    await db.vaultDeviceBindings.upsert({
-      where: { userId_credentialId: { userId: input.userId, credentialId: input.credentialId } },
-      create: { userId: input.userId, credentialId: input.credentialId, bindingId },
-      update: { bindingId, lastUsedAt: new Date() },
-    });
-    setCookie(VAULT_DEVICE_BINDING_COOKIE, bindingId, { httpOnly: true, sameSite: "lax", secure: true });
-    return { bindingId };
-  },
-
-  async touchLastUsed(bindingId: string) {
-    await db.vaultDeviceBindings.updateMany({
-      where: { bindingId },
-      data: { lastUsedAt: new Date() },
-    });
-  },
-} satisfies {
-  resolveBindingForUser(userId: string): Promise<{ bindingId: string; credentialId: string } | null>;
-  bindPasskeyToDevice(input: { userId: string; credentialId: string }): Promise<{ bindingId: string }>;
-  touchLastUsed(bindingId: string): Promise<void>;
-};
-
-/** Wire the vault-core `VaultDeviceBindingStore` contract from the store above. */
-export function createVaultDeviceBindingStoreAdapter(
-  userId: string
-): VaultDeviceBindingStore {
+export function createBindingStore(userId: string): VaultPasskeyBindingStore {
   return {
-    getDeviceBindingId() {
-      return readCookie(VAULT_DEVICE_BINDING_COOKIE);
+    getBindingId: readBindingCookie,
+    resolveBindingTarget(bindingId) {
+      return loadBindingTarget({ userId, bindingId });
     },
-    async resolveCredentialId(bindingId) {
-      const row = await db.vaultDeviceBindings.findFirst({ where: { userId, bindingId } });
-      return row?.credentialId ?? null;
+    saveBinding({ bindingId, userId: ownerId, target }) {
+      return insertBinding({ userId: ownerId, bindingId, target });
     },
-    async saveBinding({ bindingId, credentialId, userId: uid }) {
-      await vaultDeviceBindingStore.bindPasskeyToDevice({ userId: uid, credentialId });
-      setCookie(VAULT_DEVICE_BINDING_COOKIE, bindingId, { httpOnly: true, sameSite: "lax", secure: true });
-    },
-    async clearBinding(bindingId) {
-      await db.vaultDeviceBindings.deleteMany({ where: { userId, bindingId } });
-      clearCookie(VAULT_DEVICE_BINDING_COOKIE);
+    clearBinding(bindingId) {
+      return deleteBinding({ userId, bindingId });
     },
   };
 }
 ```
 
-## Vault status API (`GET /api/vault/status`)
+## Bound-browser quick unlock
 
-Include binding availability on every response when a passkey envelope exists. When this browser
-has **no** binding row for the signed-in user, pass `passkeyUnlockAvailableOnThisDevice: false`
-explicitly — do not omit the field in production (omission defaults to “available” in
-`resolvePasskeyUnlockAvailableOnDevice`).
+Missing binding state fails closed. This does not prevent a separate explicit **Use an existing
+passkey** flow.
 
 ```ts
-export async function GET(request: Request) {
-  const userId = await requireSessionUserId(request);
-  const vault = await loadUserVault(userId);
-  const binding = await vaultDeviceBindingStore.resolveBindingForUser(userId);
+import { resolvePasskeyUnlockAvailable } from "@tgoliveira/vault-core";
 
-  const passkeyUnlockAvailableOnThisDevice = resolvePasskeyUnlockAvailableOnDevice({
-    hasPasskeyPrfEnvelope: vault.hasPasskeyPrfEnvelope,
-    passkeyUnlockAvailableOnThisDevice: binding != null,
-  });
-
-  return Response.json({
-    configured: vault.configured,
-    hasPasskeyPrfEnvelope: vault.hasPasskeyPrfEnvelope,
-    passkeyUnlockAvailableOnThisDevice,
+export function resolveQuickUnlock(input: {
+  hasEnvelopeVariants: boolean;
+  bindingExists: boolean;
+}): boolean {
+  return resolvePasskeyUnlockAvailable({
+    hasPasskeyPrfEnvelope: input.hasEnvelopeVariants,
+    passkeyUnlockAvailableOnThisBrowser: input.bindingExists,
   });
 }
 ```
 
-## After passkey registration / enroll
-
-Call `bindPasskeyToDevice` when WebAuthn registration succeeds and the passkey PRF envelope is
-persisted (first enroll on this device, or “link passkey” after password unlock on a new device).
+## Exact bound-credential selection
 
 ```ts
-const { credentialId } = await verifyRegistrationResponse(/* @simplewebauthn/server */);
-await persistPasskeyPrfEnvelope(/* ciphertext only */);
-await vaultDeviceBindingStore.bindPasskeyToDevice({ userId, credentialId });
-```
+import { prepareAuthenticationOptions } from "@tgoliveira/secure-auth/client";
+import { prepareVaultPasskeyPrfAuthenticationOptions } from "@tgoliveira/vault-core/browser";
 
-## Before WebAuthn authenticate (unlock)
+declare const userId: string;
+declare const boundCredentialId: string;
+declare const serverOptions: Parameters<typeof prepareAuthenticationOptions>[0];
 
-Resolve the bound credential, scope server options, then run browser ceremony prep:
-
-```ts
-const binding = await vaultDeviceBindingStore.resolveBindingForUser(userId);
-if (!binding) {
-  throw new VaultUnlockError("passkey_not_bound_on_device");
-}
-
-const scoped = scopeAuthenticationOptionsToDevice(serverOptionsFromApi, {
-  credentialId: binding.credentialId,
+const publicKey = await prepareVaultPasskeyPrfAuthenticationOptions({
+  userId,
+  prfSaltPrefix: "acme-passkey-prf-v1:",
+  serverOptions,
+  prepareJson: prepareAuthenticationOptions,
+  credentialSelection: { mode: "exact", credentialId: boundCredentialId },
+  transportPolicy: "preserve",
 });
 
-const publicKey = prepareVaultUnlockAuthenticationOptions(scoped, {
-  credentialId: binding.credentialId,
-  filterSingleCredential: true,
-  userAgent,
-});
-
-const assertion = await navigator.credentials.get({ publicKey });
-await vaultDeviceBindingStore.touchLastUsed(binding.bindingId);
+void publicKey;
 ```
 
-## React dock
+If the credential is absent, duplicated, or malformed, the helper throws
+`PasskeyCredentialScopeError`; it never returns the original unscoped list.
 
-Pass `passkeyUnlockAvailableOnThisDevice` from the status API into `VaultStatusDock` /
-`VaultDockQuickUnlock` `serverStatus`. See
-[ADOPTING_VAULT_CORE_1_1_0.md](../../ADOPTING_VAULT_CORE_1_1_0.md) §5 (dock wiring).
+## Cleared cookie / new browser
 
-The consumer demo uses localStorage for a single-browser demo only; production apps use
-server DB + httpOnly cookie as above.
+An unbound browser should not automatically register a new passkey. Offer an explicit discoverable or
+allow-list flow:
+
+1. run WebAuthn authentication and verify the chosen credential on the server;
+2. return only that credential's bounded active envelope variants;
+3. extract PRF locally and call `unlockWithPasskeyPrfEnvelopeCandidates()`;
+4. after a match, create another opaque binding targeting the matched credential/variant.
+
+If no variant matches, preserve all variants. Require password/recovery locally before creating and
+persisting an additional compatibility variant.
+
+## Revocation boundaries
+
+These are distinct application operations:
+
+- clear one browser binding;
+- deactivate/delete one envelope variant after recovery-authorized policy checks;
+- revoke the complete WebAuthn credential and all of its vault associations.
+
+A binding cookie alone authorizes none of them.

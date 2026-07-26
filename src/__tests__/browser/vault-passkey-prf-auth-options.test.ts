@@ -26,7 +26,8 @@ describe("prepareVaultPasskeyPrfAuthenticationOptions", () => {
       },
       credentialId: CREDENTIAL_ID,
       userAgent: IPHONE_UA,
-      scopeToDevice: true,
+      scopeToCredential: true,
+      transportPolicy: "apple-mobile-internal-workaround",
       prepareJson: (options) => ({
         ...options,
         challenge: new Uint8Array(32).fill(7),
@@ -70,7 +71,7 @@ describe("prepareVaultPasskeyPrfAuthenticationOptions", () => {
     expect(prepared.allowCredentials).toHaveLength(2);
   });
 
-  it("matches unlock-only prep when scopeToDevice is false", async () => {
+  it("preserves stored transports by default", async () => {
     const prepared = await prepareVaultPasskeyPrfAuthenticationOptions({
       userId: USER_ID,
       prfSaltPrefix: PRF_PREFIX,
@@ -82,7 +83,64 @@ describe("prepareVaultPasskeyPrfAuthenticationOptions", () => {
       userAgent: IPHONE_UA,
     });
 
-    expect(prepared.allowCredentials?.[0]?.transports).toEqual(["internal"]);
+    expect(prepared.allowCredentials?.[0]?.transports).toEqual(["hybrid"]);
     expect(prepared.extensions?.prf?.eval?.first).toBeInstanceOf(ArrayBuffer);
+  });
+
+  it("fails when strict scoping omits the credential id", async () => {
+    await expect(prepareVaultPasskeyPrfAuthenticationOptions({
+      userId: USER_ID,
+      prfSaltPrefix: PRF_PREFIX,
+      serverOptions: { challenge: new Uint8Array(32), allowCredentials: [] },
+      scopeToCredential: true,
+    })).rejects.toMatchObject({ code: "invalid_credential_id" });
+  });
+
+  it("supports an explicit discoverable policy", async () => {
+    const prepared = await prepareVaultPasskeyPrfAuthenticationOptions({
+      userId: USER_ID,
+      prfSaltPrefix: PRF_PREFIX,
+      serverOptions: {
+        challenge: new Uint8Array(32),
+        allowCredentials: [{ id: CREDENTIAL_ID, type: "public-key" }],
+      },
+      credentialId: CREDENTIAL_ID,
+      transportPolicy: "discoverable",
+    });
+    expect(prepared.allowCredentials).toEqual([]);
+    expect(prepared.extensions?.prf?.eval?.first).toBeInstanceOf(ArrayBuffer);
+  });
+
+  it("supports explicit exact selection and rejects legacy conflicts", async () => {
+    const serverOptions = {
+      challenge: new Uint8Array(32),
+      allowCredentials: [
+        { id: CREDENTIAL_ID, type: "public-key" as const },
+        { id: "cred-b", type: "public-key" as const },
+      ],
+    };
+    const prepared = await prepareVaultPasskeyPrfAuthenticationOptions({
+      userId: USER_ID,
+      prfSaltPrefix: PRF_PREFIX,
+      serverOptions,
+      credentialSelection: { mode: "exact", credentialId: CREDENTIAL_ID },
+    });
+    expect(prepared.allowCredentials).toEqual([{ id: CREDENTIAL_ID, type: "public-key" }]);
+
+    await expect(prepareVaultPasskeyPrfAuthenticationOptions({
+      userId: USER_ID,
+      prfSaltPrefix: PRF_PREFIX,
+      serverOptions,
+      credentialId: CREDENTIAL_ID,
+      credentialSelection: { mode: "exact", credentialId: CREDENTIAL_ID },
+    })).rejects.toMatchObject({ code: "conflicting_credential_selection" });
+
+    await expect(prepareVaultPasskeyPrfAuthenticationOptions({
+      userId: USER_ID,
+      prfSaltPrefix: PRF_PREFIX,
+      serverOptions,
+      credentialSelection: { mode: "exact", credentialId: CREDENTIAL_ID },
+      transportPolicy: "discoverable",
+    })).rejects.toMatchObject({ code: "conflicting_credential_selection" });
   });
 });

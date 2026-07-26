@@ -451,9 +451,9 @@ describe("VaultStatusDock", () => {
   });
 
   it("shows more unlock options when passkey PRF is available", () => {
-    vi.spyOn(browser, "isPrfExtensionSupported").mockReturnValue(true);
+    vi.spyOn(browser, "isPrfExtensionHeuristicallyAvailable").mockReturnValue(true);
     renderDock({
-      serverStatus: { configured: true, hasPasskeyPrfEnvelope: true },
+      serverStatus: { configured: true, hasPasskeyPrfEnvelope: true, passkeyUnlockAvailableOnThisBrowser: true },
       prfSupported: true,
     });
     fireEvent.click(screen.getByTestId("vault-status-dock-handle"));
@@ -465,13 +465,13 @@ describe("VaultStatusDock", () => {
   });
 
   it("does not redirect to full unlock when dock passkey unlock is cancelled", async () => {
-    vi.spyOn(browser, "isPrfExtensionSupported").mockReturnValue(true);
+    vi.spyOn(browser, "isPrfExtensionHeuristicallyAvailable").mockReturnValue(true);
     const onNavigateToUnlock = vi.fn();
     const onUnlockPasskey = vi.fn().mockRejectedValue(new DOMException("cancelled", "NotAllowedError"));
     renderDock({
       onNavigateToUnlock,
       pathname: "/vault",
-      serverStatus: { configured: true, hasPasskeyPrfEnvelope: true },
+      serverStatus: { configured: true, hasPasskeyPrfEnvelope: true, passkeyUnlockAvailableOnThisBrowser: true },
       prfSupported: true,
       renderQuickUnlock: ({
         loading,
@@ -483,7 +483,7 @@ describe("VaultStatusDock", () => {
         <VaultDockQuickUnlock
           loading={loading}
           error={error}
-          serverStatus={{ configured: true, hasPasskeyPrfEnvelope: true }}
+          serverStatus={{ configured: true, hasPasskeyPrfEnvelope: true, passkeyUnlockAvailableOnThisBrowser: true }}
           onUnlockPassword={vi.fn()}
           onUnlockPasskey={onUnlockPasskey}
           passkeyReady
@@ -505,13 +505,13 @@ describe("VaultStatusDock", () => {
   });
 
   it("redirects to full unlock when dock passkey unlock fails with PRF unavailable", async () => {
-    vi.spyOn(browser, "isPrfExtensionSupported").mockReturnValue(true);
+    vi.spyOn(browser, "isPrfExtensionHeuristicallyAvailable").mockReturnValue(true);
     const onNavigateToUnlock = vi.fn();
     const onUnlockPasskey = vi.fn().mockRejectedValue(new Error("PRF unavailable in this browser"));
     renderDock({
       onNavigateToUnlock,
       pathname: "/vault",
-      serverStatus: { configured: true, hasPasskeyPrfEnvelope: true },
+      serverStatus: { configured: true, hasPasskeyPrfEnvelope: true, passkeyUnlockAvailableOnThisBrowser: true },
       prfSupported: true,
       renderQuickUnlock: ({
         loading,
@@ -523,7 +523,7 @@ describe("VaultStatusDock", () => {
         <VaultDockQuickUnlock
           loading={loading}
           error={error}
-          serverStatus={{ configured: true, hasPasskeyPrfEnvelope: true }}
+          serverStatus={{ configured: true, hasPasskeyPrfEnvelope: true, passkeyUnlockAvailableOnThisBrowser: true }}
           onUnlockPassword={vi.fn()}
           onUnlockPasskey={onUnlockPasskey}
           passkeyReady
@@ -546,13 +546,13 @@ describe("VaultStatusDock", () => {
   it("delays passkey auto-start by passkeyAutoStartDelayMs", async () => {
     vi.useFakeTimers();
     try {
-      vi.spyOn(browser, "isPrfExtensionSupported").mockReturnValue(true);
+      vi.spyOn(browser, "isPrfExtensionHeuristicallyAvailable").mockReturnValue(true);
       const onUnlockPasskey = vi.fn().mockResolvedValue(undefined);
 
       render(
         <div className="vc-status-dock-host">
           <VaultStatusDock
-            serverStatus={{ configured: true, hasPasskeyPrfEnvelope: true }}
+            serverStatus={{ configured: true, hasPasskeyPrfEnvelope: true, passkeyUnlockAvailableOnThisBrowser: true }}
             prfSupported
             pathname="/vault"
             unlockPath="/vault/unlock"
@@ -565,7 +565,7 @@ describe("VaultStatusDock", () => {
               onPasskeyUnlockCancelled,
             }) => (
               <VaultDockQuickUnlock
-                serverStatus={{ configured: true, hasPasskeyPrfEnvelope: true }}
+                serverStatus={{ configured: true, hasPasskeyPrfEnvelope: true, passkeyUnlockAvailableOnThisBrowser: true }}
                 onUnlockPassword={vi.fn()}
                 onUnlockPasskey={onUnlockPasskey}
                 passkeyReady
@@ -594,7 +594,7 @@ describe("VaultStatusDock", () => {
   });
 
   it("dedupes passkey auto-start across quick-unlock remount", async () => {
-    vi.spyOn(browser, "isPrfExtensionSupported").mockReturnValue(true);
+    vi.spyOn(browser, "isPrfExtensionHeuristicallyAvailable").mockReturnValue(true);
     const onUnlockPasskey = vi.fn().mockResolvedValue(undefined);
 
     function PasskeyQuickUnlock(
@@ -606,7 +606,7 @@ describe("VaultStatusDock", () => {
     }
 
     const { unmount } = renderDock({
-      serverStatus: { configured: true, hasPasskeyPrfEnvelope: true },
+      serverStatus: { configured: true, hasPasskeyPrfEnvelope: true, passkeyUnlockAvailableOnThisBrowser: true },
       prfSupported: true,
       renderQuickUnlock: ({
         loading,
@@ -618,7 +618,7 @@ describe("VaultStatusDock", () => {
         <PasskeyQuickUnlock
           loading={loading}
           error={error}
-          serverStatus={{ configured: true, hasPasskeyPrfEnvelope: true }}
+          serverStatus={{ configured: true, hasPasskeyPrfEnvelope: true, passkeyUnlockAvailableOnThisBrowser: true }}
           onUnlockPassword={vi.fn()}
           onUnlockPasskey={onUnlockPasskey}
           passkeyReady
@@ -637,7 +637,7 @@ describe("VaultStatusDock", () => {
 
     unmount();
     renderDock({
-      serverStatus: { configured: true, hasPasskeyPrfEnvelope: true },
+      serverStatus: { configured: true, hasPasskeyPrfEnvelope: true, passkeyUnlockAvailableOnThisBrowser: true },
       prfSupported: true,
       renderQuickUnlock: ({
         loading,
@@ -649,7 +649,7 @@ describe("VaultStatusDock", () => {
         <PasskeyQuickUnlock
           loading={loading}
           error={error}
-          serverStatus={{ configured: true, hasPasskeyPrfEnvelope: true }}
+          serverStatus={{ configured: true, hasPasskeyPrfEnvelope: true, passkeyUnlockAvailableOnThisBrowser: true }}
           onUnlockPassword={vi.fn()}
           onUnlockPasskey={onUnlockPasskey}
           passkeyReady

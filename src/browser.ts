@@ -4,7 +4,22 @@ export {
   type ExtractPasskeyPrfOutputOptions,
 } from "./envelopes/passkey-prf-output.js";
 
-export { isPasskeySupported, isPrfExtensionSupported } from "./envelopes/passkey-prf.js";
+export {
+  isPasskeySupported,
+  isPrfExtensionHeuristicallyAvailable,
+  isPrfExtensionSupported,
+  resolvePasskeyPrfCapability,
+  type PasskeyPrfCapability,
+  type ResolvePasskeyPrfCapabilityInput,
+} from "./envelopes/passkey-prf.js";
+
+export {
+  MAX_PASSKEY_PRF_ENVELOPE_CANDIDATES,
+  unlockWithPasskeyPrfEnvelopeCandidates,
+  type PasskeyPrfEnvelopeCandidateMalformedReason,
+  type UnlockPasskeyPrfEnvelopeCandidatesInput,
+  type UnlockPasskeyPrfEnvelopeCandidatesResult,
+} from "./envelopes/passkey-prf-candidates.js";
 
 export {
   DEFAULT_APPLE_MOBILE_PRF_MIN_MAJOR_VERSION,
@@ -22,8 +37,10 @@ export {
 
 export {
   isAppleMobileUserAgent,
+  applyVaultUnlockTransportPolicy,
   preferPlatformTransportsForVaultUnlock,
   resolveVaultUnlockUserAgent,
+  type VaultUnlockTransportPolicy,
 } from "./browser/vault-unlock-transports.js";
 
 export {
@@ -35,6 +52,12 @@ export {
   prepareVaultPasskeyPrfAuthenticationOptions,
   type PrepareVaultPasskeyPrfAuthenticationOptionsInput,
 } from "./browser/vault-passkey-prf-auth-options.js";
+
+export {
+  sanitizeWebAuthnResponseForServer,
+  type WebAuthnResponseWithClientExtensionResults,
+  type WebAuthnResponseWithoutPrfResults,
+} from "./browser/webauthn-response-sanitize.js";
 
 export { buildPrfSaltBytes } from "./browser/prf-salt-bytes.js";
 
@@ -217,10 +240,13 @@ export {
 export {
   unlockVaultWithPasswordRouting,
   unlockVaultWithPasskeyRouting,
+  unlockVaultWithPasskeyCandidateRouting,
   exitEmergencyMode,
   hydrateVaultEmergencyModeFromServer,
   type EmergencyUnlockPasswordInput,
   type EmergencyUnlockPasskeyInput,
+  type EmergencyUnlockPasskeyCandidateInput,
+  type EmergencyUnlockPasskeyCandidateResult,
   type ExitEmergencyModeInput,
 } from "./emergency/browser-emergency.js";
 

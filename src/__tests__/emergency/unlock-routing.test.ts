@@ -21,6 +21,7 @@ import {
   isVaultEmergencyMode,
   lockVaultSession,
   unlockVaultWithPasskeyRouting,
+  unlockVaultWithPasskeyCandidateRouting,
   unlockVaultWithPasswordRouting,
 } from "../../browser.js";
 import { z } from "zod";
@@ -328,5 +329,101 @@ describe("emergency unlock routing", () => {
     expect(spy).toHaveBeenCalled();
     expect(isVaultEmergencyMode()).toBe(true);
     spy.mockRestore();
+  });
+
+  it("candidate passkey routing preserves primary and decoy session roles", async () => {
+    const fixture = await createPrimaryDecoyVaultFixture({ scope, profile });
+    const { createPasskeyPrfEnvelope, createUserVaultKey } = await import("../../index.js");
+    const primaryKey = await createUserVaultKey();
+    const decoyKey = await createUserVaultKey();
+    const primaryPrf = new Uint8Array(32).fill(0x31);
+    const decoyPrf = new Uint8Array(32).fill(0x41);
+    const primaryEnvelope = await createPasskeyPrfEnvelope(primaryKey, primaryPrf, scope, profile);
+    const decoyEnvelope = await createPasskeyPrfEnvelope(decoyKey, decoyPrf, scope, profile);
+
+    const primaryResult = await unlockVaultWithPasskeyCandidateRouting({
+      record: fixture.record,
+      verifiedCredentialId: "credential-1",
+      primaryCandidates: [{
+        envelopeVariantId: "primary-variant",
+        credentialId: "credential-1",
+        envelope: primaryEnvelope,
+      }],
+      prfOutput: primaryPrf,
+      emergencyModeActive: false,
+      scope,
+      profile,
+    });
+    expect(primaryResult).toMatchObject({
+      status: "matched",
+      matchedEnvelopeVariantId: "primary-variant",
+      target: "primary",
+    });
+    expect(isVaultEmergencyMode()).toBe(false);
+
+    lockVaultSession();
+    let emergencyEntered = false;
+    const decoyResult = await unlockVaultWithPasskeyCandidateRouting({
+      record: fixture.record,
+      verifiedCredentialId: "credential-1",
+      primaryCandidates: [],
+      decoyCandidates: [{
+        envelopeVariantId: "decoy-variant",
+        credentialId: "credential-1",
+        envelope: decoyEnvelope,
+      }],
+      prfOutput: decoyPrf,
+      duressSignaled: true,
+      emergencyModeActive: false,
+      scope,
+      profile,
+      onEmergencyEntered: () => { emergencyEntered = true; },
+    });
+    expect(decoyResult).toMatchObject({
+      status: "matched",
+      matchedEnvelopeVariantId: "decoy-variant",
+      target: "decoy",
+    });
+    expect(isVaultEmergencyMode()).toBe(true);
+    expect(emergencyEntered).toBe(true);
+  });
+
+  it("candidate passkey routing has no session effect on no-match and requires decoy candidates", async () => {
+    const fixture = await createPrimaryDecoyVaultFixture({ scope, profile });
+    const { createPasskeyPrfEnvelope, createUserVaultKey } = await import("../../index.js");
+    const vaultKey = await createUserVaultKey();
+    const envelope = await createPasskeyPrfEnvelope(
+      vaultKey,
+      new Uint8Array(32).fill(0x51),
+      scope,
+      profile
+    );
+    const candidates = [{
+      envelopeVariantId: "variant",
+      credentialId: "credential-1",
+      envelope,
+    }];
+    const noMatch = await unlockVaultWithPasskeyCandidateRouting({
+      record: fixture.record,
+      verifiedCredentialId: "credential-1",
+      primaryCandidates: candidates,
+      prfOutput: new Uint8Array(32).fill(0x52),
+      emergencyModeActive: false,
+      scope,
+      profile,
+    });
+    expect(noMatch).toEqual({ status: "no_match", attemptedCandidateCount: 1 });
+    expect(getSessionVaultKey()).toBeNull();
+
+    await expect(unlockVaultWithPasskeyCandidateRouting({
+      record: fixture.record,
+      verifiedCredentialId: "credential-1",
+      primaryCandidates: candidates,
+      prfOutput: new Uint8Array(32).fill(0x51),
+      duressSignaled: true,
+      emergencyModeActive: false,
+      scope,
+      profile,
+    })).rejects.toThrow(/decoy vault/i);
   });
 });

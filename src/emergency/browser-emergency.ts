@@ -8,6 +8,10 @@ import type {
 } from "../validation/schemas.js";
 import { unlockWithPasswordEnvelope } from "../envelopes/password.js";
 import { unlockWithPasskeyPrfEnvelope } from "../envelopes/passkey-prf.js";
+import {
+  unlockWithPasskeyPrfEnvelopeCandidates,
+  type UnlockPasskeyPrfEnvelopeCandidatesResult,
+} from "../envelopes/passkey-prf-candidates.js";
 import { unlockWithRecoveryEnvelope } from "../envelopes/recovery.js";
 import { resolveVaultUnlockTarget } from "./unlock-routing.js";
 import {
@@ -40,6 +44,28 @@ export type EmergencyUnlockPasskeyInput = {
   profile: VaultCryptoProfile;
   onEmergencyEntered?: () => void | Promise<void>;
 };
+
+export type EmergencyUnlockPasskeyCandidateInput = {
+  record: VaultSetupWithDecoy;
+  verifiedCredentialId: string;
+  primaryCandidates: readonly unknown[];
+  decoyCandidates?: readonly unknown[];
+  prfOutput: Uint8Array;
+  duressSignaled?: boolean;
+  emergencyModeActive: boolean;
+  scope: Pick<VaultAadScope, "userId" | "resourceId">;
+  profile: VaultCryptoProfile;
+  onEmergencyEntered?: () => void | Promise<void>;
+};
+
+export type EmergencyUnlockPasskeyCandidateResult =
+  | {
+      status: "matched";
+      matchedEnvelopeVariantId: string;
+      vaultKey: CryptoKey;
+      target: "primary" | "decoy";
+    }
+  | Exclude<UnlockPasskeyPrfEnvelopeCandidatesResult, { status: "matched" }>;
 
 export type ExitEmergencyModeInput = {
   recoveryPhrase: string;
@@ -151,6 +177,55 @@ export async function unlockVaultWithPasskeyRouting(
   }
 
   return finalizeUnlock(vaultKey, role, enteredEmergency, input.onEmergencyEntered);
+}
+
+/**
+ * Candidate-aware passkey unlock that preserves emergency target selection and session roles.
+ * Session state changes only after a candidate has matched successfully.
+ */
+export async function unlockVaultWithPasskeyCandidateRouting(
+  input: EmergencyUnlockPasskeyCandidateInput
+): Promise<EmergencyUnlockPasskeyCandidateResult> {
+  const target = resolveVaultUnlockTarget({
+    duressSignaled: input.duressSignaled,
+    emergencyModeActive: input.emergencyModeActive || isVaultEmergencyMode(),
+  });
+
+  let candidates = input.primaryCandidates;
+  if (target === "decoy") {
+    requireDecoy(input.record);
+    if (!input.decoyCandidates) {
+      throw new VaultAuthorizationError(
+        "Passkey envelope candidates are not configured for the decoy vault."
+      );
+    }
+    candidates = input.decoyCandidates;
+  }
+
+  const result = await unlockWithPasskeyPrfEnvelopeCandidates({
+    verifiedCredentialId: input.verifiedCredentialId,
+    candidates,
+    prfOutput: input.prfOutput,
+    expectedScope: input.scope,
+    profile: input.profile,
+  });
+  if (result.status !== "matched") {
+    return result;
+  }
+
+  const role: VaultSessionKeyRole = target === "decoy" ? "decoy" : "primary";
+  const enteredEmergency = target === "decoy";
+  if (enteredEmergency) {
+    enterVaultEmergencyMode();
+  }
+  await finalizeUnlock(result.vaultKey, role, enteredEmergency, input.onEmergencyEntered);
+
+  return {
+    status: "matched",
+    matchedEnvelopeVariantId: result.envelopeVariantId,
+    vaultKey: result.vaultKey,
+    target,
+  };
 }
 
 /**

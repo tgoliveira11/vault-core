@@ -16,6 +16,11 @@ Envelope AAD field: `vault_key` with app `aadContextEnvelope`.
 Persisted envelopes are validated as a method-discriminated union, so password and recovery
 envelopes require Argon2id metadata while passkey PRF envelopes require `null` KDF metadata.
 
+Passkey persistence separates the logical WebAuthn credential from optional opaque browser bindings
+and PRF envelope variants. One synced credential can have zero or many bindings and one or more
+bounded compatibility variants. Binding and variant IDs are routing metadata; they do not participate
+in PRF derivation or envelope AAD.
+
 ## Encrypted payload
 
 Generic JSON encrypted under UVK. AAD field: `vault_payload` with app `aadContextVault`.

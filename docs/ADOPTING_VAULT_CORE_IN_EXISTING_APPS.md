@@ -21,6 +21,10 @@ Always install and import `@tgoliveira/vault-core`.
 
 This guide explains how to migrate an existing app from duplicated local vault crypto (AES-GCM helpers, Argon2id envelopes, recovery phrases, passkey PRF wrap/unwrap, session helpers) to `@tgoliveira/vault-core`.
 
+For passkey integrations originating on 1.2.0, also follow
+[MIGRATING_PASSKEYS_FROM_1_2_0.md](./MIGRATING_PASSKEYS_FROM_1_2_0.md). It separates logical
+credentials, opaque browser bindings, and envelope variants, and replaces device-scoped assumptions.
+
 The package provides **reusable vault primitives**, not product logic:
 
 - User Vault Key (UVK) generation
@@ -133,7 +137,10 @@ export const APP_VAULT_PROFILE: VaultCryptoProfile = {
 
 - **Profile preserves AAD compatibility** for *new* encryption using vault-core (`context` is embedded in the stored `aad` object).
 - **Do not change** profile strings after production data exists unless you have a deliberate breaking migration.
-- **Existing apps:** derive profile values from the current implementation. If legacy records have **no** `context` in stored `aad`, use the low-level `decryptField` compatibility path in an explicit migration, validate all available AAD fields, and re-encrypt with the configured context. High-level decrypt and unlock APIs intentionally reject missing contexts.
+- **Existing apps:** derive profile values from the current implementation. Missing/null vault-key
+  contexts are eligible only while `legacyVaultKeyUnlock` is enabled. Previously shipped explicit
+  strings must be listed in `legacyVaultKeyAadContexts`; arbitrary strings fail closed. Re-wrap after
+  successful unlock with the configured canonical context.
 - **New apps:** pick stable, product-neutral strings before first production release.
 - **Passkey PRF salt prefix** (if used) is app-specific and lives beside the profile, e.g. `buildPrfSaltBytes("my-app-passkey-prf-v1:", userId)` from `@tgoliveira/vault-core/browser`.
 
@@ -210,6 +217,9 @@ AES-GCM uses a random 12-byte IV per encryption. **Do not** expect byte-identica
 [ ] Add @tgoliveira/vault-core to package.json (semver, not file: link for production)
 [ ] Define APP_VAULT_PROFILE (frozen; match legacy AAD behavior via fixtures)
 [ ] Define PRF salt prefix constant if passkey PRF is used
+[ ] Model passkey credentials, opaque bindings, and envelope variants separately
+[ ] Preserve credential transports and require explicit exact/allow-list/discoverable selection
+[ ] Match a bounded candidate set locally after server-side assertion verification
 [ ] Capture golden encrypted blobs from staging or test setup into JSON fixtures
 [ ] Port tests to unlock/decrypt fixtures with vault-core APIs
 [ ] Add thin re-export wrappers in app (preserve old function names temporarily)
@@ -246,6 +256,8 @@ Agents must verify **all** items before declaring migration complete:
 [ ] Account password reset does not unlock vault
 [ ] TOTP / OAuth login do not unlock vault
 [ ] Account passkey login and passkey PRF vault unlock remain separate code paths
+[ ] Browser bindings are routing metadata only and never authorize envelope creation/replacement
+[ ] Raw PRF output and WebAuthn PRF extension results never reach the server or logs
 [ ] WebAuthn signatures are not used as encryption keys (only PRF extension output)
 ```
 
@@ -369,13 +381,17 @@ export const LETTER_TO_GOD_VAULT_PROFILE: VaultCryptoProfile = {
   cryptoVersion: "vault-v1",
   aadContextVault: "letter-to-god:vault:v1",
   aadContextEnvelope: "letter-to-god:vault-envelope:v1",
+  legacyVaultKeyUnlock: true,
 };
 
 /** Passkey PRF salt prefix — must match src/lib/passkey/prf.ts today. */
 export const LETTER_TO_GOD_PRF_SALT_PREFIX = "letters-passkey-prf-v1:";
 ```
 
-**Important:** New encryption with vault-core will embed `context` in stored `aad`. Legacy LTG ciphertext without `context` must still decrypt via `aadByteCandidates`. Do **not** re-encrypt production rows unless a migration project explicitly requires it.
+**Important:** New encryption with vault-core embeds `context` in stored `aad`. Legacy LTG ciphertext
+without/null `context` remains eligible while `legacyVaultKeyUnlock` is enabled. Add
+`legacyVaultKeyAadContexts` only if production inspection proves a specific historical string. Do not
+rewrite stored AAD without a successful decrypt-and-re-wrap migration.
 
 ---
 

@@ -6,6 +6,10 @@ const APPLE_OS_VERSION_PATTERN = /OS (\d+)[_.]/i;
 export type PrfExtensionSupportOptions = {
   userAgent?: string;
   minAppleMobileMajorVersion?: number;
+  /** Disable the versioned Apple-mobile workaround while keeping the API heuristic. */
+  appleMobileWorkaround?: boolean;
+  /** Consumer override for the preliminary heuristic only. */
+  heuristicOverride?: boolean;
 };
 
 export function resolvePrfSupportUserAgent(userAgent?: string): string {
@@ -38,7 +42,11 @@ export function isAppleMobileBelowPrfMinimum(
   return major !== null && major < minMajorVersion;
 }
 
-export function isPrfExtensionSupported(options?: PrfExtensionSupportOptions): boolean {
+export function isPrfExtensionHeuristicallyAvailable(options?: PrfExtensionSupportOptions): boolean {
+  if (options?.heuristicOverride !== undefined) {
+    return options.heuristicOverride;
+  }
+
   if (typeof globalThis === "undefined" || typeof globalThis.PublicKeyCredential === "undefined") {
     return false;
   }
@@ -52,9 +60,17 @@ export function isPrfExtensionSupported(options?: PrfExtensionSupportOptions): b
 
   const userAgent = resolvePrfSupportUserAgent(options?.userAgent);
   const minMajor = options?.minAppleMobileMajorVersion ?? DEFAULT_APPLE_MOBILE_PRF_MIN_MAJOR_VERSION;
-  if (isAppleMobileBelowPrfMinimum(userAgent, minMajor)) {
+  if (
+    options?.appleMobileWorkaround !== false &&
+    isAppleMobileBelowPrfMinimum(userAgent, minMajor)
+  ) {
     return false;
   }
 
   return true;
+}
+
+/** @deprecated This is only a heuristic. Use resolvePasskeyPrfCapability for confirmed states. */
+export function isPrfExtensionSupported(options?: PrfExtensionSupportOptions): boolean {
+  return isPrfExtensionHeuristicallyAvailable(options);
 }
