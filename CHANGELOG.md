@@ -8,6 +8,8 @@ major version; compatible corrections should retain explicit deprecation and mig
 
 ## [Unreleased]
 
+## [1.3.0] - 2026-07-26
+
 ### Added
 
 - Portable passkey state schemas/types for one logical WebAuthn credential with zero-or-many opaque
