@@ -4,6 +4,7 @@ import {
   registerVaultUnloadGuard,
   registerVaultActivityGuard,
   type VaultSessionConfig,
+  type VaultSessionLease,
 } from "../../browser.js";
 
 export type VaultSessionProviderProps = {
@@ -11,6 +12,8 @@ export type VaultSessionProviderProps = {
   sessionConfig?: VaultSessionConfig;
   registerUnloadGuard?: boolean;
   registerActivityGuard?: boolean;
+  /** Required for activity renewal after owner-scoped session mode is enabled. */
+  lease?: VaultSessionLease;
 };
 
 export function VaultSessionProvider({
@@ -18,6 +21,7 @@ export function VaultSessionProvider({
   sessionConfig,
   registerUnloadGuard = true,
   registerActivityGuard = false,
+  lease,
 }: VaultSessionProviderProps) {
   useEffect(() => {
     if (sessionConfig) {
@@ -32,8 +36,8 @@ export function VaultSessionProvider({
 
   useEffect(() => {
     if (!registerActivityGuard) return;
-    return registerVaultActivityGuard();
-  }, [registerActivityGuard]);
+    return registerVaultActivityGuard(undefined, lease);
+  }, [lease, registerActivityGuard]);
 
   return children;
 }

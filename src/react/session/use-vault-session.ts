@@ -6,6 +6,7 @@ import {
   registerVaultActivityGuard,
   touchVaultSession,
   type VaultSessionConfig,
+  type VaultSessionLease,
 } from "../../browser.js";
 import { useVaultUnlocked } from "./use-vault-unlocked.js";
 
@@ -13,6 +14,8 @@ export type UseVaultSessionOptions = {
   sessionConfig?: VaultSessionConfig;
   registerUnloadGuard?: boolean;
   registerActivityGuard?: boolean;
+  /** Required for touch/activity renewal after owner-scoped session mode is enabled. */
+  lease?: VaultSessionLease;
 };
 
 export function useVaultSession(options: UseVaultSessionOptions = {}) {
@@ -20,6 +23,7 @@ export function useVaultSession(options: UseVaultSessionOptions = {}) {
     sessionConfig,
     registerUnloadGuard = true,
     registerActivityGuard = false,
+    lease,
   } = options;
   const unlocked = useVaultUnlocked();
 
@@ -36,16 +40,16 @@ export function useVaultSession(options: UseVaultSessionOptions = {}) {
 
   useEffect(() => {
     if (!registerActivityGuard) return;
-    return registerVaultActivityGuard();
-  }, [registerActivityGuard]);
+    return registerVaultActivityGuard(undefined, lease);
+  }, [lease, registerActivityGuard]);
 
   const lock = useCallback(() => {
     lockVaultSession();
   }, []);
 
   const touch = useCallback(() => {
-    touchVaultSession();
-  }, []);
+    touchVaultSession(lease);
+  }, [lease]);
 
   return {
     unlocked,

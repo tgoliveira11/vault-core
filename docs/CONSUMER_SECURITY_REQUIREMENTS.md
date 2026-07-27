@@ -57,6 +57,17 @@ Before marking vault integration complete, verify every item below.
 
 ### 3. Locked vs unlocked access in application code
 
+- [ ] On multi-account/authenticated apps, call **`beginVaultSessionOperation(opaqueAccountId)`** at
+  every outer unlock, setup/finalize, hydration/rotation, and passkey-management flow. Thread the same
+  operation through package mutations and re-check it before app-owned state or persistence commits.
+- [ ] After unlock commit, retain/capture the **`VaultSessionLease`** and validate it after awaited
+  work and before saves/hydration state commits. Pass it to timer renewal APIs; do not use a stale
+  lease's `vaultKey` without `assertVaultSessionLeaseCurrent()`.
+- [ ] Call **`clearVaultSessionOwner()`** when logging out, removing an account, or losing resolved
+  authenticated ownership. Do not reuse an operation after lock or account replacement.
+- [ ] Treat **`VaultSessionOperationCancelledError`** as stale-flow control state, not a credential
+  failure. Keep external callbacks authenticated and owner-scoped because client cancellation cannot
+  undo a request already processed by a server.
 - [ ] **`VaultProtectedGate` is UX only** (blur + pointer blocking). It is not a security boundary.
 - [ ] Before decrypting or rendering secrets, check **`useVaultUnlocked()`** / **`getSessionVaultKey()`**
   in application logic.

@@ -2,6 +2,10 @@ import type { PasswordEnvelope } from "../validation/schemas.js";
 import type { VaultAadScope, VaultCryptoProfile } from "../profile.js";
 import { unlockWithPasswordEnvelope } from "../envelopes/password.js";
 import { lockVaultSession, resetVaultSessionLockState } from "./auto-lock.js";
+import {
+  assertVaultSessionMutationAllowed,
+  type VaultSessionOperation,
+} from "./vault-session-operation.js";
 
 type DeletionScope = Pick<VaultAadScope, "userId" | "resourceId">;
 
@@ -11,6 +15,8 @@ export type DeleteVaultAfterAuthorizationOptions = {
    * vault-core does not persist vault records; the app must delete all persisted vault artifacts.
    */
   purgePersistedVault: () => void | Promise<void>;
+  /** Required once the consumer enables owner-scoped session operations. */
+  operation?: VaultSessionOperation;
 };
 
 let deleteVaultAfterAuthorizationWarned = false;
@@ -31,6 +37,7 @@ export function resetDeleteVaultAfterAuthorizationWarningForTests(): void {
 export async function deleteVaultAfterAuthorization(
   options: DeleteVaultAfterAuthorizationOptions
 ): Promise<void> {
+  assertVaultSessionMutationAllowed(options.operation);
   if (typeof window !== "undefined" && !deleteVaultAfterAuthorizationWarned) {
     deleteVaultAfterAuthorizationWarned = true;
     console.warn(
@@ -40,6 +47,7 @@ export async function deleteVaultAfterAuthorization(
   }
 
   await options.purgePersistedVault();
+  assertVaultSessionMutationAllowed(options.operation);
   lockVaultSession();
   resetVaultSessionLockState();
 }
@@ -57,8 +65,16 @@ export type DeleteVaultWithPasswordAuthorizationOptions = DeleteVaultAfterAuthor
 export async function deleteVaultWithPasswordAuthorization(
   options: DeleteVaultWithPasswordAuthorizationOptions
 ): Promise<void> {
-  const { currentPassword, passwordEnvelope, scope, profile, purgePersistedVault } = options;
+  const {
+    currentPassword,
+    passwordEnvelope,
+    scope,
+    profile,
+    purgePersistedVault,
+    operation,
+  } = options;
 
+  assertVaultSessionMutationAllowed(operation);
   await unlockWithPasswordEnvelope(currentPassword, passwordEnvelope, scope, profile);
-  await deleteVaultAfterAuthorization({ purgePersistedVault });
+  await deleteVaultAfterAuthorization({ purgePersistedVault, operation });
 }

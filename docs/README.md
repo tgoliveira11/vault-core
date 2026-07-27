@@ -13,6 +13,8 @@ Use this page as the documentation router for `@tgoliveira/vault-core`.
 - [`MIGRATING_PASSKEYS_FROM_1_2_0.md`](MIGRATING_PASSKEYS_FROM_1_2_0.md): correct 1.2.0 passkey
   integrations for synced credentials, opaque bindings, envelope variants, strict scoping, typed PRF
   capability, and explicit transports.
+- [`MIGRATING_SESSION_OWNERSHIP_FROM_1_4_0.md`](MIGRATING_SESSION_OWNERSHIP_FROM_1_4_0.md): prevent
+  stale async browser vault work from crossing account switches with opaque owner/epoch operations.
 - [`INTEGRATING_EMERGENCY_DURESS_MODE.md`](INTEGRATING_EMERGENCY_DURESS_MODE.md): emergency / duress
   mode — decoy vault enrollment, unlock routing, dock long-press, exit flow.
 - [`../apps/consumer-demo/README.md`](../apps/consumer-demo/README.md): runnable local reference app

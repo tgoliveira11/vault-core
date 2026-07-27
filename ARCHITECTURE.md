@@ -49,3 +49,10 @@ Apps own: persistence, routes, product UI, product payload schema, WebAuthn cere
 Browser and React session layers keep the UVK in memory, run a countdown auto-lock timer, and clear it on
 lock or `pagehide`. Call `touchVaultSession()` or enable `registerVaultActivityGuard()` to renew the
 timer on user activity. Direct key mutation is not part of the public browser entry.
+
+The browser layer optionally maintains an opaque account owner plus monotonic operation epoch. Once a
+consumer begins owner-scoped operation mode, guarded session/cache/emergency mutations require the
+current token. Successful key commit creates an opaque lease bound to owner, epoch, role, and exact
+non-extractable CryptoKey for post-unlock work. A lock invalidates attempts and leases; an owner
+transition first clears the prior owner's key, cache, cleanup handlers, role, and emergency pin.
+Crypto primitives remain stateless and owner-agnostic.

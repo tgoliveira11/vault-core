@@ -11,15 +11,32 @@ import {
   setSessionKeyRole,
   getVaultSessionMode,
   isVaultEmergencyMode,
-  enterVaultEmergencyMode,
-  clearEmergencyModePin,
+  enterVaultEmergencyMode as enterVaultEmergencyModeInternal,
+  clearEmergencyModePin as clearEmergencyModePinInternal,
   isEmergencyModePinned,
   getSessionKeyRole,
   type VaultSessionMode,
   type VaultSessionKeyRole,
 } from "./memory-session.js";
-import { clearVaultInnerKeyMaterialCache } from "./inner-key-material-cache.js";
+import {
+  clearVaultInnerKeyMaterialCacheForSessionLock,
+  hasCachedVaultInnerKeyMaterial,
+} from "./inner-key-material-cache.js";
 import { runVaultLockCleanupHandlers } from "./vault-lock-cleanup.js";
+import {
+  assertVaultSessionMutationAllowed,
+  assertVaultSessionLeaseMutationAllowed,
+  assertVaultSessionOperationOwnerId,
+  clearVaultSessionOperationOwner,
+  commitVaultSessionLease,
+  getVaultSessionOperationOwner,
+  invalidateVaultSessionOperation,
+  invalidateVaultSessionLease,
+  issueVaultSessionOperation,
+  type VaultSessionMutationOptions,
+  type VaultSessionLease,
+  type VaultSessionOperation,
+} from "./vault-session-operation.js";
 
 export type VaultSessionConfig = {
   autoLockMinutes?: number;
@@ -87,7 +104,7 @@ export function clearVaultAutoLockTimer(): void {
   }
 }
 
-export function scheduleVaultAutoLock(): void {
+function scheduleVaultAutoLockInternal(): void {
   if (!isVaultUnlocked() || manuallyLocked) return;
   clearVaultAutoLockTimer();
   lastActivityAt = Date.now();
@@ -96,34 +113,88 @@ export function scheduleVaultAutoLock(): void {
   }, getAutoLockTimeoutMs());
 }
 
-export function touchVaultSession(): void {
+export function scheduleVaultAutoLock(lease?: VaultSessionLease): void {
+  if (!isVaultUnlocked() || manuallyLocked) return;
+  assertVaultSessionLeaseMutationAllowed(lease);
+  scheduleVaultAutoLockInternal();
+}
+
+export function touchVaultSession(lease?: VaultSessionLease): void {
   if (isVaultUnlocked() && !manuallyLocked) {
-    scheduleVaultAutoLock();
+    assertVaultSessionLeaseMutationAllowed(lease);
+    scheduleVaultAutoLockInternal();
   }
 }
 
 export async function unlockVaultSession(
   vaultKey: CryptoKey,
-  options?: { role?: VaultSessionKeyRole }
-): Promise<void> {
+  options?: { role?: VaultSessionKeyRole; operation?: VaultSessionOperation }
+): Promise<VaultSessionLease | null> {
+  assertVaultSessionMutationAllowed(options?.operation);
   await assertUserVaultKeyNonExtractable(vaultKey);
+  assertVaultSessionMutationAllowed(options?.operation);
   manuallyLocked = false;
-  if (options?.role) {
-    setSessionKeyRole(options.role);
-  }
+  const role = options?.role ?? "primary";
+  setSessionKeyRole(role);
   setSessionVaultKey(vaultKey);
-  scheduleVaultAutoLock();
+  const lease = commitVaultSessionLease(options?.operation, vaultKey, role);
+  scheduleVaultAutoLockInternal();
   notifyVaultSessionChange();
+  return lease;
 }
 
 export function lockVaultSession(): void {
+  invalidateVaultSessionOperation();
+  invalidateVaultSessionLease();
   clearVaultAutoLockTimer();
   lastActivityAt = 0;
-  clearVaultInnerKeyMaterialCache();
+  clearVaultInnerKeyMaterialCacheForSessionLock();
   lockVault();
   manuallyLocked = true;
   runVaultLockCleanupHandlers();
   notifyVaultSessionChange();
+}
+
+/**
+ * Starts a last-operation-wins epoch for one opaque account/session owner.
+ * An A → B transition synchronously purges A's session, cache, cleanup state, and emergency pin.
+ */
+export function beginVaultSessionUnlock(ownerId: string): VaultSessionOperation {
+  assertVaultSessionOperationOwnerId(ownerId);
+  const currentOwnerId = getVaultSessionOperationOwner();
+  const ownerChanged = currentOwnerId !== null && currentOwnerId !== ownerId;
+  const hasUnownedSensitiveState =
+    currentOwnerId === null &&
+    (isVaultUnlocked() || hasCachedVaultInnerKeyMaterial() || isVaultEmergencyMode());
+
+  if (ownerChanged || hasUnownedSensitiveState) {
+    lockVaultSession();
+    clearEmergencyModePinInternal();
+  }
+
+  return issueVaultSessionOperation(ownerId);
+}
+
+/** Compatibility name for generalized setup/finalize and passkey-management flows. */
+export const beginVaultSessionOperation = beginVaultSessionUnlock;
+
+/** Logout/account-removal boundary: cancel work and clear all owner-scoped browser vault state. */
+export function clearVaultSessionOwner(): void {
+  lockVaultSession();
+  clearEmergencyModePinInternal();
+  clearVaultSessionOperationOwner();
+}
+
+/** Guarded emergency pin mutation for owner-scoped consumers. */
+export function enterVaultEmergencyMode(options?: VaultSessionMutationOptions): void {
+  assertVaultSessionMutationAllowed(options?.operation);
+  enterVaultEmergencyModeInternal();
+}
+
+/** Guarded emergency pin clear for owner-scoped consumers. */
+export function clearEmergencyModePin(options?: VaultSessionMutationOptions): void {
+  assertVaultSessionMutationAllowed(options?.operation);
+  clearEmergencyModePinInternal();
 }
 
 export function lockVaultSessionManually(): void {
@@ -177,13 +248,14 @@ function shouldIgnoreVaultActivityEvent(event: Event): boolean {
  * (for example the vault status dock "Stay unlocked" action) resets the timer.
  */
 export function registerVaultActivityGuard(
-  events: readonly string[] = DEFAULT_ACTIVITY_EVENTS
+  events: readonly string[] = DEFAULT_ACTIVITY_EVENTS,
+  lease?: VaultSessionLease
 ): () => void {
   if (typeof window === "undefined") return () => undefined;
 
   const handler = (event: Event) => {
     if (shouldIgnoreVaultActivityEvent(event)) return;
-    touchVaultSession();
+    touchVaultSession(lease);
   };
   for (const event of events) {
     window.addEventListener(event, handler, { passive: true });
@@ -205,10 +277,8 @@ export {
   isVaultUnlocked,
   getVaultSessionMode,
   isVaultEmergencyMode,
-  enterVaultEmergencyMode,
   isEmergencyModePinned,
   getSessionKeyRole,
-  clearEmergencyModePin,
   type VaultSessionMode,
   type VaultSessionKeyRole,
 } from "./memory-session.js";

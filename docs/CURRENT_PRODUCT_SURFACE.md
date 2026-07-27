@@ -2,7 +2,7 @@
 
 Living inventory of what `@tgoliveira/vault-core` exposes today. Update this file when exports, admin screens, published artifacts, or shipped/planned status changes.
 
-Last reviewed: **2026-07-27** (package version **1.3.0**, deterministic auto-lock hydration in Unreleased)
+Last reviewed: **2026-07-27** (package version **1.4.0**, session operation ownership in Unreleased)
 
 
 ## Package entry points (shipped)
@@ -38,6 +38,10 @@ Last reviewed: **2026-07-27** (package version **1.3.0**, deterministic auto-loc
 - Password rotation (`rotateVaultPassword`)
 - Recovery phrase rotation (`rotateRecoveryPhrase`)
 - Vault deletion after authorization (`deleteVaultAfterAuthorization`, `deleteVaultWithPasswordAuthorization` on browser entry)
+- Account-owned browser operation epochs (`beginVaultSessionOperation`, `clearVaultSessionOwner`,
+  current-operation guards, typed cancellation) prevent stale async A→B session/cache mutations
+- Owner/epoch/role/key session leases (`captureVaultSessionLease`, lease guards, safe snapshot) bind
+  post-unlock saves, hydration, and timer renewal to the exact installed session
 - Runtime vault payload validation (`decryptVaultPayloadWithSchema`, `VaultPayloadValidationError`)
 - `normalizeEnvelopeAadContext` for passkey envelopes missing `aad.context`, plus fail-closed legacy
   AAD allowlisting through `legacyVaultKeyAadContexts`
