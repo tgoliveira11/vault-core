@@ -8,6 +8,13 @@ major version; compatible corrections should retain explicit deprecation and mig
 
 ## [Unreleased]
 
+### Fixed
+
+- `useVaultAutoLockPreference(adminResolvedMinutes, { sessionLease })` now re-arms an owner-scoped
+  session only with the current `VaultSessionLease`. Explicit `null` safely configures preferences
+  without scheduling while locked/bootstrap has no lease, and stale leases never renew a replacement
+  session timer. Omitting the option preserves legacy non-owner-scoped behavior.
+
 ## [1.5.0] - 2026-07-27
 
 ### Added

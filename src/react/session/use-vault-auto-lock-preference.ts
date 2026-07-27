@@ -6,6 +6,11 @@ import {
   scheduleVaultAutoLock,
 } from "../../session/auto-lock.js";
 import {
+  getVaultSessionSnapshot,
+  isVaultSessionLeaseCurrent,
+  type VaultSessionLease,
+} from "../../session/vault-session-operation.js";
+import {
   clampVaultAutoLockMinutes,
   clearUserVaultAutoLockMinutes,
   readUserVaultAutoLockMinutes,
@@ -31,12 +36,23 @@ export type UseVaultAutoLockPreferenceOptions = {
    * When omitted, browser storage is read after hydration.
    */
   initialUserMinutes?: number | null;
+  /**
+   * Current owner-scoped session lease. Pass `null` while locked/bootstrap has no installed lease.
+   * Omit only for legacy consumers that never enable owner-scoped session mode.
+   */
+  sessionLease?: VaultSessionLease | null;
 };
 
 function applySessionAutoLock(
   adminResolvedMinutes: number,
-  userMinutes: number | null
+  userMinutes: number | null,
+  hasSessionLeaseOption: boolean,
+  sessionLease: VaultSessionLease | null
 ): void {
+  if (hasSessionLeaseOption) {
+    if (sessionLease && !isVaultSessionLeaseCurrent(sessionLease)) return;
+    if (!sessionLease && getVaultSessionSnapshot() !== null) return;
+  }
   configureVaultSession({
     autoLockMinutes: adminResolvedMinutes,
     resolveAutoLockMinutes: () => {
@@ -47,6 +63,11 @@ function applySessionAutoLock(
       });
     },
   });
+  if (hasSessionLeaseOption) {
+    if (!sessionLease) return;
+    scheduleVaultAutoLock(sessionLease);
+    return;
+  }
   scheduleVaultAutoLock();
 }
 
@@ -56,6 +77,8 @@ export function useVaultAutoLockPreference(
   options: UseVaultAutoLockPreferenceOptions = {}
 ): UseVaultAutoLockPreferenceResult {
   const hasInitialUserMinutes = Object.hasOwn(options, "initialUserMinutes");
+  const hasSessionLeaseOption = Object.hasOwn(options, "sessionLease");
+  const sessionLease = options.sessionLease ?? null;
   const initialUserMinutes = hasInitialUserMinutes
     ? options.initialUserMinutes ?? null
     : null;
@@ -81,8 +104,13 @@ export function useVaultAutoLockPreference(
   });
 
   useEffect(() => {
-    applySessionAutoLock(adminResolvedMinutes, userMinutes);
-  }, [adminResolvedMinutes, userMinutes]);
+    applySessionAutoLock(
+      adminResolvedMinutes,
+      userMinutes,
+      hasSessionLeaseOption,
+      sessionLease
+    );
+  }, [adminResolvedMinutes, hasSessionLeaseOption, sessionLease, userMinutes]);
 
   const setMinutes = useCallback(
     (next: number) => {

@@ -746,13 +746,16 @@ server and pass the same serializable snapshot to the client hook:
 
 ```tsx
 import { useVaultAutoLockPreference } from "@tgoliveira/vault-core/react";
+import type { VaultSessionLease } from "@tgoliveira/vault-core/browser";
 
 function AutoLockSettings(props: {
   adminMinutes: number;
   initialUserMinutes: number | null;
+  sessionLease: VaultSessionLease | null;
 }) {
   const preference = useVaultAutoLockPreference(props.adminMinutes, {
     initialUserMinutes: props.initialUserMinutes,
+    sessionLease: props.sessionLease,
   });
 
   return <output>{preference.minutes} minutes</output>;
@@ -765,6 +768,9 @@ An explicit `null` means the server already resolved that the user has no overri
 fallback, reads local storage in an effect, and then becomes `ready`. Render a neutral placeholder or
 disable the preference control while checking to avoid presenting the fallback as a final value.
 The hook never reads `localStorage` during render.
+In owner-scoped mode, always pass the current lease or explicit `null`. A current lease re-arms the
+timer after preference changes; `null` is the locked/bootstrap state and a stale lease is ignored.
+Omit `sessionLease` only in legacy apps that never call `beginVaultSessionUnlock()`.
 
 ### Vault protected pages
 

@@ -106,7 +106,9 @@ Use `isVaultSessionLeaseCurrent()` for a non-throwing check. A newer attempt for
 not invalidate the installed lease until that attempt commits a new key. Lock, owner change, logout,
 or a successful replacement-key commit invalidates the prior lease. Pass `lease` to
 `useVaultSession`, `VaultSessionProvider`, and `VaultStatusDock` (`sessionLease`) when those React APIs
-renew the timer.
+renew the timer. Also pass `{ sessionLease: leaseOrNull }` to `useVaultAutoLockPreference`; explicit
+`null` configures the preference without scheduling while locked/bootstrap has no lease, and a stale
+lease is ignored rather than renewing a replacement session.
 
 ## 4. Clear ownership on logout
 

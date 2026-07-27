@@ -398,6 +398,8 @@ owner-scoped mode is enabled.
   `{ initialUserMinutes: number | null }` when the server has already resolved the account preference;
   explicit `null` means no override. When the option is omitted, render a neutral/loading state while
   `hydrationStatus === "checking"`; the hook reads local storage in an effect and then returns `"ready"`.
+  Owner-scoped consumers must also pass `{ sessionLease: VaultSessionLease | null }`; current leases
+  re-arm the timer, while `null`/stale leases configure preference without renewing a session.
 - `UseVaultAutoLockPreferenceOptions` / `UseVaultAutoLockPreferenceResult`
 
 ### Vault admin UI
