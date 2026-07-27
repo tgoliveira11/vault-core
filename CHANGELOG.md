@@ -8,6 +8,8 @@ major version; compatible corrections should retain explicit deprecation and mig
 
 ## [Unreleased]
 
+## [1.4.0] - 2026-07-27
+
 ### Added
 
 - `useVaultAutoLockPreference(adminResolvedMinutes, options?)` accepts an explicit
