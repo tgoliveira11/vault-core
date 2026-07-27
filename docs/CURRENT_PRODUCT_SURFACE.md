@@ -2,7 +2,7 @@
 
 Living inventory of what `@tgoliveira/vault-core` exposes today. Update this file when exports, admin screens, published artifacts, or shipped/planned status changes.
 
-Last reviewed: **2026-07-25** (package version **1.2.0**, passkey multi-device correction in Unreleased)
+Last reviewed: **2026-07-27** (package version **1.3.0**, deterministic auto-lock hydration in Unreleased)
 
 
 ## Package entry points (shipped)
@@ -111,7 +111,9 @@ decryption in admin pages.
 - `resolveVaultClientStatus`, `useVaultClientStatus` — includes `emergency_locked` / `emergency_unlocked`
 - `useLongPressDuressSignal` — 1 s long-press duress latch for dock and passkey button
 - `VaultAutoLockPreferenceField`, `useVaultAutoLockPreference` — per-user auto-lock slider (1 min …
-  admin ceiling); priority **user → admin → env → default**
+  admin ceiling); priority **user → admin → env → default**. The hook accepts a server-resolved
+  `initialUserMinutes` snapshot and exposes `hydrationStatus` when browser storage must be read after
+  hydration; it never reads `localStorage` during render.
 - `VaultPasswordStrengthFeedback` — read-only current-password strength (settings / awareness)
 
 ## Browser session preferences (shipped)

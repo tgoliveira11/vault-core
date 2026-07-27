@@ -1,5 +1,6 @@
 /** @vitest-environment jsdom */
 import { act, renderHook } from "@testing-library/react";
+import { renderToString } from "react-dom/server";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import {
   configureVaultSession,
@@ -9,10 +10,11 @@ import { useVaultAutoLockPreference } from "./use-vault-auto-lock-preference.js"
 
 const KEY = "vault-core:user:auto-lock-minutes";
 const preferenceStore = new Map<string, string>();
+const storageGetItem = vi.fn((key: string) => preferenceStore.get(key) ?? null);
 
 function installLocalStorageStub() {
   vi.stubGlobal("localStorage", {
-    getItem: (key: string) => preferenceStore.get(key) ?? null,
+    getItem: storageGetItem,
     setItem: (key: string, value: string) => {
       preferenceStore.set(key, value);
     },
@@ -37,6 +39,7 @@ vi.mock("../../session/auto-lock.js", async (importOriginal) => {
 describe("useVaultAutoLockPreference", () => {
   beforeEach(() => {
     preferenceStore.clear();
+    storageGetItem.mockClear();
     installLocalStorageStub();
     vi.mocked(configureVaultSession).mockClear();
     vi.mocked(scheduleVaultAutoLock).mockClear();
@@ -50,6 +53,7 @@ describe("useVaultAutoLockPreference", () => {
     const { result } = renderHook(() => useVaultAutoLockPreference(30));
     expect(result.current.minutes).toBe(30);
     expect(result.current.usingUserPreference).toBe(false);
+    expect(result.current.hydrationStatus).toBe("ready");
   });
 
   it("persists user preference and applies session config", () => {
@@ -100,8 +104,62 @@ describe("useVaultAutoLockPreference", () => {
 
   it("reads stored preference on mount", () => {
     preferenceStore.set(KEY, "8");
-    const { result } = renderHook(() => useVaultAutoLockPreference(30));
+    const renders: Array<{ hydrationStatus: string; minutes: number }> = [];
+    const { result } = renderHook(() => {
+      const preference = useVaultAutoLockPreference(30);
+      renders.push({
+        hydrationStatus: preference.hydrationStatus,
+        minutes: preference.minutes,
+      });
+      return preference;
+    });
+    expect(renders[0]).toEqual({ hydrationStatus: "checking", minutes: 30 });
     expect(result.current.minutes).toBe(8);
     expect(result.current.usingUserPreference).toBe(true);
+    expect(result.current.hydrationStatus).toBe("ready");
+  });
+
+  it("does not read browser storage during server rendering", () => {
+    preferenceStore.set(KEY, "8");
+
+    function Probe() {
+      const preference = useVaultAutoLockPreference(30);
+      return (
+        <output data-status={preference.hydrationStatus}>
+          {preference.minutes}
+        </output>
+      );
+    }
+
+    expect(renderToString(<Probe />)).toContain('data-status="checking">30</output>');
+    expect(storageGetItem).not.toHaveBeenCalled();
+  });
+
+  it("uses a server-resolved initial preference without reading browser storage", () => {
+    preferenceStore.set(KEY, "8");
+    const { result } = renderHook(() =>
+      useVaultAutoLockPreference(30, { initialUserMinutes: 12 })
+    );
+
+    expect(result.current).toMatchObject({
+      hydrationStatus: "ready",
+      minutes: 12,
+      usingUserPreference: true,
+    });
+    expect(storageGetItem).not.toHaveBeenCalled();
+  });
+
+  it("treats explicit null as a resolved absence and ignores browser storage", () => {
+    preferenceStore.set(KEY, "8");
+    const { result } = renderHook(() =>
+      useVaultAutoLockPreference(30, { initialUserMinutes: null })
+    );
+
+    expect(result.current).toMatchObject({
+      hydrationStatus: "ready",
+      minutes: 30,
+      usingUserPreference: false,
+    });
+    expect(storageGetItem).not.toHaveBeenCalled();
   });
 });

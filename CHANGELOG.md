@@ -8,6 +8,18 @@ major version; compatible corrections should retain explicit deprecation and mig
 
 ## [Unreleased]
 
+### Added
+
+- `useVaultAutoLockPreference(adminResolvedMinutes, options?)` accepts an explicit
+  `initialUserMinutes` server snapshot and returns `hydrationStatus: "checking" | "ready"` so SSR
+  consumers can render the resolved preference without a post-hydration replacement.
+
+### Fixed
+
+- `useVaultAutoLockPreference()` no longer reads `localStorage` during render. When no explicit
+  initial preference is supplied, browser storage hydration is deferred to an effect with identical
+  server and first-client output.
+
 ## [1.3.0] - 2026-07-26
 
 ### Added
