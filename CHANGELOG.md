@@ -8,6 +8,8 @@ major version; compatible corrections should retain explicit deprecation and mig
 
 ## [Unreleased]
 
+## [1.5.1] - 2026-07-27
+
 ### Fixed
 
 - `useVaultAutoLockPreference(adminResolvedMinutes, { sessionLease })` now re-arms an owner-scoped
