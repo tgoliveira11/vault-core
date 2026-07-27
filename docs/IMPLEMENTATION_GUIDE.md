@@ -695,6 +695,33 @@ Avoid mounting both `VaultSessionProvider` and a default `useVaultSession()` sol
 same guards. When the provider owns guards, use the hook with guard registration disabled or call the
 browser lifecycle functions directly.
 
+### Deterministic auto-lock preference hydration
+
+When the application persists a user's auto-lock preference with the account, resolve it on the
+server and pass the same serializable snapshot to the client hook:
+
+```tsx
+import { useVaultAutoLockPreference } from "@tgoliveira/vault-core/react";
+
+function AutoLockSettings(props: {
+  adminMinutes: number;
+  initialUserMinutes: number | null;
+}) {
+  const preference = useVaultAutoLockPreference(props.adminMinutes, {
+    initialUserMinutes: props.initialUserMinutes,
+  });
+
+  return <output>{preference.minutes} minutes</output>;
+}
+```
+
+An explicit `null` means the server already resolved that the user has no override, so the hook is
+`ready` on the first server and client render and does not consult browser storage. If
+`initialUserMinutes` is omitted, the hook starts with `hydrationStatus === "checking"` and the admin
+fallback, reads local storage in an effect, and then becomes `ready`. Render a neutral placeholder or
+disable the preference control while checking to avoid presenting the fallback as a final value.
+The hook never reads `localStorage` during render.
+
 ### Vault protected pages
 
 Wrap vault-gated routes with `VaultProtectedGate` so locked sessions show a blur overlay while page

@@ -314,6 +314,7 @@ function PasswordChangeSection({
 
 function AutoLockSection({ adminAutoLockMinutes }: { adminAutoLockMinutes: number }) {
   const {
+    hydrationStatus,
     minutes,
     setMinutes,
     resetToAdminDefault,
@@ -328,14 +329,20 @@ function AutoLockSection({ adminAutoLockMinutes }: { adminAutoLockMinutes: numbe
         Lock the vault after a period of inactivity. Your preference overrides the organization
         default when set (priority: your choice → admin → environment → package default).
       </p>
-      <VaultAutoLockPreferenceField
-        value={minutes}
-        onChange={setMinutes}
-        adminMaxMinutes={adminMaxMinutes}
-        adminDefaultMinutes={adminAutoLockMinutes}
-        usingUserPreference={usingUserPreference}
-      />
-      {usingUserPreference ? (
+      {hydrationStatus === "checking" ? (
+        <p className="vc-admin-card-desc" role="status">
+          Loading your auto-lock preference…
+        </p>
+      ) : (
+        <VaultAutoLockPreferenceField
+          value={minutes}
+          onChange={setMinutes}
+          adminMaxMinutes={adminMaxMinutes}
+          adminDefaultMinutes={adminAutoLockMinutes}
+          usingUserPreference={usingUserPreference}
+        />
+      )}
+      {hydrationStatus === "ready" && usingUserPreference ? (
         <button
           type="button"
           className="rounded-md border border-[var(--border)] px-4 py-2 text-sm"

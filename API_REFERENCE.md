@@ -372,7 +372,12 @@ the vault status dock **Stay unlocked** action).
 
 - `VaultPasswordStrengthFeedback` — read-only strength line for an existing password (settings flows)
 - `VaultAutoLockPreferenceField` — range slider for per-user auto-lock minutes (1 … admin max)
-- `useVaultAutoLockPreference(adminResolvedMinutes)` — read/write user preference and sync session
+- `useVaultAutoLockPreference(adminResolvedMinutes, options?)` — read/write user preference and sync
+  session without reading browser storage during render. Pass
+  `{ initialUserMinutes: number | null }` when the server has already resolved the account preference;
+  explicit `null` means no override. When the option is omitted, render a neutral/loading state while
+  `hydrationStatus === "checking"`; the hook reads local storage in an effect and then returns `"ready"`.
+- `UseVaultAutoLockPreferenceOptions` / `UseVaultAutoLockPreferenceResult`
 
 ### Vault admin UI
 

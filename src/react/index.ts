@@ -27,6 +27,7 @@ export {
 
 export {
   useVaultAutoLockPreference,
+  type UseVaultAutoLockPreferenceOptions,
   type UseVaultAutoLockPreferenceResult,
 } from "./session/use-vault-auto-lock-preference.js";
 
