@@ -30,6 +30,13 @@ inactivity timer on pointer, keyboard, touch, and focus activity by default. Pub
 do not expose direct session-key setters; use `unlockVaultSession()` and `lockVaultSession()` so
 timers and subscribers remain consistent.
 
+Multi-account consumers must use `beginVaultSessionOperation(opaqueAccountId)` and pass the returned
+operation to browser session, cache, emergency, and deletion mutations. After unlock, use the returned
+owner+epoch+role+non-extractable-key `VaultSessionLease` and validate it before post-await saves or
+hydration commits. Owner changes and locks cancel older attempts and leases so a delayed account-A
+operation cannot reinstall state after account B becomes current. Use `clearVaultSessionOwner()` on
+logout. Pure crypto and app-owned network/state continuations remain consumer-owned.
+
 `inspectLocalStoragePrefix()` and `inspectIndexedDBPrefix()` are namespace inspections, not content
 scanners. They return `"unavailable"` when inspection is blocked or unsupported. Treat that result
 as a failed security check. IndexedDB inspection checks database names and cannot prove that records

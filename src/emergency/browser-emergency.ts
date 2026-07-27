@@ -23,6 +23,10 @@ import {
   type VaultSessionKeyRole,
 } from "../session/auto-lock.js";
 import { VaultAuthorizationError } from "../errors/vault-errors.js";
+import {
+  assertVaultSessionMutationAllowed,
+  type VaultSessionOperation,
+} from "../session/vault-session-operation.js";
 
 export type EmergencyUnlockPasswordInput = {
   record: VaultSetupWithDecoy;
@@ -33,6 +37,7 @@ export type EmergencyUnlockPasswordInput = {
   profile: VaultCryptoProfile;
   /** Called after successful decoy unlock so consumer can persist server flag. */
   onEmergencyEntered?: () => void | Promise<void>;
+  operation?: VaultSessionOperation;
 };
 
 export type EmergencyUnlockPasskeyInput = {
@@ -43,6 +48,7 @@ export type EmergencyUnlockPasskeyInput = {
   scope: Pick<VaultAadScope, "userId" | "resourceId">;
   profile: VaultCryptoProfile;
   onEmergencyEntered?: () => void | Promise<void>;
+  operation?: VaultSessionOperation;
 };
 
 export type EmergencyUnlockPasskeyCandidateInput = {
@@ -56,6 +62,7 @@ export type EmergencyUnlockPasskeyCandidateInput = {
   scope: Pick<VaultAadScope, "userId" | "resourceId">;
   profile: VaultCryptoProfile;
   onEmergencyEntered?: () => void | Promise<void>;
+  operation?: VaultSessionOperation;
 };
 
 export type EmergencyUnlockPasskeyCandidateResult =
@@ -76,6 +83,7 @@ export type ExitEmergencyModeInput = {
   primaryRecoveryEnvelope: RecoveryPhraseEnvelope;
   /** When true, {@link emailOtp} must be provided (consumer-prevalidated). */
   emailOtpRequired?: boolean;
+  operation?: VaultSessionOperation;
 };
 
 function requireDecoy(record: VaultSetupWithDecoy): VaultDecoyRecord {
@@ -113,11 +121,14 @@ async function finalizeUnlock(
   vaultKey: CryptoKey,
   role: VaultSessionKeyRole,
   enteredEmergency: boolean,
-  onEmergencyEntered?: () => void | Promise<void>
+  onEmergencyEntered?: () => void | Promise<void>,
+  operation?: VaultSessionOperation
 ): Promise<CryptoKey> {
-  await unlockVaultSession(vaultKey, { role });
+  await unlockVaultSession(vaultKey, { role, operation });
   if (enteredEmergency) {
+    assertVaultSessionMutationAllowed(operation);
     await onEmergencyEntered?.();
+    assertVaultSessionMutationAllowed(operation);
   }
   return vaultKey;
 }
@@ -128,6 +139,7 @@ async function finalizeUnlock(
 export async function unlockVaultWithPasswordRouting(
   input: EmergencyUnlockPasswordInput
 ): Promise<CryptoKey> {
+  assertVaultSessionMutationAllowed(input.operation);
   const target = resolveVaultUnlockTarget({
     password: input.password,
     duressSequence: input.duressSequence,
@@ -144,11 +156,13 @@ export async function unlockVaultWithPasswordRouting(
 
   const role: VaultSessionKeyRole = target === "decoy" ? "decoy" : "primary";
   const enteredEmergency = target === "decoy";
-  if (enteredEmergency) {
-    enterVaultEmergencyMode();
-  }
-
-  return finalizeUnlock(vaultKey, role, enteredEmergency, input.onEmergencyEntered);
+  return finalizeUnlock(
+    vaultKey,
+    role,
+    enteredEmergency,
+    input.onEmergencyEntered,
+    input.operation
+  );
 }
 
 /**
@@ -157,6 +171,7 @@ export async function unlockVaultWithPasswordRouting(
 export async function unlockVaultWithPasskeyRouting(
   input: EmergencyUnlockPasskeyInput
 ): Promise<CryptoKey> {
+  assertVaultSessionMutationAllowed(input.operation);
   const target = resolveVaultUnlockTarget({
     duressSignaled: input.duressSignaled,
     emergencyModeActive: input.emergencyModeActive || isVaultEmergencyMode(),
@@ -172,11 +187,13 @@ export async function unlockVaultWithPasskeyRouting(
 
   const role: VaultSessionKeyRole = target === "decoy" ? "decoy" : "primary";
   const enteredEmergency = target === "decoy";
-  if (enteredEmergency) {
-    enterVaultEmergencyMode();
-  }
-
-  return finalizeUnlock(vaultKey, role, enteredEmergency, input.onEmergencyEntered);
+  return finalizeUnlock(
+    vaultKey,
+    role,
+    enteredEmergency,
+    input.onEmergencyEntered,
+    input.operation
+  );
 }
 
 /**
@@ -186,6 +203,7 @@ export async function unlockVaultWithPasskeyRouting(
 export async function unlockVaultWithPasskeyCandidateRouting(
   input: EmergencyUnlockPasskeyCandidateInput
 ): Promise<EmergencyUnlockPasskeyCandidateResult> {
+  assertVaultSessionMutationAllowed(input.operation);
   const target = resolveVaultUnlockTarget({
     duressSignaled: input.duressSignaled,
     emergencyModeActive: input.emergencyModeActive || isVaultEmergencyMode(),
@@ -209,16 +227,20 @@ export async function unlockVaultWithPasskeyCandidateRouting(
     expectedScope: input.scope,
     profile: input.profile,
   });
+  assertVaultSessionMutationAllowed(input.operation);
   if (result.status !== "matched") {
     return result;
   }
 
   const role: VaultSessionKeyRole = target === "decoy" ? "decoy" : "primary";
   const enteredEmergency = target === "decoy";
-  if (enteredEmergency) {
-    enterVaultEmergencyMode();
-  }
-  await finalizeUnlock(result.vaultKey, role, enteredEmergency, input.onEmergencyEntered);
+  await finalizeUnlock(
+    result.vaultKey,
+    role,
+    enteredEmergency,
+    input.onEmergencyEntered,
+    input.operation
+  );
 
   return {
     status: "matched",
@@ -233,6 +255,7 @@ export async function unlockVaultWithPasskeyCandidateRouting(
  * Normal vault password does not clear emergency — only this flow.
  */
 export async function exitEmergencyMode(input: ExitEmergencyModeInput): Promise<void> {
+  assertVaultSessionMutationAllowed(input.operation);
   if (!isVaultEmergencyMode()) {
     return;
   }
@@ -248,15 +271,20 @@ export async function exitEmergencyMode(input: ExitEmergencyModeInput): Promise<
     input.profile
   );
 
+  assertVaultSessionMutationAllowed(input.operation);
+  clearEmergencyModePin({ operation: input.operation });
   lockVaultSession();
-  clearEmergencyModePin();
 }
 
 /**
  * Apply server-persisted emergency flag on app hydration (before unlock).
  */
-export function hydrateVaultEmergencyModeFromServer(emergencyModeActive: boolean): void {
+export function hydrateVaultEmergencyModeFromServer(
+  emergencyModeActive: boolean,
+  options?: { operation?: VaultSessionOperation }
+): void {
+  assertVaultSessionMutationAllowed(options?.operation);
   if (emergencyModeActive) {
-    enterVaultEmergencyMode();
+    enterVaultEmergencyMode(options);
   }
 }

@@ -8,6 +8,32 @@ major version; compatible corrections should retain explicit deprecation and mig
 
 ## [Unreleased]
 
+### Added
+
+- Browser account/session operation ownership: `beginVaultSessionOperation(ownerId)`,
+  `clearVaultSessionOwner()`, opaque `VaultSessionOperation`, current-operation guards, and typed
+  `VaultSessionOperationCancelledError` for stale or unscoped mutations.
+- `beginVaultSessionUnlock`, owner+epoch+role+non-extractable-key `VaultSessionLease`,
+  `captureVaultSessionLease`, lease current guards, and key-free `getVaultSessionSnapshot` for
+  post-unlock saves/hydration and explicit timer renewal.
+- Migration guide: [`docs/MIGRATING_SESSION_OWNERSHIP_FROM_1_4_0.md`](docs/MIGRATING_SESSION_OWNERSHIP_FROM_1_4_0.md).
+
+### Changed
+
+- `unlockVaultSession`, emergency routing/hydration/exit, vault deletion, inner-key cache population,
+  and session-cache passkey envelope creation accept an optional operation token. After a consumer
+  opts into ownership mode, those mutations fail closed without the current token. Consumers that
+  never opt in retain the 1.4.0 behavior.
+- `unlockVaultSession` returns the committed lease in owner-scoped mode. `touchVaultSession`, activity
+  guards, React session provider/hook, and `VaultStatusDock` accept that lease; renewal fails closed
+  without it after ownership opt-in.
+
+### Security
+
+- Owner changes and every lock invalidate older async work. Stale password/recovery/passkey unlock,
+  setup finalization, cache population/mismatch clear, emergency callback completion, and deletion
+  completion can no longer overwrite or clear a newer owner's package-managed browser vault state.
+
 ## [1.4.0] - 2026-07-27
 
 ### Added

@@ -168,6 +168,7 @@ export function persistVaultRecordLocally(): never {
 export {
   createPasskeyPrfEnvelopeWithSessionCache,
   type CreatePasskeyPrfEnvelopeOptions,
+  type CreatePasskeyPrfEnvelopeWithSessionCacheOptions,
 } from "./envelopes/passkey-prf.js";
 
 export {
@@ -210,6 +211,9 @@ export {
   clearVaultAutoLockTimer,
   scheduleVaultAutoLock,
   touchVaultSession,
+  beginVaultSessionUnlock,
+  beginVaultSessionOperation,
+  clearVaultSessionOwner,
   unlockVaultSession,
   lockVaultSession,
   lockVaultSessionManually,
@@ -231,6 +235,24 @@ export {
   type VaultSessionMode,
   type VaultSessionKeyRole,
 } from "./session/auto-lock.js";
+
+export {
+  assertVaultSessionOperationCurrent,
+  assertVaultSessionUnlockAttemptCurrent,
+  assertVaultSessionLeaseCurrent,
+  captureVaultSessionLease,
+  getVaultSessionSnapshot,
+  isVaultSessionOperationCurrent,
+  isVaultSessionUnlockAttemptCurrent,
+  isVaultSessionLeaseCurrent,
+  VaultSessionOperationCancelledError,
+  type VaultSessionMutationOptions,
+  type VaultSessionLease,
+  type VaultSessionOperation,
+  type VaultSessionOperationCancellationReason,
+  type VaultSessionSnapshot,
+  type VaultSessionUnlockAttempt,
+} from "./session/vault-session-operation.js";
 
 export {
   registerVaultLockCleanup,

@@ -6,6 +6,10 @@ import {
 } from "../crypto/vault-key-envelope.js";
 import { importAesKwKey } from "../crypto/user-vault-key-crypto.js";
 import { VaultAuthorizationError } from "../errors/vault-errors.js";
+import {
+  assertVaultSessionMutationAllowed,
+  type VaultSessionMutationOptions,
+} from "./vault-session-operation.js";
 
 export type VaultInnerKeyMaterialCacheEntry = {
   inner: Uint8Array;
@@ -22,23 +26,52 @@ function zeroSensitiveBytes(bytes: Uint8Array): void {
   bytes.fill(0);
 }
 
-export function clearVaultInnerKeyMaterialCache(): void {
+function clearCachedEntry(): void {
   if (cachedEntry?.inner) {
     zeroSensitiveBytes(cachedEntry.inner);
   }
   cachedEntry = null;
 }
 
-export function getCachedVaultInnerKeyMaterial(): VaultInnerKeyMaterialCacheEntry | null {
+export function clearVaultInnerKeyMaterialCache(
+  options?: VaultSessionMutationOptions
+): void {
+  assertVaultSessionMutationAllowed(options?.operation);
+  clearCachedEntry();
+}
+
+/** @internal Lock/owner-transition cleanup already invalidates the active operation. */
+export function clearVaultInnerKeyMaterialCacheForSessionLock(): void {
+  clearCachedEntry();
+}
+
+/** @internal Detect legacy unowned cache state before enabling owner-scoped operations. */
+export function hasCachedVaultInnerKeyMaterial(): boolean {
+  return cachedEntry !== null;
+}
+
+export function getCachedVaultInnerKeyMaterial(
+  options?: VaultSessionMutationOptions
+): VaultInnerKeyMaterialCacheEntry | null {
+  assertVaultSessionMutationAllowed(options?.operation);
   return cachedEntry;
 }
 
 export async function cacheVaultInnerKeyMaterialFromEnvelopeDecrypt(
   inner: Uint8Array,
   wrappingKey: CryptoKey,
-  sessionVaultKey: CryptoKey
+  sessionVaultKey: CryptoKey,
+  options?: VaultSessionMutationOptions
 ): Promise<void> {
-  await assertInnerVaultKeyBlobMatchesVaultKey(inner, sessionVaultKey, wrappingKey);
+  try {
+    assertVaultSessionMutationAllowed(options?.operation);
+    await assertInnerVaultKeyBlobMatchesVaultKey(inner, sessionVaultKey, wrappingKey);
+    assertVaultSessionMutationAllowed(options?.operation);
+  } catch (error) {
+    zeroSensitiveBytes(inner);
+    throw error;
+  }
+  clearCachedEntry();
   cachedEntry = { inner, wrappingKey };
 }
 
@@ -46,13 +79,20 @@ export async function cacheVaultInnerKeyMaterialFromPasskeyEnvelope(
   encryptedVaultKey: EncryptedVaultPayload,
   prfOutput: Uint8Array,
   prfEncryptionKey: CryptoKey,
-  sessionVaultKey: CryptoKey
+  sessionVaultKey: CryptoKey,
+  options?: VaultSessionMutationOptions
 ): Promise<void> {
-  const inner = await extractInnerVaultKeyBlob(encryptedVaultKey, prfEncryptionKey);
+  assertVaultSessionMutationAllowed(options?.operation);
   const wrappingKey = await importAesKwKey(
     prfOutput.byteLength === 32 ? prfOutput : prfOutput.slice(0, 32)
   );
-  await cacheVaultInnerKeyMaterialFromEnvelopeDecrypt(inner, wrappingKey, sessionVaultKey);
+  const inner = await extractInnerVaultKeyBlob(encryptedVaultKey, prfEncryptionKey);
+  await cacheVaultInnerKeyMaterialFromEnvelopeDecrypt(
+    inner,
+    wrappingKey,
+    sessionVaultKey,
+    options
+  );
 }
 
 /**
@@ -61,13 +101,14 @@ export async function cacheVaultInnerKeyMaterialFromPasskeyEnvelope(
  */
 export async function resolveInnerVaultKeyBlobForWrap(
   sessionVaultKey: CryptoKey,
-  options?: WrapUserVaultKeyOptions
+  options?: WrapUserVaultKeyOptions,
+  sessionOptions?: VaultSessionMutationOptions
 ): Promise<WrapUserVaultKeyOptions | undefined> {
   if (options?.innerVaultKeyBlob) {
     return options;
   }
 
-  const cached = getCachedVaultInnerKeyMaterial();
+  const cached = getCachedVaultInnerKeyMaterial(sessionOptions);
   if (!cached) {
     return options;
   }
@@ -78,9 +119,11 @@ export async function resolveInnerVaultKeyBlobForWrap(
       sessionVaultKey,
       cached.wrappingKey
     );
+    assertVaultSessionMutationAllowed(sessionOptions?.operation);
     return { ...options, innerVaultKeyBlob: cached.inner };
   } catch {
-    clearVaultInnerKeyMaterialCache();
+    assertVaultSessionMutationAllowed(sessionOptions?.operation);
+    clearVaultInnerKeyMaterialCache(sessionOptions);
     throw new VaultAuthorizationError(INNER_VAULT_KEY_CACHE_MISMATCH_MESSAGE);
   }
 }

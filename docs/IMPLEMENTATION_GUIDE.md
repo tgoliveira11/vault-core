@@ -654,6 +654,50 @@ sync. By default the auto-lock countdown runs down until lock or an explicit `to
 (for example the vault status dock **Stay unlocked** action). Opt in to activity-based renewal with
 `registerVaultActivityGuard()` when meaningful user activity should extend the session.
 
+### Account ownership and async cancellation
+
+Authenticated or multi-account applications must start one opaque operation at each outer vault flow
+boundary and thread it through every package mutation:
+
+```ts
+import {
+  assertVaultSessionOperationCurrent,
+  assertVaultSessionLeaseCurrent,
+  beginVaultSessionUnlock,
+  clearVaultSessionOwner,
+  unlockVaultSession,
+} from "@tgoliveira/vault-core/browser";
+
+const operation = beginVaultSessionUnlock(opaqueAccountId);
+const vaultKey = await unlockWithPasswordEnvelope(password, envelope, scope, profile);
+assertVaultSessionOperationCurrent(operation);
+const lease = await unlockVaultSession(vaultKey, { operation });
+if (!lease) throw new Error("Owner-scoped unlock did not produce a lease");
+
+const payload = await loadAndDecryptVaultPayload(lease.vaultKey);
+assertVaultSessionLeaseCurrent(lease);
+setDecryptedPayload(payload);
+
+// Logout, account removal, or unresolved authenticated ownership:
+clearVaultSessionOwner();
+```
+
+Each new attempt cancels the prior attempt; switching owners also synchronously purges the prior
+owner's browser vault state. Every lock invalidates the token, so the next unlock starts a new
+operation. Once enabled, guarded package mutations reject missing or stale tokens with
+`VaultSessionOperationCancelledError`. Treat that error as stale-flow control state rather than a
+credential error. Pure setup/rotation crypto remains stateless: re-check the operation after awaited
+crypto and immediately before persistence or React state commits. See
+[`MIGRATING_SESSION_OWNERSHIP_FROM_1_4_0.md`](./MIGRATING_SESSION_OWNERSHIP_FROM_1_4_0.md) for the full
+mutation matrix.
+
+After key commit, use the returned `VaultSessionLease` for saves and hydration. It binds the opaque
+owner, committed epoch, role, and non-extractable key; validate it after awaited work and before
+app-owned commits. `captureVaultSessionLease(ownerId)` retrieves the current lease for a later
+component, while `getVaultSessionSnapshot()` exposes only owner/epoch/role. Timer renewal requires the
+lease after opt-in (`touchVaultSession(lease)`, `useVaultSession({ lease })`,
+`VaultSessionProvider lease={lease}`, and `VaultStatusDock sessionLease={lease}`).
+
 ## 12. React session integration
 
 Mount one provider near the client application root:

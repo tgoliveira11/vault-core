@@ -14,6 +14,7 @@ import {
   lockVaultSessionManually,
   suppressVaultActivity,
   touchVaultSession,
+  type VaultSessionLease,
 } from "../../browser.js";
 import { useVaultClientStatus } from "../status/use-vault-client-status.js";
 import type {
@@ -109,6 +110,8 @@ export type VaultStatusDockProps = {
   className?: string;
   onLock?: () => void;
   onStayUnlocked?: () => void;
+  /** Required for Stay unlocked after owner-scoped session mode is enabled. */
+  sessionLease?: VaultSessionLease;
   /**
    * When dock passkey unlock fails with a matching failure kind, navigates to the full unlock
    * page with the current return path. User cancellation does not redirect by default.
@@ -217,6 +220,7 @@ export function VaultStatusDock({
   className,
   onLock,
   onStayUnlocked,
+  sessionLease,
   redirectOnPasskeyUnlockFailure = DEFAULT_PASSKEY_REDIRECT_KINDS,
   shouldRedirectOnPasskeyUnlockFailure,
   onNavigateToUnlock,
@@ -472,7 +476,7 @@ export function VaultStatusDock({
   }
 
   function stayUnlocked() {
-    touchVaultSession();
+    touchVaultSession(sessionLease);
     onStayUnlocked?.();
   }
 

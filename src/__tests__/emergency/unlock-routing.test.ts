@@ -14,16 +14,21 @@ import {
   VaultEmergencyDecryptError,
 } from "../../index.js";
 import {
+  beginVaultSessionOperation,
+  clearVaultSessionOwner,
   clearEmergencyModePin,
   exitEmergencyMode,
   getSessionVaultKey,
   hydrateVaultEmergencyModeFromServer,
   isVaultEmergencyMode,
   lockVaultSession,
+  unlockVaultSession,
   unlockVaultWithPasskeyRouting,
   unlockVaultWithPasskeyCandidateRouting,
   unlockVaultWithPasswordRouting,
+  VaultSessionOperationCancelledError,
 } from "../../browser.js";
+import { resetVaultSessionOperationsForTests } from "../../session/vault-session-operation.js";
 import { z } from "zod";
 import type { VaultCryptoProfile } from "../../profile.js";
 
@@ -44,7 +49,8 @@ const payloadSchema = z.object({
 
 describe("emergency unlock routing", () => {
   beforeEach(() => {
-    lockVaultSession();
+    clearVaultSessionOwner();
+    resetVaultSessionOperationsForTests();
     clearEmergencyModePin();
   });
 
@@ -426,4 +432,99 @@ describe("emergency unlock routing", () => {
       profile,
     })).rejects.toThrow(/decoy vault/i);
   });
+
+  it("does not let deferred password routing from A overwrite B or pin emergency mode", async () => {
+    const fixture = await createPrimaryDecoyVaultFixture({ scope, profile });
+    const operationA = beginVaultSessionOperation("account-A");
+    const onEmergencyEntered = vi.fn();
+    const unlockA = unlockVaultWithPasswordRouting({
+      record: fixture.record,
+      password: fixture.duressPassword,
+      duressSequence: fixture.duressSequence,
+      emergencyModeActive: false,
+      scope,
+      profile,
+      operation: operationA,
+      onEmergencyEntered,
+    });
+
+    const operationB = beginVaultSessionOperation("account-B");
+    const keyB = await createNonExtractableSessionVaultKey();
+    await unlockVaultSession(keyB, { operation: operationB, role: "primary" });
+
+    await expect(unlockA).rejects.toBeInstanceOf(VaultSessionOperationCancelledError);
+    expect(getSessionVaultKey()).toBe(keyB);
+    expect(isVaultEmergencyMode()).toBe(false);
+    expect(onEmergencyEntered).not.toHaveBeenCalled();
+  }, 20_000);
+
+  it("does not let deferred passkey routing from A overwrite B", async () => {
+    const fixture = await createPrimaryDecoyVaultFixture({ scope, profile });
+    const { createPasskeyPrfEnvelope, createUserVaultKey } = await import("../../index.js");
+    const vaultKeyA = await createUserVaultKey();
+    const prfOutput = new Uint8Array(32).fill(0x60);
+    const envelope = await createPasskeyPrfEnvelope(
+      vaultKeyA,
+      prfOutput,
+      scope,
+      profile
+    );
+    const operationA = beginVaultSessionOperation("account-A");
+    const unlockA = unlockVaultWithPasskeyRouting({
+      record: { ...fixture.record, passkeyPrfEnvelope: envelope },
+      prfOutput,
+      duressSignaled: false,
+      emergencyModeActive: false,
+      scope,
+      profile,
+      operation: operationA,
+    });
+
+    const operationB = beginVaultSessionOperation("account-B");
+    const keyB = await createNonExtractableSessionVaultKey();
+    await unlockVaultSession(keyB, { operation: operationB });
+
+    await expect(unlockA).rejects.toBeInstanceOf(VaultSessionOperationCancelledError);
+    expect(getSessionVaultKey()).toBe(keyB);
+    expect(isVaultEmergencyMode()).toBe(false);
+  }, 20_000);
+
+  it("rejects stale candidate routing and emergency hydration after A to B", async () => {
+    const fixture = await createPrimaryDecoyVaultFixture({ scope, profile });
+    const { createPasskeyPrfEnvelope, createUserVaultKey } = await import("../../index.js");
+    const vaultKeyA = await createUserVaultKey();
+    const prfOutput = new Uint8Array(32).fill(0x61);
+    const envelope = await createPasskeyPrfEnvelope(
+      vaultKeyA,
+      prfOutput,
+      scope,
+      profile
+    );
+    const operationA = beginVaultSessionOperation("account-A");
+    const candidateA = unlockVaultWithPasskeyCandidateRouting({
+      record: fixture.record,
+      verifiedCredentialId: "credential-A",
+      primaryCandidates: [{
+        envelopeVariantId: "variant-A",
+        credentialId: "credential-A",
+        envelope,
+      }],
+      prfOutput,
+      emergencyModeActive: false,
+      scope,
+      profile,
+      operation: operationA,
+    });
+
+    const operationB = beginVaultSessionOperation("account-B");
+    const keyB = await createNonExtractableSessionVaultKey();
+    await unlockVaultSession(keyB, { operation: operationB });
+
+    await expect(candidateA).rejects.toBeInstanceOf(VaultSessionOperationCancelledError);
+    expect(() =>
+      hydrateVaultEmergencyModeFromServer(true, { operation: operationA })
+    ).toThrow(VaultSessionOperationCancelledError);
+    expect(getSessionVaultKey()).toBe(keyB);
+    expect(isVaultEmergencyMode()).toBe(false);
+  }, 20_000);
 });

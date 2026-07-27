@@ -15,6 +15,10 @@ import {
   resolveInnerVaultKeyBlobForWrap,
   INNER_VAULT_KEY_CACHE_MISMATCH_MESSAGE,
 } from "../session/inner-key-material-cache.js";
+import {
+  assertVaultSessionMutationAllowed,
+  type VaultSessionMutationOptions,
+} from "../session/vault-session-operation.js";
 import { assertVaultKeyAad } from "../validation/aad-assert.js";
 import { unlockVaultKeyEnvelopeWithAadRouting } from "./legacy-vault-key-unlock.js";
 
@@ -57,6 +61,8 @@ async function importPrfAsAesKey(prfOutput: Uint8Array): Promise<CryptoKey> {
 type WrapScope = Pick<VaultAadScope, "userId" | "resourceId">;
 
 export type CreatePasskeyPrfEnvelopeOptions = WrapUserVaultKeyOptions;
+export type CreatePasskeyPrfEnvelopeWithSessionCacheOptions =
+  CreatePasskeyPrfEnvelopeOptions & VaultSessionMutationOptions;
 
 export async function createPasskeyPrfEnvelope(
   vaultKey: CryptoKey,
@@ -96,20 +102,26 @@ export async function createPasskeyPrfEnvelopeWithSessionCache(
   scope: WrapScope,
   profile: VaultCryptoProfile,
   publicMetadata?: Record<string, unknown>,
-  options?: CreatePasskeyPrfEnvelopeOptions
+  options?: CreatePasskeyPrfEnvelopeWithSessionCacheOptions
 ): Promise<PasskeyPrfEnvelope> {
-  if (options?.innerVaultKeyBlob) {
-    return createPasskeyPrfEnvelope(
+  const { operation, ...wrapOptions } = options ?? {};
+  assertVaultSessionMutationAllowed(operation);
+
+  if (wrapOptions.innerVaultKeyBlob) {
+    const envelope = await createPasskeyPrfEnvelope(
       vaultKey,
       prfOutput,
       scope,
       profile,
       publicMetadata,
-      options
+      wrapOptions
     );
+    assertVaultSessionMutationAllowed(operation);
+    return envelope;
   }
 
-  const cached = getCachedVaultInnerKeyMaterial();
+  const sessionOptions = { operation };
+  const cached = getCachedVaultInnerKeyMaterial(sessionOptions);
   if (cached) {
     try {
       const prfWrappingKey = await importAesKwKey(
@@ -121,16 +133,20 @@ export async function createPasskeyPrfEnvelopeWithSessionCache(
         prfWrappingKey,
         vaultKey
       );
-      return createPasskeyPrfEnvelope(
+      assertVaultSessionMutationAllowed(operation);
+      const envelope = await createPasskeyPrfEnvelope(
         vaultKey,
         prfOutput,
         scope,
         profile,
         publicMetadata,
-        { ...options, innerVaultKeyBlob: rewrappedInner }
+        { ...wrapOptions, innerVaultKeyBlob: rewrappedInner }
       );
+      assertVaultSessionMutationAllowed(operation);
+      return envelope;
     } catch (error) {
-      clearVaultInnerKeyMaterialCache();
+      assertVaultSessionMutationAllowed(operation);
+      clearVaultInnerKeyMaterialCache(sessionOptions);
       if (error instanceof VaultAuthorizationError) {
         throw new VaultAuthorizationError(INNER_VAULT_KEY_CACHE_MISMATCH_MESSAGE);
       }
@@ -138,8 +154,13 @@ export async function createPasskeyPrfEnvelopeWithSessionCache(
     }
   }
 
-  const resolvedOptions = await resolveInnerVaultKeyBlobForWrap(vaultKey, options);
-  return createPasskeyPrfEnvelope(
+  const resolvedOptions = await resolveInnerVaultKeyBlobForWrap(
+    vaultKey,
+    wrapOptions,
+    sessionOptions
+  );
+  assertVaultSessionMutationAllowed(operation);
+  const envelope = await createPasskeyPrfEnvelope(
     vaultKey,
     prfOutput,
     scope,
@@ -147,6 +168,8 @@ export async function createPasskeyPrfEnvelopeWithSessionCache(
     publicMetadata,
     resolvedOptions
   );
+  assertVaultSessionMutationAllowed(operation);
+  return envelope;
 }
 
 export async function unwrapVaultKeyFromPasskey(

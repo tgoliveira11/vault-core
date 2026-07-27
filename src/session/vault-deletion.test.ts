@@ -10,14 +10,19 @@ import {
   resetDeleteVaultAfterAuthorizationWarningForTests,
 } from "./vault-deletion.js";
 import {
+  beginVaultSessionOperation,
   clearVaultAutoLockTimer,
+  clearVaultSessionOwner,
   getSessionVaultKey,
   isVaultManuallyLocked,
   isVaultUnlocked,
   resetVaultSessionLockState,
   unlockVaultSession,
 } from "./auto-lock.js";
-import { clearVaultClientState } from "./memory-session.js";
+import {
+  resetVaultSessionOperationsForTests,
+  VaultSessionOperationCancelledError,
+} from "./vault-session-operation.js";
 import {
   FIXTURE_ARGON2_SALT,
   FIXTURE_VAULT_PASSWORD,
@@ -28,13 +33,15 @@ import { createNonExtractableSessionVaultKey } from "../testing/session-vault-ke
 
 describe("vault deletion", () => {
   beforeEach(() => {
-    clearVaultClientState();
+    clearVaultSessionOwner();
+    resetVaultSessionOperationsForTests();
     resetVaultSessionLockState();
   });
 
   afterEach(() => {
     clearVaultAutoLockTimer();
-    clearVaultClientState();
+    clearVaultSessionOwner();
+    resetVaultSessionOperationsForTests();
     resetVaultSessionLockState();
   });
 
@@ -125,5 +132,28 @@ describe("vault deletion", () => {
     expect(warn).toHaveBeenCalledOnce();
     expect(warn.mock.calls[0]?.[0]).toMatch(/does not verify credentials/i);
     warn.mockRestore();
+  });
+
+  it("does not let a deferred A deletion lock a newer B session", async () => {
+    let finishPurge!: () => void;
+    const purgeWait = new Promise<void>((resolve) => {
+      finishPurge = resolve;
+    });
+    const operationA = beginVaultSessionOperation("account-A");
+    const deletionA = deleteVaultAfterAuthorization({
+      operation: operationA,
+      purgePersistedVault: () => purgeWait,
+    });
+    await Promise.resolve();
+
+    const operationB = beginVaultSessionOperation("account-B");
+    const keyB = await createNonExtractableSessionVaultKey();
+    await unlockVaultSession(keyB, { operation: operationB });
+    finishPurge();
+
+    await expect(deletionA).rejects.toBeInstanceOf(
+      VaultSessionOperationCancelledError
+    );
+    expect(getSessionVaultKey()).toBe(keyB);
   });
 });

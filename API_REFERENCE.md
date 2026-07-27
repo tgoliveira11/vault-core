@@ -295,10 +295,26 @@ New code should use the canonical APIs. Deprecated unlock aliases use the curren
 ### Session lifecycle
 
 - `configureVaultSession(config)`
-- `await unlockVaultSession(vaultKey)` / `lockVaultSession()` — session UVK must be **non-extractable** (keys from envelope unlock satisfy this; do not pass `createUserVaultKey()` output directly)
+- `beginVaultSessionUnlock(ownerId)` / `beginVaultSessionOperation(ownerId)` — starts an opaque,
+  last-operation-wins owner epoch; an owner change synchronously purges prior browser vault state
+- `clearVaultSessionOwner()` — logout/account-removal boundary; cancels work, locks, clears cache,
+  cleanup state, owner, session role, and emergency pin
+- `isVaultSessionOperationCurrent(operation)` /
+  `assertVaultSessionOperationCurrent(operation)` — guard app-owned async continuations
+- `captureVaultSessionLease(ownerId)`, `isVaultSessionLeaseCurrent(lease)`, and
+  `assertVaultSessionLeaseCurrent(lease)` — capture/validate the installed owner+epoch+role+key
+  capability for saves, hydration, and other post-unlock work
+- `getVaultSessionSnapshot()` — current `{ ownerId, epoch, role }` without exposing the key
+- `VaultSessionLease`, `VaultSessionSnapshot`, `VaultSessionUnlockAttempt`
+- `VaultSessionOperation`, `VaultSessionMutationOptions`, and
+  `VaultSessionOperationCancelledError` (`missing_operation` / `stale_operation`)
+- `await unlockVaultSession(vaultKey, { role?, operation? })` returns the committed lease (or `null`
+  for a legacy unowned session); the UVK must be **non-extractable** and every lock invalidates both
+  attempts and leases
 - `lockVaultSessionManually()` / `isVaultManuallyLocked()`
 - `registerVaultLockCleanup(handler)` — sync app cleanup on lock (returns unregister); invoked after UVK and inner-key cache are cleared
-- `touchVaultSession()` / `scheduleVaultAutoLock()` / `clearVaultAutoLockTimer()`
+- `touchVaultSession(lease?)` / `scheduleVaultAutoLock(lease?)` / `clearVaultAutoLockTimer()` — lease
+  is required for renewal after owner-scoped mode is enabled
 - `getVaultAutoLockRemainingMs()`
 - `getVaultAutoLockMinutes()` — resolved session auto-lock duration in minutes
 - `suppressVaultActivity(ms?)` — when activity-based renewal is enabled, briefly suppresses guard listeners so vault dock toggles do not reset inactivity
@@ -314,7 +330,9 @@ New code should use the canonical APIs. Deprecated unlock aliases use the curren
 - `deleteVaultAfterAuthorization(options)` / `deleteVaultWithPasswordAuthorization(options)` — prefer password authorization; `deleteVaultAfterAuthorization` requires the caller to verify authorization first (emits a one-time browser warning)
 - `VaultSessionConfig`
 
-Direct session-key setters are intentionally not exported.
+Direct session-key setters are intentionally not exported. Once a consumer starts owner-scoped mode,
+package session/cache/emergency mutations require a current operation. See
+[`docs/MIGRATING_SESSION_OWNERSHIP_FROM_1_4_0.md`](docs/MIGRATING_SESSION_OWNERSHIP_FROM_1_4_0.md).
 
 ### Storage inspection
 
@@ -335,7 +353,8 @@ boolean aliases that fail closed.
 - `extractPasskeyPrfOutput`, `isPasskeySupported`, `isPrfExtensionHeuristicallyAvailable`,
   `resolvePasskeyPrfCapability`
 - `unlockWithPasskeyPrfEnvelopeCandidates`, `MAX_PASSKEY_PRF_ENVELOPE_CANDIDATES`
-- `createPasskeyPrfEnvelopeWithSessionCache`, `CreatePasskeyPrfEnvelopeOptions`
+- `createPasskeyPrfEnvelopeWithSessionCache`, `CreatePasskeyPrfEnvelopeOptions`,
+  `CreatePasskeyPrfEnvelopeWithSessionCacheOptions`
 - `VaultInnerKeyMaterialCache` — memory-only inner-key cache (`clear`, `getCached`, `cacheFromEnvelopeDecrypt`, `cacheFromPasskeyEnvelope`)
 - `cacheVaultInnerKeyMaterialAfterPasswordUnlock`, `cacheVaultInnerKeyMaterialAfterRecoveryUnlock`, `cacheVaultInnerKeyMaterialFromPasskeyUnlock`
 - `clearVaultInnerKeyMaterialCache`, `getCachedVaultInnerKeyMaterial`, `resolveInnerVaultKeyBlobForWrap`
@@ -367,6 +386,8 @@ Provider and session hook guard options are `registerActivityGuard` (defaults to
 `registerUnloadGuard` (defaults to `true`). Set `registerActivityGuard` when the app should renew the
 auto-lock countdown on user activity; otherwise call `touchVaultSession()` explicitly (for example from
 the vault status dock **Stay unlocked** action).
+Both accept `lease?: VaultSessionLease`; pass it whenever activity/touch renewal runs after
+owner-scoped mode is enabled.
 
 ### Vault password and session preferences
 
@@ -431,6 +452,7 @@ Import styles once (includes `vc-status-dock-*` classes).
 redirect). The quick-unlock slot receives `fullUnlockHref`, `onPasskeyUnlockFailed`,
 `onPasskeyUnlockCancelled`, `bindAutoStartPasskey`, and `autoStartConsumed`. Set `visible={false}`
 when the user is signed out. Hide before vault setup via `serverStatus.configured === false`.
+Pass `sessionLease` so **Stay unlocked** can renew an owner-scoped session.
 
 ### Vault protected gate
 

@@ -13,6 +13,10 @@ import {
   resolveInnerVaultKeyBlobForWrap,
   type VaultInnerKeyMaterialCacheEntry,
 } from "../session/inner-key-material-cache.js";
+import {
+  assertVaultSessionMutationAllowed,
+  type VaultSessionMutationOptions,
+} from "../session/vault-session-operation.js";
 
 export {
   VaultInnerKeyMaterialCache,
@@ -40,8 +44,10 @@ async function importPrfAsAesKey(prfOutput: Uint8Array): Promise<CryptoKey> {
 export async function cacheVaultInnerKeyMaterialAfterPasswordUnlock(
   sessionVaultKey: CryptoKey,
   envelope: PasswordEnvelope | { encryptedVaultKey: PasswordEnvelope["encryptedVaultKey"]; kdfMetadata: PasswordEnvelope["kdfMetadata"] },
-  vaultPassword: string
+  vaultPassword: string,
+  options?: VaultSessionMutationOptions
 ): Promise<void> {
+  assertVaultSessionMutationAllowed(options?.operation);
   if (envelope.kdfMetadata?.kdf !== "argon2id") {
     throw new Error("Vault password envelope requires Argon2id metadata");
   }
@@ -49,6 +55,7 @@ export async function cacheVaultInnerKeyMaterialAfterPasswordUnlock(
     vaultPassword,
     envelope.kdfMetadata
   );
+  // The lower-level cache commit revalidates again after every remaining await.
   const inner = await extractInnerVaultKeyBlob(
     envelope.encryptedVaultKey,
     derivedKeys.encryptionKey
@@ -56,7 +63,8 @@ export async function cacheVaultInnerKeyMaterialAfterPasswordUnlock(
   await cacheVaultInnerKeyMaterialFromEnvelopeDecrypt(
     inner,
     derivedKeys.wrappingKey,
-    sessionVaultKey
+    sessionVaultKey,
+    options
   );
 }
 
@@ -64,8 +72,10 @@ export async function cacheVaultInnerKeyMaterialAfterPasswordUnlock(
 export async function cacheVaultInnerKeyMaterialAfterRecoveryUnlock(
   sessionVaultKey: CryptoKey,
   envelope: RecoveryPhraseEnvelope | { encryptedVaultKey: RecoveryPhraseEnvelope["encryptedVaultKey"]; kdfMetadata: RecoveryPhraseEnvelope["kdfMetadata"] },
-  recoveryPhrase: string
+  recoveryPhrase: string,
+  options?: VaultSessionMutationOptions
 ): Promise<void> {
+  assertVaultSessionMutationAllowed(options?.operation);
   if (envelope.kdfMetadata?.kdf !== "argon2id") {
     throw new Error("Recovery phrase envelope requires Argon2id metadata");
   }
@@ -80,7 +90,8 @@ export async function cacheVaultInnerKeyMaterialAfterRecoveryUnlock(
   await cacheVaultInnerKeyMaterialFromEnvelopeDecrypt(
     inner,
     derivedKeys.wrappingKey,
-    sessionVaultKey
+    sessionVaultKey,
+    options
   );
 }
 
@@ -88,13 +99,16 @@ export async function cacheVaultInnerKeyMaterialAfterRecoveryUnlock(
 export async function cacheVaultInnerKeyMaterialFromPasskeyUnlock(
   sessionVaultKey: CryptoKey,
   envelope: PasskeyPrfEnvelope | { encryptedVaultKey: PasskeyPrfEnvelope["encryptedVaultKey"] },
-  prfOutput: Uint8Array
+  prfOutput: Uint8Array,
+  options?: VaultSessionMutationOptions
 ): Promise<void> {
+  assertVaultSessionMutationAllowed(options?.operation);
   const prfKey = await importPrfAsAesKey(prfOutput);
   await cacheVaultInnerKeyMaterialFromPasskeyEnvelope(
     envelope.encryptedVaultKey,
     prfOutput,
     prfKey,
-    sessionVaultKey
+    sessionVaultKey,
+    options
   );
 }
