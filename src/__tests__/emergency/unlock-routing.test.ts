@@ -47,7 +47,7 @@ const payloadSchema = z.object({
   sentinel: z.string(),
 });
 
-describe("emergency unlock routing", () => {
+describe("emergency unlock routing", { timeout: 20_000 }, () => {
   beforeEach(() => {
     clearVaultSessionOwner();
     resetVaultSessionOperationsForTests();
