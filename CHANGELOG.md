@@ -8,6 +8,8 @@ major version; compatible corrections should retain explicit deprecation and mig
 
 ## [Unreleased]
 
+## [1.5.0] - 2026-07-27
+
 ### Added
 
 - Browser account/session operation ownership: `beginVaultSessionOperation(ownerId)`,
