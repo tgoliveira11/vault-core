@@ -2,7 +2,7 @@
 
 Living inventory of what `@tgoliveira/vault-core` exposes today. Update this file when exports, admin screens, published artifacts, or shipped/planned status changes.
 
-Last reviewed: **2026-07-27** (package version **1.4.0**, session operation ownership in Unreleased)
+Last reviewed: **2026-07-27** (package version **1.5.0**, lease-aware auto-lock preference in Unreleased)
 
 
 ## Package entry points (shipped)

@@ -3,9 +3,15 @@ import { act, renderHook } from "@testing-library/react";
 import { renderToString } from "react-dom/server";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import {
+  beginVaultSessionUnlock,
+  clearVaultSessionOwner,
   configureVaultSession,
+  resetVaultSessionLockState,
   scheduleVaultAutoLock,
+  unlockVaultSession,
 } from "../../session/auto-lock.js";
+import { resetVaultSessionOperationsForTests } from "../../session/vault-session-operation.js";
+import { createNonExtractableSessionVaultKey } from "../../testing/session-vault-key.js";
 import { useVaultAutoLockPreference } from "./use-vault-auto-lock-preference.js";
 
 const KEY = "vault-core:user:auto-lock-minutes";
@@ -38,6 +44,9 @@ vi.mock("../../session/auto-lock.js", async (importOriginal) => {
 
 describe("useVaultAutoLockPreference", () => {
   beforeEach(() => {
+    clearVaultSessionOwner();
+    resetVaultSessionOperationsForTests();
+    resetVaultSessionLockState();
     preferenceStore.clear();
     storageGetItem.mockClear();
     installLocalStorageStub();
@@ -46,6 +55,9 @@ describe("useVaultAutoLockPreference", () => {
   });
 
   afterEach(() => {
+    clearVaultSessionOwner();
+    resetVaultSessionOperationsForTests();
+    resetVaultSessionLockState();
     preferenceStore.clear();
   });
 
@@ -161,5 +173,82 @@ describe("useVaultAutoLockPreference", () => {
       usingUserPreference: false,
     });
     expect(storageGetItem).not.toHaveBeenCalled();
+  });
+
+  it("re-arms an owner-scoped session with the current lease", async () => {
+    const attempt = beginVaultSessionUnlock("account-A");
+    const lease = await unlockVaultSession(
+      await createNonExtractableSessionVaultKey(),
+      { operation: attempt }
+    );
+    expect(lease).not.toBeNull();
+    vi.mocked(scheduleVaultAutoLock).mockClear();
+
+    renderHook(() =>
+      useVaultAutoLockPreference(30, {
+        initialUserMinutes: null,
+        sessionLease: lease,
+      })
+    );
+
+    expect(scheduleVaultAutoLock).toHaveBeenCalledWith(lease);
+  });
+
+  it("does not re-arm the timer with a stale lease", async () => {
+    const attemptA = beginVaultSessionUnlock("account-A");
+    const leaseA = await unlockVaultSession(
+      await createNonExtractableSessionVaultKey(),
+      { operation: attemptA }
+    );
+    const attemptB = beginVaultSessionUnlock("account-B");
+    await unlockVaultSession(await createNonExtractableSessionVaultKey(), {
+      operation: attemptB,
+    });
+    vi.mocked(configureVaultSession).mockClear();
+    vi.mocked(scheduleVaultAutoLock).mockClear();
+
+    renderHook(() =>
+      useVaultAutoLockPreference(30, {
+        initialUserMinutes: null,
+        sessionLease: leaseA,
+      })
+    );
+
+    expect(scheduleVaultAutoLock).not.toHaveBeenCalled();
+    expect(configureVaultSession).not.toHaveBeenCalled();
+  });
+
+  it("configures preference without scheduling while the owner has no lease", () => {
+    beginVaultSessionUnlock("account-A");
+    vi.mocked(scheduleVaultAutoLock).mockClear();
+
+    renderHook(() =>
+      useVaultAutoLockPreference(30, {
+        initialUserMinutes: null,
+        sessionLease: null,
+      })
+    );
+
+    expect(configureVaultSession).toHaveBeenCalled();
+    expect(scheduleVaultAutoLock).not.toHaveBeenCalled();
+  });
+
+  it("does not let a missing lease reconfigure an installed owner-scoped session", async () => {
+    const attempt = beginVaultSessionUnlock("account-A");
+    await unlockVaultSession(await createNonExtractableSessionVaultKey(), {
+      operation: attempt,
+    });
+    vi.mocked(configureVaultSession).mockClear();
+    vi.mocked(scheduleVaultAutoLock).mockClear();
+
+    renderHook(() =>
+      useVaultAutoLockPreference(30, {
+        initialUserMinutes: null,
+        sessionLease: null,
+      })
+    );
+
+    expect(configureVaultSession).not.toHaveBeenCalled();
+    expect(scheduleVaultAutoLock).not.toHaveBeenCalled();
   });
 });
