@@ -134,6 +134,10 @@ provided.
 
 - `createPasskeyPrfEnvelope(vaultKey, prfOutput, scope, profile, publicMetadata?, options?)` — optional `WrapUserVaultKeyOptions` for re-wrap with `innerVaultKeyBlob`
 - `createPasskeyPrfEnvelopeWithSessionCache(...)` — uses in-memory inner-key cache when `innerVaultKeyBlob` is omitted
+- `createPasskeyPrfEnvelopeAfterIndependentAuthorization(input)` — locally reopens a password or
+  recovery envelope and returns `{ vaultKey, envelope }` for append-only no-match repair; it accepts
+  no binding/passkey authorization and has no persistence side effects. Defer it when
+  emergency/duress candidate routing has not resolved primary vs decoy.
 - `unlockWithPasskeyPrfEnvelope(envelope, prfOutput, expectedScope, profile, options?)`
 - `unlockWithPasskeyPrfEnvelopeCandidates(input)` — tries at most
   `MAX_PASSKEY_PRF_ENVELOPE_CANDIDATES` (5) variants for one verified credential; returns matched
@@ -142,7 +146,7 @@ provided.
 - `isLegacyVaultKeyEnvelope(payload, profile)` / `isVaultKeyAadContextAllowed(context, profile)` / `unwrapVaultKeyWithLegacyAadFallback(...)` / `unlockVaultKeyEnvelopeWithAadRouting(...)`
 - `normalizeEnvelopeAadContext(payload, profile)`
 - `extractPasskeyPrfOutput(extensionResults, options?)` — prefers `evalByCredential[credentialId]` on Safari; coerces ArrayBuffer, views, base64url, and number arrays
-- `prfBytesForAes256Import(bytes)` — normalizes PRF output to 32 bytes for AES import
+- `prfBytesForAes256Import(bytes)` — returns an owned 32-byte PRF snapshot for AES import
 - `resolvePasskeyPrfCapability(input?)` — typed heuristic, registration-confirmed,
   authentication-confirmed, unavailable, or incompatible state; never returns PRF material
 - `isPasskeySupported()` / `isPrfExtensionHeuristicallyAvailable(options?)` — preliminary API/UA
@@ -159,6 +163,7 @@ provided.
 | `scopeAuthenticationOptionsToCredential(...)` | Strictly filters to one credential or throws `PasskeyCredentialScopeError` |
 | `selectAuthenticationCredentials(...)` | Applies explicit selection mode |
 | `resolvePasskeyUnlockAvailable(...)` | Bound-browser quick-unlock status; missing binding fails closed |
+| `resolvePasskeyUnlockPlan(...)` | Typed explicit-vs-quick plan; explicit defaults to allow-list without binding, quick requires exact binding target |
 | Deprecated device-named aliases | Compatibility only; see migration guide |
 
 Example: [`docs/examples/device-binding/README.md`](docs/examples/device-binding/README.md).
@@ -223,9 +228,12 @@ Associated inferred types include `EncryptedVaultPayload`, `Argon2idKdfMetadata`
 | Export | Purpose |
 | --- | --- |
 | `useLongPressDuressSignal(options?)` | 1 s long-press latch for dock/passkey duress |
+| `VaultServerStatusSnapshot.emergencyModeEnabled` | Explicit opt-in gate; false/omitted ignores emergency status |
 | `VaultServerStatusSnapshot.emergencyModeActive` | Server-persisted emergency flag |
 | `VaultServerStatusSnapshot.decoyConfigured` | Decoy enrollment completed |
-| `VaultStatusDock.passkeyAutoStartDelayMs` | Default `2000` — delay before dock passkey auto-start |
+| `VaultStatusDock.emergencyModeEnabled` | Enables emergency status and dock long-press; default false |
+| `VaultDockQuickUnlock.emergencyModeEnabled` | Enables passkey-button long-press; default false |
+| `VaultStatusDock.passkeyAutoStartDelayMs` | Default `0`, or `2000` while emergency mode is enabled |
 | `VaultStatusDock.onDuressSignalChange` | Duress latch callback |
 | `resolveVaultClientStatus` | Returns `emergency_locked` / `emergency_unlocked` when applicable |
 
@@ -238,6 +246,8 @@ Associated inferred types include `EncryptedVaultPayload`, `Argon2idKdfMetadata`
 **Security preconditions:** Never decrypt primary `encryptedBlob` in emergency mode. Exit requires
 primary recovery phrase; normal password does not exit. Duress sequence is a signal, not a secret key.
 Consumer must persist `emergencyModeActive` atomically and rate-limit `emergency_exit`.
+The feature is disabled by default through `VAULT_EMERGENCY_MODE_ENABLED=false` and the admin key
+`emergencyModeEnabled`.
 
 **Integration guide:** [docs/INTEGRATING_EMERGENCY_DURESS_MODE.md](docs/INTEGRATING_EMERGENCY_DURESS_MODE.md)
 
@@ -360,13 +370,19 @@ boolean aliases that fail closed.
 - `clearVaultInnerKeyMaterialCache`, `getCachedVaultInnerKeyMaterial`, `resolveInnerVaultKeyBlobForWrap`
 - `INNER_VAULT_KEY_CACHE_MISMATCH_MESSAGE` — actionable error when cached material is stale
 - `prepareWebAuthnPrfExtensions(extensions)` — coerce JSON PRF salts to `ArrayBuffer`
+- `prepareVaultPasskeyPrfRegistrationOptions({ userId, prfSaltPrefix, serverOptions, prepareJson? })`
+  — requests the canonical PRF during creation so enrollment normally needs one WebAuthn ceremony
+- `resolvePasskeyPrfEnrollmentAfterRegistration({ registrationCredentialId, verifiedCredentialId, clientExtensionResults })`
+  — returns typed `ready`, `authentication_required`, `unavailable`, or `rejected`; `ready` includes
+  an owned browser-only PRF snapshot only when both credential IDs match, while fallback includes
+  exact `credentialSelection`
 - `alignPrfExtensionsForCredential(options, credentialId?)` — single-credential iOS `eval` parity
 - `applyVaultUnlockTransportPolicy(options, policy?, userAgent?)` — preserve (default), platform-only,
   discoverable, or explicit Apple-mobile workaround
 - `prepareVaultUnlockAuthenticationOptions(options, { credentialSelection?, transportPolicy?, ... })`
   — composed PRF ceremony prep with fail-closed explicit selection
 - `prepareVaultPasskeyPrfAuthenticationOptions({ userId, prfSaltPrefix, serverOptions, prepareJson?, credentialSelection?, transportPolicy?, ... })`
-  — full pipeline for unlock, enable, disable, and re-wrap
+  — full pipeline for unlock, enrollment fallback, disable, and re-wrap
 - `sanitizeWebAuthnResponseForServer(response)` — returns a non-mutating response copy without
   `clientExtensionResults.prf`; call before JSON serialization to a server
 - `isAppleMobileUserAgent(userAgent)`, `resolveVaultUnlockUserAgent(userAgent?)`
@@ -513,8 +529,12 @@ Import styles once (includes `vc-vault-unlock-*` classes).
 
 - `VaultUnlockPanel` / `VaultUnlockPanelProps` — password, recovery phrase, and optional passkey unlock
   (`autoFocusPassword` default `true`; `autoStartPasskey` default `false` on the full unlock page;
-  passkey auto-start remains opt-in). Optional `unlockRateLimiter` + `rateLimitScopeKey` (default
-  `"default"`) assert before unlock and record failures/successes. Customizable `labels`, `passkeyReady`, etc.
+  passkey auto-start remains opt-in and requires `quickPasskeyPlan` plus the separate exact-bound
+  `onQuickUnlockPasskey`; `onUnlockPasskey` is explicit-only). Optional `unlockRateLimiter` +
+  `rateLimitScopeKey` (default `"default"`) assert before unlock and record failures/successes.
+  Customizable `labels`, `passkeyReady`, etc.
+- `ReadyQuickPasskeyUnlockPlan` — ready `intent: "quick"` plan accepted by the full-page exact-bound
+  auto-start callback
 - `VAULT_UNLOCK_RETURN_QUERY_PARAM` — default query key for post-unlock navigation (`"next"`)
 - `resolveVaultUnlockReturnPath(raw, options?)` — sanitize a return path (relative `/…` only)
 - `readVaultUnlockReturnPath(searchParams, options?)` — read and sanitize from URL search params

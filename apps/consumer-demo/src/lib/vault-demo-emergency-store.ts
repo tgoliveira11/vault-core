@@ -41,12 +41,17 @@ export function setDemoEmergencyModeActive(active: boolean): void {
   });
 }
 
-export function getDemoServerStatusSnapshot(configured: boolean, hasPasskey: boolean) {
+export function getDemoServerStatusSnapshot(
+  configured: boolean,
+  hasPasskey: boolean,
+  emergencyModeEnabled = false
+) {
   const meta = loadDemoEmergencyMetadata();
   return {
     configured,
     hasPasskeyPrfEnvelope: hasPasskey,
-    emergencyModeActive: meta.emergencyModeActive,
-    decoyConfigured: meta.decoyConfigured,
+    emergencyModeEnabled,
+    emergencyModeActive: emergencyModeEnabled && meta.emergencyModeActive,
+    decoyConfigured: emergencyModeEnabled && meta.decoyConfigured,
   };
 }

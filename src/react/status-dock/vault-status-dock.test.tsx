@@ -126,7 +126,12 @@ describe("VaultStatusDock", () => {
 
   it("renders emergency locked state from server snapshot", () => {
     renderDock({
-      serverStatus: { configured: true, emergencyModeActive: true, decoyConfigured: true },
+      serverStatus: {
+        configured: true,
+        emergencyModeEnabled: true,
+        emergencyModeActive: true,
+        decoyConfigured: true,
+      },
     });
     expect(screen.getByText("Vault locked")).toBeTruthy();
   });
@@ -135,7 +140,12 @@ describe("VaultStatusDock", () => {
     const key = await createNonExtractableSessionVaultKey();
     await unlockVaultSession(key, { role: "decoy" });
     renderDock({
-      serverStatus: { configured: true, emergencyModeActive: true, decoyConfigured: true },
+      serverStatus: {
+        configured: true,
+        emergencyModeEnabled: true,
+        emergencyModeActive: true,
+        decoyConfigured: true,
+      },
     });
     fireEvent.click(screen.getByTestId("vault-status-dock-handle"));
     expect(screen.getAllByText("Vault open").length).toBeGreaterThan(0);
@@ -153,6 +163,38 @@ describe("VaultStatusDock", () => {
     expect(handle.getAttribute("aria-expanded")).toBe("true");
     expect(handle.className).toContain("vc-status-dock-handle--closed");
     expect(handle.querySelector(".vc-status-dock-handle__label")?.textContent).toBe("Vault locked");
+  });
+
+  it("keeps duress behavior disabled by default", async () => {
+    vi.useFakeTimers();
+    try {
+      const onDuressSignalChange = vi.fn();
+      renderDock({ onDuressSignalChange });
+      const handle = screen.getByTestId("vault-status-dock-handle");
+      fireEvent.pointerDown(handle, { pointerType: "touch", button: 0 });
+      await act(async () => {
+        vi.advanceTimersByTime(1_100);
+      });
+      expect(onDuressSignalChange).not.toHaveBeenCalledWith(true);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("enables handle duress behavior only when explicitly opted in", async () => {
+    vi.useFakeTimers();
+    try {
+      const onDuressSignalChange = vi.fn();
+      renderDock({ emergencyModeEnabled: true, onDuressSignalChange });
+      const handle = screen.getByTestId("vault-status-dock-handle");
+      fireEvent.pointerDown(handle, { pointerType: "touch", button: 0 });
+      await act(async () => {
+        vi.advanceTimersByTime(1_100);
+      });
+      expect(onDuressSignalChange).toHaveBeenCalledWith(true);
+    } finally {
+      vi.useRealTimers();
+    }
   });
 
   it("keeps locked handle visible when expanded quick-unlock panel is open", async () => {
@@ -543,7 +585,7 @@ describe("VaultStatusDock", () => {
     vi.restoreAllMocks();
   });
 
-  it("delays passkey auto-start by passkeyAutoStartDelayMs", async () => {
+  it("uses the two-second passkey delay by default only when emergency mode is enabled", async () => {
     vi.useFakeTimers();
     try {
       vi.spyOn(browser, "isPrfExtensionHeuristicallyAvailable").mockReturnValue(true);
@@ -557,7 +599,7 @@ describe("VaultStatusDock", () => {
             pathname="/vault"
             unlockPath="/vault/unlock"
             autoLockMinutes={15}
-            passkeyAutoStartDelayMs={2000}
+            emergencyModeEnabled
             collapsedPreferenceKey="test:dock:delay"
             renderQuickUnlock={({
               bindAutoStartPasskey,
@@ -591,6 +633,52 @@ describe("VaultStatusDock", () => {
       vi.useRealTimers();
       vi.restoreAllMocks();
     }
+  });
+
+  it("auto-starts passkey immediately by default when emergency mode is disabled", async () => {
+    vi.spyOn(browser, "isPrfExtensionHeuristicallyAvailable").mockReturnValue(true);
+    const onUnlockPasskey = vi.fn().mockResolvedValue(undefined);
+
+    render(
+      <div className="vc-status-dock-host">
+        <VaultStatusDock
+          serverStatus={{
+            configured: true,
+            hasPasskeyPrfEnvelope: true,
+            passkeyUnlockAvailableOnThisBrowser: true,
+          }}
+          prfSupported
+          pathname="/vault"
+          unlockPath="/vault/unlock"
+          autoLockMinutes={15}
+          collapsedPreferenceKey="test:dock:immediate-default"
+          renderQuickUnlock={({
+            bindAutoStartPasskey,
+            onPasskeyUnlockFailed,
+            onPasskeyUnlockCancelled,
+          }) => (
+            <VaultDockQuickUnlock
+              serverStatus={{
+                configured: true,
+                hasPasskeyPrfEnvelope: true,
+                passkeyUnlockAvailableOnThisBrowser: true,
+              }}
+              onUnlockPassword={vi.fn()}
+              onUnlockPasskey={onUnlockPasskey}
+              passkeyReady
+              passkeyOptionsReady
+              bindAutoStartPasskey={bindAutoStartPasskey}
+              onPasskeyUnlockFailed={onPasskeyUnlockFailed}
+              onPasskeyUnlockCancelled={onPasskeyUnlockCancelled}
+            />
+          )}
+        />
+      </div>
+    );
+
+    fireEvent.click(screen.getByTestId("vault-status-dock-handle"));
+    await waitFor(() => expect(onUnlockPasskey).toHaveBeenCalledTimes(1));
+    vi.restoreAllMocks();
   });
 
   it("dedupes passkey auto-start across quick-unlock remount", async () => {

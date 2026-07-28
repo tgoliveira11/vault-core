@@ -33,6 +33,8 @@ export type VaultAdminRateLimitConfig = {
 export type VaultAdminFeatureFlags = {
   adminEnabled: boolean;
   passkeyPrfUnlockEnabled: boolean;
+  /** Optional for backward-compatible consumer-authored config snapshots; omitted means false. */
+  emergencyModeEnabled?: boolean;
   recoveryPhrase12WordSupported: boolean;
   recoveryPhrase24WordSupported: boolean;
 };

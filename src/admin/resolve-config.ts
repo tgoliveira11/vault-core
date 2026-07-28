@@ -151,6 +151,7 @@ export function buildVaultAdminConfigFromEnv(
     features: {
       adminEnabled: readBoolEnv(env, "VAULT_ADMIN_ENABLED", false),
       passkeyPrfUnlockEnabled: readBoolEnv(env, "VAULT_PASSKEY_PRF_UNLOCK_ENABLED", true),
+      emergencyModeEnabled: readBoolEnv(env, "VAULT_EMERGENCY_MODE_ENABLED", false),
       recoveryPhrase12WordSupported: true,
       recoveryPhrase24WordSupported: true,
     },
@@ -219,6 +220,8 @@ export function listVaultAdminConfigEntries(
         return config.passwordPolicy.strengthPosition;
       case "passkeyPrfUnlockEnabled":
         return config.features.passkeyPrfUnlockEnabled;
+      case "emergencyModeEnabled":
+        return config.features.emergencyModeEnabled === true;
       case "unlockMaxFailures":
         return config.rateLimit.unlockMaxFailures;
       case "unlockFailureWindowMinutes":

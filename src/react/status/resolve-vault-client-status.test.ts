@@ -27,14 +27,28 @@ describe("resolveVaultClientStatus", () => {
 
   it("returns emergency_locked when server emergency flag is set", () => {
     expect(
-      resolveVaultClientStatus({ configured: true, emergencyModeActive: true }, false, true)
+      resolveVaultClientStatus(
+        { configured: true, emergencyModeEnabled: true, emergencyModeActive: true },
+        false,
+        true
+      )
     ).toBe("emergency_locked");
   });
 
   it("returns emergency_unlocked when emergency active and session unlocked", () => {
     expect(
-      resolveVaultClientStatus({ configured: true, emergencyModeActive: true }, true, true)
+      resolveVaultClientStatus(
+        { configured: true, emergencyModeEnabled: true, emergencyModeActive: true },
+        true,
+        true
+      )
     ).toBe("emergency_unlocked");
+  });
+
+  it("ignores emergency state unless the feature is explicitly enabled", () => {
+    const status = { configured: true, emergencyModeActive: true };
+    expect(resolveVaultClientStatus(status, false, true)).toBe("locked");
+    expect(resolveVaultClientStatus(status, true, true)).toBe("unlocked");
   });
 
   it("returns locked copy for emergency_locked expanded state", async () => {

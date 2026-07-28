@@ -15,9 +15,6 @@ Each ADR follows this structure:
 | **Consequences** | Positive, negative, and follow-up work |
 | **References** | Related docs, issues, and code |
 
-Companion issue breakdowns (when present) live alongside the ADR as
-`NNNN-<slug>-issues.md` and are suitable for GitHub issue creation.
-
 ## Index
 
 | ADR | Title | Status |

@@ -319,11 +319,92 @@ replace the old password envelope atomically on the server.
 what to import vs delete (inner-key cache, WebAuthn prep, legacy AAD, device binding, classifiers).
 
 The package does not run WebAuthn ceremonies. The application must request the PRF extension and pass
-the first PRF result to vault-core. Use the browser helpers below to prepare authentication options
-(iOS `eval` parity, salt coercion, fail-closed credential selection, and an explicit transport
-policy) before calling `navigator.credentials.get`. Stored transports are preserved by default.
+the first PRF result to vault-core. Use the browser helpers below for both creation and authentication
+options (canonical salt, iOS `eval` parity, salt coercion, fail-closed credential selection, and an
+explicit transport policy). Stored transports are preserved by default.
 
-### PRF authentication ceremonies (unlock **and** enroll/manage)
+### PRF registration and authentication ceremonies
+
+For a new passkey, ask for the canonical PRF salt during `navigator.credentials.create`. If the
+registration returns `prf.enabled: true` and a usable `prf.results.first`, the first envelope can be
+created from that one ceremony after server verification. Do not always authenticate the credential
+again. Use `navigator.credentials.get` only as a typed fallback when registration confirms PRF but
+does not return an output.
+
+The example below converts all fields for native `navigator.credentials.create()`. Browser libraries
+such as SimpleWebAuthn convert challenge/user/credential fields but pass extension inputs through.
+For those libraries, call the same helper without `prepareJson`: the encoded server fields remain
+unchanged while the PRF salt is a native `ArrayBuffer` when the library calls WebAuthn. See
+[the account-auth interoperability contract](./PASSKEY_ACCOUNT_AUTH_INTEROPERABILITY.md).
+
+```ts
+import {
+  prepareVaultPasskeyPrfRegistrationOptions,
+  resolvePasskeyPrfEnrollmentAfterRegistration,
+  sanitizeWebAuthnResponseForServer,
+  type PublicKeyCredentialCreationOptionsInput,
+} from "@tgoliveira/vault-core/browser";
+import type { PasskeyCredentialSelection } from "@tgoliveira/vault-core";
+
+declare const userId: string;
+declare const registrationOptionsJson: PublicKeyCredentialCreationOptionsInput;
+declare function prepareRegistrationOptions(
+  input: PublicKeyCredentialCreationOptionsInput
+): PublicKeyCredentialCreationOptionsInput;
+declare function serializeRegistrationResponse(
+  credential: PublicKeyCredential
+): { id: string; clientExtensionResults: Record<string, unknown> };
+declare function verifyRegistrationOnServer(
+  response: unknown
+): Promise<{ verifiedCredentialId: string }>;
+declare function createAndPersistPasskeyEnvelope(
+  credentialId: string,
+  prfOutput: Uint8Array
+): Promise<void>;
+declare function runExactCredentialAuthenticationFallback(
+  selection: Extract<PasskeyCredentialSelection, { mode: "exact" }>
+): Promise<void>;
+
+const publicKey = await prepareVaultPasskeyPrfRegistrationOptions({
+  userId,
+  prfSaltPrefix: "acme-passkey-prf-v1:",
+  serverOptions: registrationOptionsJson,
+  prepareJson: prepareRegistrationOptions,
+});
+const credential = await navigator.credentials.create({
+  publicKey: publicKey as PublicKeyCredentialCreationOptions,
+});
+if (!(credential instanceof PublicKeyCredential)) {
+  throw new Error("Passkey registration did not return a public-key credential");
+}
+
+const extensionResults = credential.getClientExtensionResults() as Record<string, unknown>;
+const registrationJson = serializeRegistrationResponse(credential);
+const verification = await verifyRegistrationOnServer(
+  sanitizeWebAuthnResponseForServer(registrationJson)
+);
+const enrollment = resolvePasskeyPrfEnrollmentAfterRegistration({
+  registrationCredentialId: credential.id,
+  verifiedCredentialId: verification.verifiedCredentialId,
+  clientExtensionResults: extensionResults,
+});
+
+if (enrollment.status === "ready") {
+  try {
+    await createAndPersistPasskeyEnvelope(enrollment.credentialId, enrollment.prfOutput);
+  } finally {
+    enrollment.prfOutput.fill(0);
+  }
+} else if (enrollment.status === "authentication_required") {
+  await runExactCredentialAuthenticationFallback(enrollment.credentialSelection);
+} else {
+  throw new Error("This credential cannot enable passkey PRF vault unlock");
+}
+```
+
+The serializer, server verification, short-lived persistence proof, and envelope persistence are
+application-owned. The proof should be single-use and bound to the verified registration. The raw
+extension results remain in the browser; the sanitizer removes PRF before the server call.
 
 Any client call to `navigator.credentials.get` that feeds PRF output into
 `createPasskeyPrfEnvelope*` or `unwrapVaultKeyFromPasskey*` **must** pass options through the
@@ -335,7 +416,7 @@ envelopes created at enable time cannot be decrypted at unlock.
 | Ceremony | Requires full vault-core PRF prep |
 | --- | --- |
 | Vault unlock | Yes |
-| Passkey vault unlock **enable** (post-register) | Yes |
+| Passkey vault unlock **enable fallback** (only when create omitted PRF output) | Yes |
 | Passkey vault unlock **disable** (PRF proof) | Yes |
 | Envelope **re-wrap / rotate** on device | Yes |
 
@@ -547,11 +628,16 @@ if (candidateResult.status === "matched") {
 }
 ```
 
-`no_match` must leave all variants intact and the vault locked. Require password or recovery locally
-before adding a compatibility variant. When emergency/duress mode is enabled, use
+`no_match` must leave all variants intact and the vault locked. Call
+`createPasskeyPrfEnvelopeAfterIndependentAuthorization()` with password or recovery locally, then
+append its returned envelope as a new variant and install its non-extractable UVK. Do not use the
+session cache, binding, or another passkey as authorization for this repair path. When
+emergency/duress mode is enabled, use
 `unlockVaultWithPasskeyCandidateRouting()` so candidate matching preserves primary/decoy routing and
 session roles. After either matched flow, populate the memory-only inner-key cache from the matched
 envelope when later passkey enrollment or re-wrap must work with the non-extractable session UVK.
+If emergency/duress candidate routing returns `no_match`, do not run or install the stateless repair
+result: fall back to password/recovery routing and defer variant repair until normal primary context.
 
 ### Passkey enroll after unlock (non-extractable session UVK)
 
@@ -887,14 +973,21 @@ export function VaultUnlockPage() {
     <VaultUnlockPanel
       serverStatus={serverStatus}
       prfSupported={browserSupportsPrf}
-      passkeyReady={passkeyReadyOnDevice}
+      passkeyReady={explicitPasskeyOptionsReady}
       onUnlockPassword={(password) => unlockWithPassword(password)}
       onUnlockRecoveryPhrase={(phrase) => unlockWithRecovery(phrase)}
-      onUnlockPasskey={passkeyReadyOnDevice ? () => unlockWithPasskey() : undefined}
+      onUnlockPasskey={explicitPasskeyOptionsReady ? () => unlockWithPasskey() : undefined}
     />
   );
 }
 ```
+
+`explicitPasskeyOptionsReady` means the authenticated user's allow-listed WebAuthn request options
+are loaded. Do not derive it from a browser binding. Use `resolvePasskeyUnlockPlan({ intent:
+"explicit", ... })` for this page. A binding is required only for exact dock/auto-start quick unlock.
+If this full page opts into `autoStartPasskey`, pass the ready `intent: "quick"` plan through
+`quickPasskeyPlan` and implement `onQuickUnlockPasskey(plan)` separately. The explicit
+`onUnlockPasskey` callback is never auto-started.
 
 Link to the unlock page from the status dock or protected gates:
 
@@ -1130,6 +1223,10 @@ See [INTEGRATING_EMERGENCY_DURESS_MODE.md](./INTEGRATING_EMERGENCY_DURESS_MODE.m
 consumer integration guide (phased checklist, dock wiring, server metadata, testing). See
 [ADR 0001](./adr/0001-emergency-duress-mode.md) for the threat model and design decisions.
 
+This feature is disabled by default. Do not render or execute any flow in this section unless the
+resolved admin configuration has `features.emergencyModeEnabled === true`. Enable it explicitly
+with `VAULT_EMERGENCY_MODE_ENABLED=true` in `.env.local` or the authenticated admin override.
+
 ### Enrollment (trusted session)
 
 ```ts
@@ -1202,7 +1299,8 @@ await persistEmergencyModeActive(false);
 ### Dock integration
 
 - Wire `VaultStatusDock.onDuressSignalChange` and pass `duressSignaled` into passkey unlock.
-- Default `passkeyAutoStartDelayMs={2000}` allows 1 s handle long-press before auto-start.
+- Set `emergencyModeEnabled`; the dock then defaults `passkeyAutoStartDelayMs` to 2000 so a 1 s
+  handle long-press can complete. With emergency mode disabled, the default is immediate (`0`).
 - Use `useLongPressDuressSignal` on custom unlock UIs when not using the dock.
 
 ### Testing

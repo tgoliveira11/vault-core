@@ -22,6 +22,7 @@ describe("extractPasskeyPrfOutput", () => {
     expect(
       extractPasskeyPrfOutput({ prf: { results: { first: new ArrayBuffer(16) } } })
     ).toBeNull();
+    expect(() => prfBytesForAes256Import(new Uint8Array(31))).toThrow(/at least 32/);
   });
 
   it("reads results.first from ArrayBuffer", () => {
@@ -30,6 +31,8 @@ describe("extractPasskeyPrfOutput", () => {
       prf: { results: { first: bufferFromBytes(bytes) } },
     });
     expect(output).toEqual(bytes);
+    output?.fill(0);
+    expect(bytes).not.toEqual(output);
   });
 
   it("prefers evalByCredential for the matching credentialId on Safari-style payloads", () => {

@@ -63,6 +63,8 @@ export type VaultDockQuickUnlockProps = {
    * On iOS, expand-click auto-start may still fail; the explicit passkey button is reliable.
    */
   autoStartPasskey?: boolean;
+  /** Enables long-press emergency/duress behavior. Defaults to false. */
+  emergencyModeEnabled?: boolean;
   /** Latched duress signal from dock handle long-press (combined with button long-press). */
   duressSignaled?: boolean;
   /** Called when combined duress latch changes. */
@@ -99,6 +101,7 @@ export function VaultDockQuickUnlock({
   bindAutoStartPasskey,
   autoFocusPassword = true,
   autoStartPasskey = true,
+  emergencyModeEnabled = false,
   duressSignaled: externalDuressSignaled = false,
   onDuressSignalChange,
   resetDuressSignal: externalResetDuressSignal,
@@ -112,11 +115,17 @@ export function VaultDockQuickUnlock({
   const passwordInputRef = useRef<HTMLInputElement>(null);
   const { hasEnvelope, showPasskey, prfExplicitlyUnsupported } =
     resolveVaultDockPasskeyAvailability(serverStatus);
-  const passkeyDuress = useLongPressDuressSignal();
-  const combinedDuressSignaled = externalDuressSignaled || passkeyDuress.duressSignaled;
+  const passkeyDuress = useLongPressDuressSignal({ disabled: !emergencyModeEnabled });
+  const combinedDuressSignaled =
+    emergencyModeEnabled && (externalDuressSignaled || passkeyDuress.duressSignaled);
   const passwordId = `${idPrefix}-vault-password`;
   const usePasskeyPrimary = hasEnvelope;
   const displayedError = rateLimitError ?? error;
+
+  function resetDuressSignals() {
+    passkeyDuress.resetDuressSignal();
+    externalResetDuressSignal?.();
+  }
 
   async function runUnlockAttempt<T>(
     action: "password" | "passkey_prf",
@@ -153,6 +162,8 @@ export function VaultDockQuickUnlock({
       setVaultPassword("");
     } catch {
       // Error surfaced via error or rate limit props.
+    } finally {
+      resetDuressSignals();
     }
   }
 
@@ -172,6 +183,8 @@ export function VaultDockQuickUnlock({
       await runUnlockAttempt("passkey_prf", () => Promise.resolve(onUnlockPasskey()));
     } catch (error) {
       handlePasskeyFailure(error);
+    } finally {
+      resetDuressSignals();
     }
   }
 
@@ -224,10 +237,10 @@ export function VaultDockQuickUnlock({
           className="vc-status-dock__action vc-status-dock__action--subtle vc-status-dock-unlock__submit"
           disabled={loading || !passkeyReady}
           onClick={() => void submitPasskey()}
-          onPointerDown={passkeyDuress.onPointerDown}
-          onPointerUp={passkeyDuress.onPointerUp}
-          onPointerLeave={passkeyDuress.onPointerLeave}
-          onPointerCancel={passkeyDuress.onPointerCancel}
+          onPointerDown={emergencyModeEnabled ? passkeyDuress.onPointerDown : undefined}
+          onPointerUp={emergencyModeEnabled ? passkeyDuress.onPointerUp : undefined}
+          onPointerLeave={emergencyModeEnabled ? passkeyDuress.onPointerLeave : undefined}
+          onPointerCancel={emergencyModeEnabled ? passkeyDuress.onPointerCancel : undefined}
         >
           {loading ? labels.unlocking : labels.unlockWithPasskey}
         </button>

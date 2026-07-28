@@ -24,16 +24,33 @@ Before marking vault integration complete, verify every item below.
 ### 2. Client unlock flows
 
 - [ ] Wrap **every** code path that calls `unlockWithPasswordEnvelope`, `unlockWithRecoveryEnvelope`,
-  `unlockWithPasskeyPrfEnvelope`, or `unlockWithPasskeyPrfEnvelopeCandidates` with
+  `unlockWithPasskeyPrfEnvelope`, `unlockWithPasskeyPrfEnvelopeCandidates`, or
+  `createPasskeyPrfEnvelopeAfterIndependentAuthorization` with
   **`withVaultUnlockRateLimit()`** (or equivalent) — not only
   `VaultUnlockPanel` / `VaultDockQuickUnlock`. UI rate limits are bypassable via DevTools or direct
   API calls. Use action **`recovery_phrase`** for recovery-phrase unlock, KDF upgrade, and rotation
-  flows that verify the phrase.
+  flows that verify the phrase; use `password` or `recovery_phrase` for the independent authorization
+  helper according to its authorization kind.
 - [ ] Use **`readVaultUnlockReturnPath()`** / **`resolveVaultUnlockReturnPath()`** for post-unlock
   navigation — never pass raw `searchParams.get("next")` to the router.
 - [ ] Keep **account login** and **vault unlock** as separate security domains.
 - [ ] Keep each logical WebAuthn credential distinct from opaque browser bindings and PRF envelope
   variants. A binding is routing metadata, not an authentication factor or authorization grant.
+- [ ] Use **`resolvePasskeyUnlockPlan({ intent: "explicit", ... })`** for the full unlock page so a
+  synced credential remains usable without a browser binding. Restrict exact selection and WebAuthn
+  auto-start to the `quick` plan. On `VaultUnlockPanel`, pass that plan through `quickPasskeyPlan` and
+  use the separate `onQuickUnlockPasskey`; stale/missing bindings must not hide the explicit action.
+- [ ] Prepare passkey creation with **`prepareVaultPasskeyPrfRegistrationOptions()`** and accept its
+  PRF only through **`resolvePasskeyPrfEnrollmentAfterRegistration()`** after server verification
+  returns the exact same credential ID. Use a second authentication only when the resolver returns
+  `authentication_required`; WebAuthn fallback cannot run silently in the background.
+- [ ] If a WebAuthn library converts challenge/credential JSON but passes extension inputs through
+  (for example SimpleWebAuthn), call the existing preparation helper without `prepareJson`: encoded
+  server fields stay intact while the PRF salt remains the native `ArrayBuffer` required by WebAuthn.
+- [ ] If one credential is opted into both account login and vault unlock, use one authoritative
+  server counter/verifier, distinct challenge audiences, PRF sanitization plus server rejection,
+  and never unwrap before the account session (including 2FA) is complete. Follow
+  [`PASSKEY_ACCOUNT_AUTH_INTEROPERABILITY.md`](./PASSKEY_ACCOUNT_AUTH_INTEROPERABILITY.md).
 - [ ] Scope bound credential requests fail closed. Use an explicit exact, allow-list, or discoverable
   selection and preserve stored transports unless a documented compatibility policy requires otherwise.
 - [ ] Verify the WebAuthn assertion server-side before returning at most five active variants for that
@@ -42,18 +59,26 @@ Before marking vault integration complete, verify every item below.
   **`sanitizeWebAuthnResponseForServer()`** (or an equally strict app-owned serializer) before every
   registration/authentication request. Candidate results may contain only a matched opaque variant ID
   and the in-memory non-extractable UVK.
-- [ ] On candidate no-match, preserve all variants and require password/recovery locally before adding
-  another variant. A binding alone must not authorize envelope creation, replacement, or deletion.
+- [ ] On candidate no-match, preserve all variants and call
+  **`createPasskeyPrfEnvelopeAfterIndependentAuthorization()`** with password/recovery before appending
+  another variant. A session UVK, binding, or passkey alone must not authorize envelope creation,
+  replacement, or deletion.
 - [ ] Validate decrypted vault JSON with **`decryptVaultPayloadWithSchema()`** and an app-owned Zod
   schema — do not trust ciphertext shape after schema migrations or tampering.
 - [ ] When emergency/duress mode is enabled, use **`unlockVaultWithPasswordRouting()`** /
   **`unlockVaultWithPasskeyRouting()`** (or **`unlockVaultWithPasskeyCandidateRouting()`** for
   variants) and **`decryptVaultPayloadForSession()`** — never decrypt the
   primary `encryptedBlob` while `emergencyModeActive` is set.
-- [ ] Persist **`emergencyModeActive`** server-side; hydrate with **`hydrateVaultEmergencyModeFromServer()`**
-  on authenticated load. Clear the flag only through **`exitEmergencyMode()`** (primary recovery phrase).
-- [ ] Rate-limit **`emergency_exit`** unlock action separately from password/passkey unlock.
-- [ ] Wire dock **`onDuressSignalChange`** / long-press latch into passkey unlock orchestration.
+- [ ] If emergency/duress passkey candidate routing returns `no_match`, keep the vault locked and use
+  password/recovery routing. Do not install or persist a compatibility result until a confirmed normal
+  primary context.
+- [ ] When emergency/duress mode is explicitly enabled, persist **`emergencyModeActive`**
+  server-side; hydrate with **`hydrateVaultEmergencyModeFromServer()`** on authenticated load. Clear
+  the flag only through **`exitEmergencyMode()`** (primary recovery phrase).
+- [ ] When emergency/duress mode is explicitly enabled, rate-limit **`emergency_exit`** unlock
+  action separately from password/passkey unlock.
+- [ ] When emergency/duress mode is explicitly enabled, wire dock **`onDuressSignalChange`** /
+  long-press latch into passkey unlock orchestration.
 
 ### 3. Locked vs unlocked access in application code
 

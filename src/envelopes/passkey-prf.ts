@@ -2,13 +2,12 @@ import type { EncryptedVaultPayload, PasskeyPrfEnvelope } from "../validation/sc
 import type { VaultCryptoProfile, VaultAadScope } from "../profile.js";
 import type { WrapUserVaultKeyOptions } from "../crypto/vault-key-envelope.js";
 import { PasskeyPrfRequiredError, PasskeyUnlockError, VaultAuthorizationError } from "../errors/vault-errors.js";
-import { toBufferSource } from "../crypto/encoding.js";
+import { importPrfAesGcmKey, importPrfAesKwKey } from "../crypto/prf-key.js";
 import {
   unwrapUserVaultKeyWithPrfOutput,
   wrapUserVaultKeyWithPrfOutput,
   rewrapInnerVaultKeyMaterialForWrappingKeys,
 } from "../crypto/vault-key-envelope.js";
-import { importAesKwKey } from "../crypto/user-vault-key-crypto.js";
 import {
   getCachedVaultInnerKeyMaterial,
   clearVaultInnerKeyMaterialCache,
@@ -47,17 +46,6 @@ export {
   type ResolvePasskeyPrfCapabilityInput,
 } from "./passkey-prf-capability.js";
 
-async function importPrfAsAesKey(prfOutput: Uint8Array): Promise<CryptoKey> {
-  const keyBytes = prfOutput.byteLength === 32 ? prfOutput : prfOutput.slice(0, 32);
-  return crypto.subtle.importKey(
-    "raw",
-    toBufferSource(keyBytes),
-    { name: "AES-GCM", length: 256 },
-    false,
-    ["encrypt", "decrypt"]
-  );
-}
-
 type WrapScope = Pick<VaultAadScope, "userId" | "resourceId">;
 
 export type CreatePasskeyPrfEnvelopeOptions = WrapUserVaultKeyOptions;
@@ -75,7 +63,7 @@ export async function createPasskeyPrfEnvelope(
   if (prfOutput.byteLength < 32) {
     throw new Error("PRF output must be at least 32 bytes");
   }
-  const prfKey = await importPrfAsAesKey(prfOutput);
+  const prfKey = await importPrfAesGcmKey(prfOutput);
   const encryptedVaultKey = await wrapUserVaultKeyWithPrfOutput(
     vaultKey,
     prfOutput,
@@ -124,9 +112,7 @@ export async function createPasskeyPrfEnvelopeWithSessionCache(
   const cached = getCachedVaultInnerKeyMaterial(sessionOptions);
   if (cached) {
     try {
-      const prfWrappingKey = await importAesKwKey(
-        prfOutput.byteLength === 32 ? prfOutput : prfOutput.slice(0, 32)
-      );
+      const prfWrappingKey = await importPrfAesKwKey(prfOutput);
       const rewrappedInner = await rewrapInnerVaultKeyMaterialForWrappingKeys(
         cached.inner,
         cached.wrappingKey,
@@ -182,7 +168,7 @@ export async function unwrapVaultKeyFromPasskey(
   if (prfOutput.byteLength < 32) {
     throw new Error("PRF output must be at least 32 bytes");
   }
-  const prfKey = await importPrfAsAesKey(prfOutput);
+  const prfKey = await importPrfAesGcmKey(prfOutput);
   const decrypt = async (candidate: EncryptedVaultPayload) =>
     unwrapUserVaultKeyWithPrfOutput(candidate, prfOutput, prfKey);
 

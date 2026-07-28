@@ -4,7 +4,7 @@ import {
   assertInnerVaultKeyBlobMatchesVaultKey,
   extractInnerVaultKeyBlob,
 } from "../crypto/vault-key-envelope.js";
-import { importAesKwKey } from "../crypto/user-vault-key-crypto.js";
+import { importPrfAesKwKey } from "../crypto/prf-key.js";
 import { VaultAuthorizationError } from "../errors/vault-errors.js";
 import {
   assertVaultSessionMutationAllowed,
@@ -83,9 +83,7 @@ export async function cacheVaultInnerKeyMaterialFromPasskeyEnvelope(
   options?: VaultSessionMutationOptions
 ): Promise<void> {
   assertVaultSessionMutationAllowed(options?.operation);
-  const wrappingKey = await importAesKwKey(
-    prfOutput.byteLength === 32 ? prfOutput : prfOutput.slice(0, 32)
-  );
+  const wrappingKey = await importPrfAesKwKey(prfOutput);
   const inner = await extractInnerVaultKeyBlob(encryptedVaultKey, prfEncryptionKey);
   await cacheVaultInnerKeyMaterialFromEnvelopeDecrypt(
     inner,

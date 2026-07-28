@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { VaultStatusDockClient } from "@/components/vault/vault-status-dock-client";
+import { useDemoVaultFeatures } from "@/components/providers";
 
 const NAV = [
   { href: "/dashboard", label: "Dashboard" },
@@ -12,6 +13,7 @@ const NAV = [
 ] as const;
 
 export function AppHeader({ title }: { title: string }) {
+  const { emergencyModeEnabled } = useDemoVaultFeatures();
   return (
     <header className="border-b border-[var(--border)] bg-[var(--card)]">
       <div className="mx-auto flex max-w-4xl flex-wrap items-center justify-between gap-3 px-4 py-3">
@@ -34,7 +36,7 @@ export function AppHeader({ title }: { title: string }) {
             ))}
           </nav>
           <div className="vc-status-dock-host">
-            <VaultStatusDockClient />
+            <VaultStatusDockClient emergencyModeEnabled={emergencyModeEnabled} />
           </div>
         </div>
       </div>

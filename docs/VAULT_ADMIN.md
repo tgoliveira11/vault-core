@@ -78,7 +78,11 @@ All vault-related variables are cataloged in `VAULT_ADMIN_ENV_CATALOG` and rende
 - **Crypto profile:** `VAULT_AAD_CONTEXT_VAULT`, `VAULT_AAD_CONTEXT_ENVELOPE`, `VAULT_PRF_SALT_PREFIX`, `VAULT_DEFAULT_RECOVERY_WORD_COUNT`
 - **Session:** `NEXT_PUBLIC_VAULT_AUTO_LOCK_MINUTES`, `VAULT_AUTO_LOCK_MINUTES`
 - **Password policy:** `VAULT_PASSWORD_*`
-- **Features:** `VAULT_PASSKEY_PRF_UNLOCK_ENABLED`
+- **Features:** `VAULT_PASSKEY_PRF_UNLOCK_ENABLED`, `VAULT_EMERGENCY_MODE_ENABLED` (default `false`)
+
+`emergencyModeEnabled` is an admin-overridable opt-in flag. Consuming applications must use the
+resolved value to hide emergency enrollment/exit screens and disable emergency unlock routing when
+false; the package does not own consumer routes or persistence.
 
 Copy-ready block: `buildVaultEnvLocalTemplate(productName)` or the admin **Environment template** page.
 

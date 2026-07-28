@@ -6,10 +6,17 @@ import {
   withVaultUnlockRateLimit,
   type VaultUnlockRateLimiter,
 } from "../../rate-limit/vault-unlock-rate-limit.js";
-import { resolveVaultDockPasskeyAvailability } from "../status-dock/resolve-passkey-dock-availability.js";
+import {
+  resolvePasskeyUnlockPlan,
+  type PasskeyUnlockPlan,
+} from "../../passkey/device-binding/index.js";
 import type { VaultServerStatusSnapshot } from "../status/resolve-vault-client-status.js";
 
 export type VaultUnlockMethod = "password" | "recovery_phrase";
+export type ReadyQuickPasskeyUnlockPlan = Extract<
+  PasskeyUnlockPlan,
+  { status: "ready"; intent: "quick" }
+>;
 
 export type VaultUnlockPanelLabels = {
   title: string;
@@ -50,14 +57,20 @@ export type VaultUnlockPanelProps = {
   error?: string | null;
   serverStatus?: VaultServerStatusSnapshot | null;
   prfSupported?: boolean;
-  /** When false, passkey UI stays visible but disabled (for example credential not on this device). */
+  /** When false, explicit WebAuthn options are not ready yet. Do not derive this from browser binding. */
   passkeyReady?: boolean;
   idPrefix?: string;
   labels?: Partial<VaultUnlockPanelLabels>;
   defaultMethod?: VaultUnlockMethod;
   onUnlockPassword: (password: string) => void | Promise<void>;
   onUnlockRecoveryPhrase: (phrase: string) => void | Promise<void>;
+  /** User-initiated explicit allow-list/discoverable unlock. Never auto-started. */
   onUnlockPasskey?: () => void | Promise<void>;
+  /** Exact bound-credential unlock. Required, with quickPasskeyPlan, for auto-start. */
+  onQuickUnlockPasskey?: (
+    plan: ReadyQuickPasskeyUnlockPlan
+  ) => void | Promise<void>;
+  quickPasskeyPlan?: ReadyQuickPasskeyUnlockPlan | null;
   autoFocusPassword?: boolean;
   autoStartPasskey?: boolean;
   unlockRateLimiter?: VaultUnlockRateLimiter;
@@ -87,6 +100,8 @@ export function VaultUnlockPanel({
   onUnlockPassword,
   onUnlockRecoveryPhrase,
   onUnlockPasskey,
+  onQuickUnlockPasskey,
+  quickPasskeyPlan = null,
   autoFocusPassword = true,
   autoStartPasskey = false,
   unlockRateLimiter,
@@ -101,10 +116,14 @@ export function VaultUnlockPanel({
   const [rateLimitError, setRateLimitError] = useState<string | null>(null);
   const passwordInputRef = useRef<HTMLInputElement>(null);
   const passkeyAutoStartedRef = useRef(false);
-  const { hasEnvelope, showPasskey: dockShowPasskey, prfExplicitlyUnsupported: dockPrfUnsupported } =
-    resolveVaultDockPasskeyAvailability(serverStatus);
-  const showPasskey = dockShowPasskey && prfSupported !== false;
-  const prfExplicitlyUnsupported = dockPrfUnsupported || prfSupported === false;
+  const hasEnvelope = Boolean(serverStatus?.hasPasskeyPrfEnvelope);
+  const explicitPasskeyPlan = resolvePasskeyUnlockPlan({
+    intent: "explicit",
+    hasPasskeyPrfEnvelope: hasEnvelope,
+    preliminaryPrfAvailable: prfSupported !== false,
+  });
+  const explicitPasskeyReady = explicitPasskeyPlan.status === "ready";
+  const quickPasskeyReady = Boolean(quickPasskeyPlan && onQuickUnlockPasskey);
   const showPasskeyUnlock = Boolean(hasEnvelope && onUnlockPasskey);
   const passwordId = `${idPrefix}-vault-password`;
   const phraseId = `${idPrefix}-recovery-phrase`;
@@ -165,6 +184,17 @@ export function VaultUnlockPanel({
     }
   }
 
+  async function submitQuickPasskey() {
+    if (!passkeyReady || !quickPasskeyPlan || !onQuickUnlockPasskey) return;
+    try {
+      await runUnlockAttempt("passkey_prf", () =>
+        Promise.resolve(onQuickUnlockPasskey(quickPasskeyPlan))
+      );
+    } catch {
+      // Error surfaced via error or rate limit props.
+    }
+  }
+
   useEffect(() => {
     if (!autoFocusPassword || method !== "password" || showPasskeyUnlock) return;
     passwordInputRef.current?.focus();
@@ -173,8 +203,8 @@ export function VaultUnlockPanel({
   useEffect(() => {
     if (
       !autoStartPasskey ||
-      !showPasskeyUnlock ||
-      !showPasskey ||
+      !hasEnvelope ||
+      !quickPasskeyReady ||
       !passkeyReady ||
       loading ||
       passkeyAutoStartedRef.current
@@ -182,8 +212,8 @@ export function VaultUnlockPanel({
       return;
     }
     passkeyAutoStartedRef.current = true;
-    void submitPasskey();
-  }, [autoStartPasskey, showPasskeyUnlock, showPasskey, passkeyReady, loading]);
+    void submitQuickPasskey();
+  }, [autoStartPasskey, hasEnvelope, quickPasskeyReady, passkeyReady, loading]);
 
   function handlePasswordSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -207,12 +237,12 @@ export function VaultUnlockPanel({
           <button
             type="button"
             className="vc-vault-unlock__submit vc-vault-unlock__submit--secondary"
-            disabled={loading || !passkeyReady || !showPasskey}
+            disabled={loading || !passkeyReady || !explicitPasskeyReady}
             onClick={() => void submitPasskey()}
           >
             {loading ? labels.unlocking : labels.unlockWithPasskey}
           </button>
-          {!showPasskey || prfExplicitlyUnsupported ? (
+          {!explicitPasskeyReady || !passkeyReady ? (
             <p className="vc-vault-unlock__note">{labels.passkeyUnavailable}</p>
           ) : null}
         </div>

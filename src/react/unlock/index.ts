@@ -11,6 +11,7 @@ export {
   type VaultUnlockMethod,
   type VaultUnlockPanelLabels,
   type VaultUnlockPanelProps,
+  type ReadyQuickPasskeyUnlockPlan,
 } from "./vault-unlock-panel.js";
 export {
   useVaultUnlockPageNavigation,

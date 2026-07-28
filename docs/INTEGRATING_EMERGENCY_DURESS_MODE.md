@@ -13,9 +13,9 @@ document to add coercion-resistant decoy vault unlock to an existing vault integ
 | [CONSUMER_SECURITY_REQUIREMENTS.md](./CONSUMER_SECURITY_REQUIREMENTS.md) §2 | Mandatory checklist items |
 | [apps/consumer-demo](../apps/consumer-demo/) | Runnable reference wiring |
 
-**Prerequisites:** vault-core **1.2.0+** (or the release that ships emergency mode — see
-[CHANGELOG.md](../CHANGELOG.md) `[Unreleased]` / release notes). Primary vault setup, session
-provider, and at least one unlock path (password) must already work.
+**Availability:** emergency mode is shipped but **disabled by default**. Primary vault setup,
+session provider, and at least one unlock path (password) must already work. Enable it only after
+all persistence, routing, exit, and testing requirements in this guide are implemented.
 
 ---
 
@@ -36,6 +36,32 @@ configured a recovery email, your app must also verify an email OTP **before** c
 accepts `emailOtpRequired` + `emailOtp` as a gate parameter; it does not send email).
 
 Normal vault password **does not** exit emergency mode.
+
+### Enable the feature explicitly
+
+Environment configuration in `.env.local`:
+
+```dotenv
+VAULT_EMERGENCY_MODE_ENABLED=true
+```
+
+Or set the overridable admin key through your authenticated vault-admin configuration API:
+
+```json
+{ "emergencyModeEnabled": true }
+```
+
+Resolve both paths with `buildVaultAdminConfigFromEnv()` and use
+`config.features.emergencyModeEnabled` as the single application feature gate. When false:
+
+- do not render enrollment, emergency-exit, help, or status UI;
+- do not attach long-press handlers or delay normal passkey auto-start;
+- do not hydrate or route unlock through emergency metadata; and
+- keep existing decoy ciphertext/metadata intact so a later re-enable does not destroy data.
+
+Changing this flag is a trusted administrative action. If disabling while an emergency browser
+session is active, lock the vault and clear the in-memory emergency pin before another unlock.
+Never treat a client-provided flag as authorization.
 
 ---
 
@@ -118,7 +144,8 @@ import type { VaultServerStatusSnapshot } from "@tgoliveira/vault-core/react";
 const serverStatus: VaultServerStatusSnapshot = {
   configured: true,
   hasPasskeyPrfEnvelope: true,
-  passkeyUnlockAvailableOnThisDevice: true,
+  passkeyUnlockAvailableOnThisBrowser: true,
+  emergencyModeEnabled: config.features.emergencyModeEnabled,
   emergencyModeActive: metadata.emergencyModeActive,
   decoyConfigured: metadata.decoyConfigured,
 };
@@ -267,7 +294,7 @@ const duressRef = useRef(false);
 
 <VaultStatusDock
   serverStatus={serverStatus}
-  passkeyAutoStartDelayMs={2000}   // default; allows 1 s handle long-press before auto-start
+  emergencyModeEnabled={config.features.emergencyModeEnabled}
   onDuressSignalChange={(signaled) => {
     duressRef.current = signaled;
   }}
@@ -279,6 +306,7 @@ const duressRef = useRef(false);
   }) => (
     <VaultDockQuickUnlock
       bindAutoStartPasskey={bindAutoStartPasskey}
+      emergencyModeEnabled={config.features.emergencyModeEnabled}
       duressSignaled={duressSignaled}
       resetDuressSignal={resetDuressSignal}
       onDuressSignalChange={(signaled) => {
@@ -293,6 +321,8 @@ const duressRef = useRef(false);
 />
 ```
 
+Auto-start defaults to 2 s while emergency mode is enabled and 0 while it is disabled.
+
 **Behavior**
 
 | Gesture | Result |
@@ -306,11 +336,18 @@ For custom unlock UIs (full page passkey button):
 ```tsx
 import { useLongPressDuressSignal } from "@tgoliveira/vault-core/react";
 
-const { bind, duressSignaled, resetDuressSignal } = useLongPressDuressSignal({
+const duress = useLongPressDuressSignal({
   thresholdMs: 1000,
+  disabled: !config.features.emergencyModeEnabled,
 });
 
-<button {...bind()} onClick={() => unlockPasskey({ duressSignaled })}>
+<button
+  onPointerDown={duress.onPointerDown}
+  onPointerUp={duress.onPointerUp}
+  onPointerLeave={duress.onPointerLeave}
+  onPointerCancel={duress.onPointerCancel}
+  onClick={() => unlockPasskey({ duressSignaled: duress.duressSignaled })}
+>
   Unlock with passkey
 </button>
 ```
@@ -376,12 +413,7 @@ User must perform a **normal** unlock to access the real vault.
 ```ts
 import { resolveVaultClientStatus } from "@tgoliveira/vault-core/react";
 
-const status = resolveVaultClientStatus({
-  configured: true,
-  unlocked: isUnlocked,
-  serverStatus,
-  /* ... */
-});
+const status = resolveVaultClientStatus(serverStatus, isUnlocked, prfSupported);
 // "emergency_locked" | "emergency_unlocked" when applicable
 ```
 
@@ -413,6 +445,7 @@ import {
 | `exitEmergencyMode` + primary recovery | Flag cleared, locked, normal mode |
 | Wrong recovery on exit | Fails, flag unchanged |
 | Primary decrypt while emergency | `VaultEmergencyDecryptError` |
+| Feature disabled | No emergency UI/gesture/delay/status; normal unlock only |
 
 Use `assertNoVaultPlaintextInDocument()` after lock with sentinel strings.
 

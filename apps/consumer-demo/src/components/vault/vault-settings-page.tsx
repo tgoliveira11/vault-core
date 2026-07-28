@@ -42,11 +42,13 @@ function formatSecurityError(error: unknown): string {
 export function VaultSettingsPage({
   recoveryWordCount,
   passkeyPrfUnlockEnabled,
+  emergencyModeEnabled,
   passwordPolicy,
   adminAutoLockMinutes,
 }: {
   recoveryWordCount: RecoveryPhraseWordCount;
   passkeyPrfUnlockEnabled: boolean;
+  emergencyModeEnabled: boolean;
   passwordPolicy: VaultAdminPasswordPolicy;
   adminAutoLockMinutes: number;
 }) {
@@ -54,6 +56,7 @@ export function VaultSettingsPage({
     <VaultSettingsContent
       recoveryWordCount={recoveryWordCount}
       passkeyPrfUnlockEnabled={passkeyPrfUnlockEnabled}
+      emergencyModeEnabled={emergencyModeEnabled}
       passwordPolicy={passwordPolicy}
       adminAutoLockMinutes={adminAutoLockMinutes}
     />
@@ -63,11 +66,13 @@ export function VaultSettingsPage({
 function VaultSettingsContent({
   recoveryWordCount,
   passkeyPrfUnlockEnabled,
+  emergencyModeEnabled,
   passwordPolicy,
   adminAutoLockMinutes,
 }: {
   recoveryWordCount: RecoveryPhraseWordCount;
   passkeyPrfUnlockEnabled: boolean;
+  emergencyModeEnabled: boolean;
   passwordPolicy: VaultAdminPasswordPolicy;
   adminAutoLockMinutes: number;
 }) {
@@ -149,13 +154,15 @@ function VaultSettingsContent({
 
           <AutoLockSection adminAutoLockMinutes={adminAutoLockMinutes} />
 
-          <DecoyEnrollmentSection
-            busy={busy}
-            onComplete={() => {
-              refresh();
-              setMessage("Decoy vault configured.");
-            }}
-          />
+          {emergencyModeEnabled ? (
+            <DecoyEnrollmentSection
+              busy={busy}
+              onComplete={() => {
+                refresh();
+                setMessage("Decoy vault configured.");
+              }}
+            />
+          ) : null}
 
           <PasswordChangeSection
             busy={busy}

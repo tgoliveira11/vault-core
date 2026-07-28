@@ -8,6 +8,7 @@ export default async function VaultSettingsRoute() {
     <VaultSettingsPage
       recoveryWordCount={config.defaultRecoveryWordCount}
       passkeyPrfUnlockEnabled={config.features.passkeyPrfUnlockEnabled}
+      emergencyModeEnabled={config.features.emergencyModeEnabled === true}
       passwordPolicy={config.passwordPolicy}
       adminAutoLockMinutes={config.session.autoLockMinutes}
     />

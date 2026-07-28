@@ -15,10 +15,12 @@ import {
 } from "@tgoliveira/vault-core";
 import { z } from "zod";
 import {
+  clearEmergencyModePin,
   exitEmergencyMode,
   getSessionVaultKey,
   hydrateVaultEmergencyModeFromServer,
   isVaultEmergencyMode,
+  lockVaultSession,
   unlockVaultSession,
   unlockVaultWithPasswordRouting,
   unlockVaultWithPasskeyRouting,
@@ -61,11 +63,14 @@ function onEmergencyEntered() {
   setDemoEmergencyModeActive(true);
 }
 
-export function hydrateDemoEmergencyFromServer(): void {
-  const meta = loadDemoEmergencyMetadata();
-  if (meta.emergencyModeActive) {
-    hydrateVaultEmergencyModeFromServer(true);
+export function hydrateDemoEmergencyFromServer(emergencyModeEnabled = false): void {
+  if (!emergencyModeEnabled) {
+    lockVaultSession();
+    clearEmergencyModePin();
+    return;
   }
+  const meta = loadDemoEmergencyMetadata();
+  hydrateVaultEmergencyModeFromServer(meta.emergencyModeActive);
 }
 
 export type DemoVaultPayload = z.infer<typeof demoVaultPayloadSchema>;
@@ -166,7 +171,10 @@ export async function enrollDemoDecoyVault(input: {
   });
 }
 
-export async function unlockDemoVault(vaultPassword: string): Promise<DemoVaultPayload> {
+export async function unlockDemoVault(
+  vaultPassword: string,
+  options?: { emergencyModeEnabled?: boolean }
+): Promise<DemoVaultPayload> {
   return runDemoUnlockAttempt("password", async () => {
     const record = loadVaultRecord();
     if (!record) {
@@ -174,13 +182,13 @@ export async function unlockDemoVault(vaultPassword: string): Promise<DemoVaultP
     }
 
     const scope = vaultScope(DEMO_USER_ID);
-    const emergency = getEmergencyContext();
+    const emergency = options?.emergencyModeEnabled ? getEmergencyContext() : null;
 
     await unlockVaultWithPasswordRouting({
       record,
       password: vaultPassword,
-      duressSequence: emergency.duressSequence,
-      emergencyModeActive: emergency.emergencyModeActive,
+      duressSequence: emergency?.duressSequence ?? null,
+      emergencyModeActive: emergency?.emergencyModeActive ?? false,
       scope,
       profile: VAULT_PROFILE,
       onEmergencyEntered,
@@ -229,6 +237,7 @@ export async function unlockDemoVaultWithRecoveryPhrase(
 
 export async function unlockDemoVaultWithPasskey(options?: {
   duressSignaled?: boolean;
+  emergencyModeEnabled?: boolean;
 }): Promise<DemoVaultPayload> {
   return runDemoUnlockAttempt("passkey_prf", async () => {
     const record = loadVaultRecord();
@@ -236,20 +245,25 @@ export async function unlockDemoVaultWithPasskey(options?: {
       throw new Error("Passkey unlock is not configured");
     }
 
-    const credentialId = loadPasskeyCredentialId();
+    const metadataCredentialId = record.passkeyPrfEnvelope.publicMetadata?.credentialId;
+    const credentialId = loadPasskeyCredentialId() ?? (
+      typeof metadataCredentialId === "string" && metadataCredentialId.trim() === metadataCredentialId
+        ? metadataCredentialId
+        : null
+    );
     if (!credentialId) {
-      throw new Error("No passkey credential is linked on this device");
+      throw new Error("No verified passkey credential is linked to this vault");
     }
 
     const prfOutput = await authenticateDemoPasskey(credentialId);
     const scope = vaultScope(DEMO_USER_ID);
-    const emergency = getEmergencyContext();
+    const emergency = options?.emergencyModeEnabled ? getEmergencyContext() : null;
 
     await unlockVaultWithPasskeyRouting({
       record,
       prfOutput,
-      duressSignaled: options?.duressSignaled,
-      emergencyModeActive: emergency.emergencyModeActive,
+      duressSignaled: options?.emergencyModeEnabled && options.duressSignaled,
+      emergencyModeActive: emergency?.emergencyModeActive ?? false,
       scope,
       profile: VAULT_PROFILE,
       onEmergencyEntered,
@@ -299,7 +313,12 @@ export function verifyDemoEmergencyExitOtp(otp: string): boolean {
 export function isDemoPasskeyUnlockAvailable(): boolean {
   const record = loadVaultRecord();
   if (!record?.passkeyPrfEnvelope) return false;
-  return loadPasskeyCredentialId() != null;
+  const metadataCredentialId = record.passkeyPrfEnvelope.publicMetadata?.credentialId;
+  return loadPasskeyCredentialId() != null || (
+    typeof metadataCredentialId === "string" &&
+    metadataCredentialId.length > 0 &&
+    metadataCredentialId.trim() === metadataCredentialId
+  );
 }
 
 export async function loadDecryptedDemoPayload(): Promise<DemoVaultPayload | null> {

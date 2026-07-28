@@ -141,7 +141,11 @@ export async function linkDemoPasskeyPrf(): Promise<void> {
     prfOutput,
     scope,
     VAULT_PROFILE,
-    { linkedAt: new Date().toISOString() }
+    {
+      credentialId,
+      linkedAt: new Date().toISOString(),
+      prfRequired: true,
+    }
   );
 
   saveVaultRecord({ ...record, passkeyPrfEnvelope });

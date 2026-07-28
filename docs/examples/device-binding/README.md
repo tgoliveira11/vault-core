@@ -70,18 +70,24 @@ Missing binding state fails closed. This does not prevent a separate explicit **
 passkey** flow.
 
 ```ts
-import { resolvePasskeyUnlockAvailable } from "@tgoliveira/vault-core";
+import { resolvePasskeyUnlockPlan } from "@tgoliveira/vault-core";
 
 export function resolveQuickUnlock(input: {
   hasEnvelopeVariants: boolean;
-  bindingExists: boolean;
-}): boolean {
-  return resolvePasskeyUnlockAvailable({
+  preliminaryPrfAvailable: boolean;
+  bindingTarget: { credentialId: string; selectedEnvelopeVariantId?: string } | null;
+}) {
+  return resolvePasskeyUnlockPlan({
+    intent: "quick",
     hasPasskeyPrfEnvelope: input.hasEnvelopeVariants,
-    passkeyUnlockAvailableOnThisBrowser: input.bindingExists,
+    preliminaryPrfAvailable: input.preliminaryPrfAvailable,
+    bindingTarget: input.bindingTarget,
   });
 }
 ```
+
+For the full unlock page call the same helper with `intent: "explicit"`; it defaults to the
+authenticated account's allow-list and intentionally ignores binding as a prerequisite.
 
 ## Exact bound-credential selection
 
@@ -118,8 +124,10 @@ allow-list flow:
 3. extract PRF locally and call `unlockWithPasskeyPrfEnvelopeCandidates()`;
 4. after a match, create another opaque binding targeting the matched credential/variant.
 
-If no variant matches, preserve all variants. Require password/recovery locally before creating and
-persisting an additional compatibility variant.
+If no variant matches, preserve all variants. Call
+`createPasskeyPrfEnvelopeAfterIndependentAuthorization()` with password/recovery locally, persist its
+envelope as an additional compatibility variant, and install its returned non-extractable UVK. Do not
+use `createPasskeyPrfEnvelopeWithSessionCache()` as authorization for this repair path.
 
 ## Revocation boundaries
 

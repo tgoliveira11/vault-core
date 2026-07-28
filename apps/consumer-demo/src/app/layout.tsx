@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import { Providers } from "@/components/providers";
-import { getVaultAutoLockMinutesAsync } from "@/lib/env/vault-from-env";
+import { getVaultAdminConfigAsync } from "@/lib/env/vault-from-env";
 import "./globals.css";
 
 export const metadata: Metadata = {
@@ -10,12 +10,17 @@ export const metadata: Metadata = {
 };
 
 export default async function RootLayout({ children }: { children: React.ReactNode }) {
-  const autoLockMinutes = await getVaultAutoLockMinutesAsync();
+  const config = await getVaultAdminConfigAsync();
 
   return (
     <html lang="en">
       <body className="min-h-screen antialiased">
-        <Providers autoLockMinutes={autoLockMinutes}>{children}</Providers>
+        <Providers
+          autoLockMinutes={config.session.autoLockMinutes}
+          emergencyModeEnabled={config.features.emergencyModeEnabled === true}
+        >
+          {children}
+        </Providers>
       </body>
     </html>
   );

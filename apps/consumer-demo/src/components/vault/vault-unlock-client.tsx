@@ -9,7 +9,6 @@ import {
 } from "@tgoliveira/vault-core/react";
 import { AppShell } from "@/components/app-shell";
 import {
-  hydrateDemoEmergencyFromServer,
   isDemoPasskeyUnlockAvailable,
   unlockDemoVault,
   unlockDemoVaultWithPasskey,
@@ -19,14 +18,16 @@ import { getDemoServerStatusSnapshot } from "@/lib/vault-demo-emergency-store";
 import { getDemoPasskeySupport } from "@/lib/vault-demo-passkey";
 import { isVaultConfigured, loadVaultRecord } from "@/lib/vault-demo-store";
 import { getDemoVaultUnlockRateLimiter } from "@/lib/vault-rate-limit";
+import { useDemoVaultFeatures } from "@/components/providers";
 
 function VaultUnlockForm() {
+  const { emergencyModeEnabled } = useDemoVaultFeatures();
   const router = useRouter();
   const searchParams = useSearchParams();
   const returnPath = readVaultUnlockReturnPath(searchParams, { defaultPath: "/vault" });
   const [configured, setConfigured] = useState<boolean | null>(null);
   const [serverStatus, setServerStatus] = useState(
-    getDemoServerStatusSnapshot(false, false)
+    getDemoServerStatusSnapshot(false, false, emergencyModeEnabled)
   );
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
@@ -35,14 +36,17 @@ function VaultUnlockForm() {
   const passkeyReady = isDemoPasskeyUnlockAvailable();
 
   useEffect(() => {
-    hydrateDemoEmergencyFromServer();
     const vaultConfigured = isVaultConfigured();
     setConfigured(vaultConfigured);
     const record = loadVaultRecord();
     setServerStatus(
-      getDemoServerStatusSnapshot(vaultConfigured, Boolean(record?.passkeyPrfEnvelope))
+      getDemoServerStatusSnapshot(
+        vaultConfigured,
+        Boolean(record?.passkeyPrfEnvelope),
+        emergencyModeEnabled
+      )
     );
-  }, []);
+  }, [emergencyModeEnabled]);
 
   useVaultUnlockPageNavigation({
     configured,
@@ -71,8 +75,9 @@ function VaultUnlockForm() {
   );
 
   const handleUnlockPassword = useCallback(
-    (password: string) => runUnlock(() => unlockDemoVault(password)),
-    [runUnlock]
+    (password: string) =>
+      runUnlock(() => unlockDemoVault(password, { emergencyModeEnabled })),
+    [emergencyModeEnabled, runUnlock]
   );
 
   const handleUnlockRecoveryPhrase = useCallback(
@@ -83,9 +88,12 @@ function VaultUnlockForm() {
   const handleUnlockPasskey = useCallback(
     () =>
       runUnlock(() =>
-        unlockDemoVaultWithPasskey({ duressSignaled: duressSignaledRef.current })
+        unlockDemoVaultWithPasskey({
+          duressSignaled: emergencyModeEnabled && duressSignaledRef.current,
+          emergencyModeEnabled,
+        })
       ),
-    [runUnlock]
+    [emergencyModeEnabled, runUnlock]
   );
 
   if (configured === null) {

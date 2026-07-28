@@ -31,9 +31,21 @@ export {
   alignPrfExtensionsForCredential,
   prepareWebAuthnPrfExtensions,
   type PublicKeyCredentialRequestOptionsInput,
+  type PublicKeyCredentialCreationOptionsInput,
   type WebAuthnExtensionsInput,
   type WebAuthnPrfExtensionInput,
 } from "./browser/webauthn-prf-options.js";
+
+export {
+  prepareVaultPasskeyPrfRegistrationOptions,
+  type PrepareVaultPasskeyPrfRegistrationOptionsInput,
+} from "./browser/vault-passkey-prf-registration-options.js";
+
+export {
+  resolvePasskeyPrfEnrollmentAfterRegistration,
+  type PasskeyPrfEnrollmentAfterRegistrationResult,
+  type ResolvePasskeyPrfEnrollmentAfterRegistrationInput,
+} from "./browser/passkey-prf-enrollment.js";
 
 export {
   isAppleMobileUserAgent,

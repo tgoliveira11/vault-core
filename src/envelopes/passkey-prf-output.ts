@@ -9,30 +9,38 @@ type PrfResultEntry = {
   first?: unknown;
 };
 
-/** Normalizes PRF extension bytes to exactly 32 bytes for AES-256 import. */
+/** Returns an owned 32-byte snapshot of PRF extension bytes for AES-256 import. */
 export function prfBytesForAes256Import(bytes: Uint8Array): Uint8Array {
-  return bytes.byteLength === 32 ? bytes : bytes.slice(0, 32);
+  if (bytes.byteLength < 32) {
+    throw new Error("PRF output must be at least 32 bytes");
+  }
+  return bytes.slice(0, 32);
 }
 
-function coerceExtensionBytesToUint8Array(value: unknown): Uint8Array | null {
+type CoercedExtensionBytes = { bytes: Uint8Array; owned: boolean };
+
+function coerceExtensionBytesToUint8Array(value: unknown): CoercedExtensionBytes | null {
   if (value instanceof ArrayBuffer) {
-    return new Uint8Array(value);
+    return { bytes: new Uint8Array(value), owned: false };
   }
 
   if (ArrayBuffer.isView(value)) {
-    return new Uint8Array(value.buffer, value.byteOffset, value.byteLength);
+    return {
+      bytes: new Uint8Array(value.buffer, value.byteOffset, value.byteLength),
+      owned: false,
+    };
   }
 
   if (typeof value === "string") {
     try {
-      return base64UrlToBytes(value);
+      return { bytes: base64UrlToBytes(value), owned: true };
     } catch {
       return null;
     }
   }
 
   if (Array.isArray(value) && value.length >= 32 && value.every((entry) => typeof entry === "number")) {
-    return new Uint8Array(value);
+    return { bytes: new Uint8Array(value), owned: true };
   }
 
   return null;
@@ -43,12 +51,18 @@ function pickPrfResultFirst(entry: unknown): Uint8Array | null {
     return null;
   }
 
-  const bytes = coerceExtensionBytesToUint8Array((entry as PrfResultEntry).first);
-  if (!bytes || bytes.byteLength < 32) {
+  const coerced = coerceExtensionBytesToUint8Array((entry as PrfResultEntry).first);
+  if (!coerced) {
     return null;
   }
-
-  return prfBytesForAes256Import(bytes);
+  try {
+    if (coerced.bytes.byteLength < 32) {
+      return null;
+    }
+    return prfBytesForAes256Import(coerced.bytes);
+  } finally {
+    if (coerced.owned) coerced.bytes.fill(0);
+  }
 }
 
 function pickFirstInEvalByCredentialMap(evalByCredential: unknown): Uint8Array | null {

@@ -126,8 +126,13 @@ export type VaultStatusDockProps = {
   /** Invoked when dock passkey unlock is cancelled (no redirect by default). */
   onPasskeyUnlockCancelled?: (error: unknown) => void;
   /**
-   * Delay (ms) before passkey auto-start after dock expand. Default 2000 ms so long-press on the
-   * handle can complete before the ceremony starts. Set to 0 for immediate auto-start (tests).
+   * Enables emergency/duress status and long-press behavior. Defaults to the explicit
+   * `serverStatus.emergencyModeEnabled` value, then false.
+   */
+  emergencyModeEnabled?: boolean;
+  /**
+   * Delay (ms) before passkey auto-start after dock expand. Defaults to 0, or 2000 ms when
+   * emergency mode is enabled so a long-press can complete before the ceremony starts.
    */
   passkeyAutoStartDelayMs?: number;
   /** Notified when the long-press duress latch changes (handle or passkey button). */
@@ -225,14 +230,33 @@ export function VaultStatusDock({
   shouldRedirectOnPasskeyUnlockFailure,
   onNavigateToUnlock,
   onPasskeyUnlockCancelled,
-  passkeyAutoStartDelayMs = DEFAULT_PASSKEY_AUTO_START_DELAY_MS,
+  emergencyModeEnabled,
+  passkeyAutoStartDelayMs,
   onDuressSignalChange,
   renderQuickUnlock,
 }: VaultStatusDockProps) {
+  const emergencyEnabled =
+    emergencyModeEnabled ?? serverStatus?.emergencyModeEnabled === true;
+  const effectivePasskeyAutoStartDelayMs =
+    passkeyAutoStartDelayMs ??
+    (emergencyEnabled ? DEFAULT_PASSKEY_AUTO_START_DELAY_MS : 0);
+  const effectiveServerStatus = useMemo<VaultServerStatusSnapshot | null>(
+    () =>
+      serverStatus
+        ? {
+            ...serverStatus,
+            emergencyModeEnabled: emergencyEnabled,
+            emergencyModeActive:
+              emergencyEnabled && serverStatus.emergencyModeActive === true,
+            decoyConfigured: emergencyEnabled && serverStatus.decoyConfigured === true,
+          }
+        : null,
+    [emergencyEnabled, serverStatus]
+  );
   const labels = { ...DEFAULT_VAULT_STATUS_DOCK_LABELS, ...labelOverrides };
   const buildUnlockHref =
     buildUnlockHrefProp ?? ((returnPath: string) => buildVaultUnlockHref(unlockPath, returnPath));
-  const clientStatus = useVaultClientStatus(serverStatus, prfSupported);
+  const clientStatus = useVaultClientStatus(effectiveServerStatus, prfSupported);
   const matchesFullUnlockPage =
     isFullUnlockPage ?? createVaultFullUnlockPageMatcher(unlockPath);
   const onFullUnlockPage = matchesFullUnlockPage(pathname);
@@ -248,7 +272,7 @@ export function VaultStatusDock({
   const autoStartConsumedRef = useRef(false);
   const autoStartTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const autoStartScopeKey = `${collapsedPreferenceKey}:passkey-auto-start`;
-  const handleDuress = useLongPressDuressSignal();
+  const handleDuress = useLongPressDuressSignal({ disabled: !emergencyEnabled });
   const [expansion, setExpansion] = useState<{
     status: VaultClientStatus;
     expanded: boolean;
@@ -295,8 +319,8 @@ export function VaultStatusDock({
   }, [clientStatus, collapsedPreferenceKey, handleDuress]);
 
   useEffect(() => {
-    onDuressSignalChange?.(handleDuress.duressSignaled);
-  }, [handleDuress.duressSignaled, onDuressSignalChange]);
+    onDuressSignalChange?.(emergencyEnabled && handleDuress.duressSignaled);
+  }, [emergencyEnabled, handleDuress.duressSignaled, onDuressSignalChange]);
 
   const triggerPasskeyAutoStart = useCallback(() => {
     if (autoStartConsumedRef.current) return;
@@ -313,7 +337,7 @@ export function VaultStatusDock({
       autoStartHandlerRef.current();
     };
 
-    if (passkeyAutoStartDelayMs <= 0) {
+    if (effectivePasskeyAutoStartDelayMs <= 0) {
       fire();
       return;
     }
@@ -324,16 +348,16 @@ export function VaultStatusDock({
     autoStartTimerRef.current = setTimeout(() => {
       autoStartTimerRef.current = null;
       fire();
-    }, passkeyAutoStartDelayMs);
-  }, [autoStartScopeKey, passkeyAutoStartDelayMs]);
+    }, effectivePasskeyAutoStartDelayMs);
+  }, [autoStartScopeKey, effectivePasskeyAutoStartDelayMs]);
 
   const bindAutoStartPasskey = useCallback((handler: (() => void) | null) => {
     autoStartHandlerRef.current = handler;
-    if (handler && pendingAutoStartRef.current && passkeyAutoStartDelayMs <= 0) {
+    if (handler && pendingAutoStartRef.current && effectivePasskeyAutoStartDelayMs <= 0) {
       pendingAutoStartRef.current = false;
       handler();
     }
-  }, [passkeyAutoStartDelayMs]);
+  }, [effectivePasskeyAutoStartDelayMs]);
 
   const expand = useCallback(() => {
     suppressVaultActivity();
@@ -353,14 +377,14 @@ export function VaultStatusDock({
     ) {
       return;
     }
-    if (!quickUnlockEnabled || serverStatus?.configured !== true) return;
+    if (!quickUnlockEnabled || effectiveServerStatus?.configured !== true) return;
     triggerPasskeyAutoStart();
   }, [
     clientStatus,
     expanded,
     onFullUnlockPage,
     quickUnlockEnabled,
-    serverStatus?.configured,
+    effectiveServerStatus?.configured,
     triggerPasskeyAutoStart,
   ]);
 
@@ -456,13 +480,13 @@ export function VaultStatusDock({
 
   const status = clientStatus;
   const expandedCopy = getVaultStatusDockExpandedCopy(status, countdown, labels);
-  const passkeyAvailability = resolveVaultDockPasskeyAvailability(serverStatus);
+  const passkeyAvailability = resolveVaultDockPasskeyAvailability(effectiveServerStatus);
   const showQuickUnlock =
     quickUnlockEnabled &&
     (status === "locked" ||
       status === "unsupported_prf" ||
       status === "emergency_locked") &&
-    serverStatus?.configured === true;
+    effectiveServerStatus?.configured === true;
   const fullUnlockLinkLabel =
     passkeyAvailability.hasEnvelope && !passkeyAvailability.showPasskey
       ? labels.fullUnlockLink
@@ -498,10 +522,10 @@ export function VaultStatusDock({
         aria-expanded={handleExpanded}
         aria-label={handleExpanded ? labels.collapseAriaLabel : labels.expandAriaLabel}
         onClick={handleExpanded ? undefined : expand}
-        onPointerDown={handleDuress.onPointerDown}
-        onPointerUp={handleDuress.onPointerUp}
-        onPointerLeave={handleDuress.onPointerLeave}
-        onPointerCancel={handleDuress.onPointerCancel}
+        onPointerDown={emergencyEnabled ? handleDuress.onPointerDown : undefined}
+        onPointerUp={emergencyEnabled ? handleDuress.onPointerUp : undefined}
+        onPointerLeave={emergencyEnabled ? handleDuress.onPointerLeave : undefined}
+        onPointerCancel={emergencyEnabled ? handleDuress.onPointerCancel : undefined}
       >
         <span className={cn("vc-status-dock-handle__icon", iconToneClass(status))}>
           <VaultStatusIcon status={status} />
@@ -617,14 +641,14 @@ export function VaultStatusDock({
           {renderQuickUnlock?.({
             loading,
             error: unlockError,
-            serverStatus,
+            serverStatus: effectiveServerStatus,
             collapse,
             fullUnlockHref: unlockHref,
             onPasskeyUnlockFailed: handlePasskeyUnlockFailed,
             onPasskeyUnlockCancelled: handlePasskeyUnlockCancelled,
             bindAutoStartPasskey,
             autoStartConsumed: autoStartConsumedRef.current,
-            duressSignaled: handleDuress.duressSignaled,
+            duressSignaled: emergencyEnabled && handleDuress.duressSignaled,
             resetDuressSignal: handleDuress.resetDuressSignal,
           })}
           <p className="vc-status-dock-panel__fallback">

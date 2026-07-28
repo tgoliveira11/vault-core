@@ -6,6 +6,12 @@ Account login, password reset, TOTP, OAuth, and passkey **login** must not unloc
 
 Vault unlock requires a separate vault password, recovery phrase, or passkey PRF envelope.
 
+One WebAuthn credential may be explicitly opted into both passkey login and vault PRF, but the
+capabilities, challenges, verification outcomes, server sessions, and lifecycle flags remain
+independent. Login never implies vault unlock. A shared credential increases compromise blast radius
+compared with separate credentials and requires informed user choice. See
+[the interoperability contract](docs/PASSKEY_ACCOUNT_AUTH_INTEROPERABILITY.md).
+
 ## Server must never receive
 
 - Vault password
@@ -61,6 +67,12 @@ Consuming applications must implement authentication, RBAC, CSP, mandatory unloc
 `assertNoVaultPlaintextFields()` on server routes. See
 [docs/CONSUMER_SECURITY_REQUIREMENTS.md](docs/CONSUMER_SECURITY_REQUIREMENTS.md).
 
+Envelope `publicMetadata` is server-visible and untrusted. Consumers must keep it non-secret and
+apply route/schema size limits. `createPasskeyPrfEnvelopeAfterIndependentAuthorization()` additionally
+enforces JSON-only metadata, forbidden-plaintext field rejection, bounded depth/entries, and a
+4,096-byte limit. Legacy envelope parsing remains compatible and does not imply that old metadata is
+trusted.
+
 ## Logging
 
 Never log vault secrets, request bodies containing envelopes, or decrypted payloads.
@@ -71,17 +83,42 @@ A synced/multi-device WebAuthn credential is one logical credential, not one cre
 device. Optional browser bindings are opaque routing/UX state; possession of a binding is not WebAuthn
 proof and cannot authorize envelope creation, replacement, or deletion.
 
-Treat API/user-agent PRF detection as preliminary only. Confirm credential capability from registration
-`prf.enabled` and confirm a usable authentication result from `prf.results`. PRF output and hashes stay
-client-only; note that serializing a `PublicKeyCredential` can include extension results, so remove PRF
-results with `sanitizeWebAuthnResponseForServer()` (or an equally strict app-owned serializer) before
-sending WebAuthn data to a server.
+Use `resolvePasskeyUnlockPlan({ intent: "explicit", ... })` for a user-initiated unlock page. It does
+not require a browser binding and defaults to the authenticated account's allow-list. Use `intent:
+"quick"` (or `resolvePasskeyUnlockAvailable()`) only for exact bound-credential routing and optional
+auto-start. `VaultUnlockPanel` requires that ready quick plan and a separate quick callback for
+auto-start; it never auto-starts the explicit callback.
+
+Treat API/user-agent PRF detection as preliminary only. During enrollment, request `prf.eval.first`
+in registration and accept its output only after server verification returns the exact same credential
+ID. `resolvePasskeyPrfEnrollmentAfterRegistration()` enforces that boundary and tells the app when a
+second authentication ceremony is actually required. Authentication PRF is confirmed only for the
+server-verified assertion credential. PRF output and hashes stay client-only; note that serializing a
+`PublicKeyCredential` can include extension results, so remove PRF results with
+`sanitizeWebAuthnResponseForServer()` (or an equally strict app-owned serializer) before sending
+WebAuthn data to a server.
+
+Browser libraries such as SimpleWebAuthn may convert challenge, user, and credential IDs while
+passing extension inputs through unchanged. Compose their server options with the existing
+`prepareVaultPasskeyPrfRegistrationOptions()` / `prepareVaultPasskeyPrfAuthenticationOptions()`
+without `prepareJson` so those JSON fields remain encoded and the local PRF salt remains a native
+`ArrayBuffer`. When account authentication and vault use the same credential, keep one authoritative
+server counter with atomic monotonic compare-and-swap, one verifier per assertion, distinct
+challenge audiences, and no vault unwrap before the fully authenticated account session (including
+2FA).
 
 When compatibility requires multiple envelopes for one verified credential, pass only that
 credential's bounded active candidates to `unlockWithPasskeyPrfEnvelopeCandidates()`. A no-match must
 preserve every candidate and require password/recovery authorization before adding another variant.
+Use `createPasskeyPrfEnvelopeAfterIndependentAuthorization()` for that local authorization and
+creation step; do not authorize it from a session UVK, binding cookie, or another passkey alone.
 Use `unlockVaultWithPasskeyCandidateRouting()` when emergency/duress mode is enabled so candidate
 selection cannot bypass primary/decoy session routing.
+
+If emergency/duress candidate routing returns `no_match`, keep the vault locked and fall back to
+`unlockVaultWithPasswordRouting()` or the package recovery/exit flow. Do not install the UVK returned
+by the stateless compatibility helper in that ambiguous context. Defer variant repair until the app
+has a confirmed normal primary context.
 
 Candidate AAD context checks use the exact profile when `legacyVaultKeyUnlock` is disabled. While
 legacy routing is enabled, only missing/null contexts and strings explicitly listed in

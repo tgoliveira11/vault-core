@@ -9,6 +9,8 @@ Framework-independent vault crypto primitives extracted from LiqSense.
 - Argon2id password and recovery phrase envelopes
 - Passkey PRF envelope wrap/unwrap, synced-credential metadata, and bounded local variant matching
   (PRF bytes only — no WebAuthn ceremony)
+- Unified passkey unlock planning: explicit synced-passkey reuse without browser binding, with binding
+  reserved for exact quick unlock and auto-start
 - BIP39 12/24-word recovery phrases
 - No-plaintext validation helpers
 
@@ -54,12 +56,14 @@ See [CONTRIBUTING.md](CONTRIBUTING.md) and [docs/contributing.md](docs/contribut
 
 ## Documentation
 
-- [Adopting 1.1.0](docs/ADOPTING_VAULT_CORE_1_1_0.md) — upgrade from 1.0.x; remove duplicate passkey/legacy code
-- [Migrating passkeys from 1.2.0](docs/MIGRATING_PASSKEYS_FROM_1_2_0.md) — synced credentials,
-  multiple bindings/envelope variants, strict scoping, PRF capability, and transport policy
-- [Migrating browser session ownership from 1.4.0](docs/MIGRATING_SESSION_OWNERSHIP_FROM_1_4_0.md)
-  — cancel stale async unlock/cache work across account switches
 - [Complete implementation guide](docs/IMPLEMENTATION_GUIDE.md)
+- [Adopting vault-core in an existing app](docs/ADOPTING_VAULT_CORE_IN_EXISTING_APPS.md)
+- [Adopting unified passkey unlock from 1.5.1](docs/ADOPTING_UNIFIED_PASSKEY_UNLOCK_FROM_1_5_1.md)
+  — reuse synced credentials without binding; reserve binding for quick unlock
+- [Passkey account-auth interoperability](docs/PASSKEY_ACCOUNT_AUTH_INTEROPERABILITY.md) — optional
+  credential reuse with independent login and vault authorization
+- [Emergency / duress mode](docs/INTEGRATING_EMERGENCY_DURESS_MODE.md) — opt-in and disabled by
+  default
 - [Documentation index](docs/README.md)
 - [API reference](API_REFERENCE.md)
 - [Security model](SECURITY.md)
@@ -67,6 +71,9 @@ See [CONTRIBUTING.md](CONTRIBUTING.md) and [docs/contributing.md](docs/contribut
 - [Publishing and releases](docs/publishing.md)
 - [Repository settings (GitHub)](docs/repo-settings.md)
 - [Agent and contributor guide](AGENTS.md)
+
+Version-specific upgrade guides are grouped under the
+[historical migration section](docs/README.md#historical-upgrade-guides).
 
 ## Quick start
 
@@ -135,4 +142,7 @@ AAD to the user, resource, field, and application context expected by the caller
 - Vault password, recovery phrase, UVK, PRF output, and decrypted payload must stay client-side
 - Persisted envelope schemas enforce method-specific KDF metadata at runtime
 
-See `SECURITY.md`, `ARCHITECTURE.md`, `MIGRATION_FROM_LIQSENSE.md`, [`docs/VAULT_ADMIN.md`](docs/VAULT_ADMIN.md), and [`docs/ADOPTING_VAULT_CORE_IN_EXISTING_APPS.md`](docs/ADOPTING_VAULT_CORE_IN_EXISTING_APPS.md) for migrating other apps (including [letter-to-god](https://github.com/tgoliveira11/letter-to-god)).
+See `SECURITY.md`, `ARCHITECTURE.md`, `MIGRATION_FROM_LIQSENSE.md`,
+[`docs/VAULT_ADMIN.md`](docs/VAULT_ADMIN.md), and
+[`docs/ADOPTING_VAULT_CORE_IN_EXISTING_APPS.md`](docs/ADOPTING_VAULT_CORE_IN_EXISTING_APPS.md)
+for migration and integration guidance.

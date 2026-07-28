@@ -6,8 +6,19 @@ import {
 import { buildVaultEnvLocalTemplate, VAULT_ADMIN_ENV_CATALOG } from "./env-catalog.js";
 import { listVaultAdminScreens, resolveVaultAdminPaths } from "./paths.js";
 import { readBoolEnv, readEnumEnv, readIntEnv } from "./env-parse.js";
+import type { VaultAdminFeatureFlags } from "./types.js";
 
 describe("buildVaultAdminConfigFromEnv", () => {
+  it("keeps consumer-authored feature snapshots source-compatible when emergency is omitted", () => {
+    const legacyFeatures: VaultAdminFeatureFlags = {
+      adminEnabled: false,
+      passkeyPrfUnlockEnabled: true,
+      recoveryPhrase12WordSupported: true,
+      recoveryPhrase24WordSupported: true,
+    };
+    expect(legacyFeatures.emergencyModeEnabled).toBeUndefined();
+  });
+
   it("resolves defaults without env overrides", () => {
     const config = buildVaultAdminConfigFromEnv({
       productName: "Test App",
@@ -24,6 +35,7 @@ describe("buildVaultAdminConfigFromEnv", () => {
     expect(config.session.autoLockMinutes).toBe(15);
     expect(config.rateLimit.unlockMaxFailures).toBe(5);
     expect(config.rateLimit.apiMaxRequests).toBe(120);
+    expect(config.features.emergencyModeEnabled).toBe(false);
     expect(config.profile.aadContextVault).toBe("test:vault:v1");
   });
 
@@ -36,6 +48,7 @@ describe("buildVaultAdminConfigFromEnv", () => {
         VAULT_PASSWORD_MIN_LENGTH: "20",
         NEXT_PUBLIC_VAULT_AUTO_LOCK_MINUTES: "30",
         VAULT_DEFAULT_RECOVERY_WORD_COUNT: "12",
+        VAULT_EMERGENCY_MODE_ENABLED: "true",
       },
     });
 
@@ -45,6 +58,7 @@ describe("buildVaultAdminConfigFromEnv", () => {
     expect(config.passwordPolicy.minLength).toBe(20);
     expect(config.session.autoLockMinutes).toBe(30);
     expect(config.defaultRecoveryWordCount).toBe(12);
+    expect(config.features.emergencyModeEnabled).toBe(true);
   });
 
   it("builds profile from env when profile prop is omitted", () => {
@@ -87,6 +101,7 @@ describe("paths and catalog", () => {
   it("builds env template with catalog entries", () => {
     const template = buildVaultEnvLocalTemplate("Demo");
     expect(template).toContain("VAULT_ADMIN_ENABLED=true");
+    expect(template).toContain("VAULT_EMERGENCY_MODE_ENABLED=false");
     expect(VAULT_ADMIN_ENV_CATALOG.length).toBeGreaterThan(10);
   });
 });

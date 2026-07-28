@@ -4,6 +4,8 @@ import {
   extractPasskeyPrfOutput,
   isPasskeySupported,
   isPrfExtensionSupported,
+  prepareVaultPasskeyPrfRegistrationOptions,
+  resolvePasskeyPrfEnrollmentAfterRegistration,
 } from "@tgoliveira/vault-core/browser";
 import { DEMO_USER_ID, PRF_SALT_PREFIX } from "@/lib/vault-profile";
 
@@ -46,9 +48,10 @@ export async function registerDemoPasskey(): Promise<{
     throw new Error("Passkey PRF is not supported in this browser.");
   }
 
-  const salt = await buildPrfSalt();
-  const credential = await navigator.credentials.create({
-    publicKey: {
+  const publicKey = await prepareVaultPasskeyPrfRegistrationOptions({
+    userId: DEMO_USER_ID,
+    prfSaltPrefix: PRF_SALT_PREFIX,
+    serverOptions: {
       challenge: crypto.getRandomValues(new Uint8Array(32)),
       rp: { name: "Vault Core Demo", id: getRpId() },
       user: {
@@ -57,33 +60,43 @@ export async function registerDemoPasskey(): Promise<{
         displayName: "Vault demo user",
       },
       pubKeyCredParams: [
-        { alg: -7, type: "public-key" },
-        { alg: -257, type: "public-key" },
+        { alg: -7, type: "public-key" as const },
+        { alg: -257, type: "public-key" as const },
       ],
       authenticatorSelection: {
-        residentKey: "preferred",
-        userVerification: "required",
-      },
-      extensions: {
-        prf: { eval: { first: salt } },
+        residentKey: "preferred" as const,
+        userVerification: "required" as const,
       },
     },
+  });
+  const credential = await navigator.credentials.create({
+    publicKey: publicKey as PublicKeyCredentialCreationOptions,
   });
 
   if (!(credential instanceof PublicKeyCredential)) {
     throw new Error("Passkey registration did not return a credential.");
   }
 
-  const prfOutput = extractPasskeyPrfOutput(
-    credential.getClientExtensionResults() as Record<string, unknown>
-  );
-  if (!prfOutput) {
-    throw new Error("This authenticator did not return a PRF output.");
+  const credentialId = bytesToBase64Url(new Uint8Array(credential.rawId));
+  // The demo has no backend. Production must pass the credential id returned by server verification.
+  const enrollment = resolvePasskeyPrfEnrollmentAfterRegistration({
+    registrationCredentialId: credentialId,
+    verifiedCredentialId: credentialId,
+    clientExtensionResults: credential.getClientExtensionResults() as Record<string, unknown>,
+  });
+  if (enrollment.status === "authentication_required") {
+    return {
+      prfOutput: await authenticateDemoPasskey(enrollment.credentialId),
+      credentialId: enrollment.credentialId,
+    };
+  }
+  if (enrollment.status !== "ready") {
+    throw new Error("This authenticator did not enable PRF registration.");
   }
 
   return {
-    prfOutput,
-    credentialId: bytesToBase64Url(new Uint8Array(credential.rawId)),
+    prfOutput: enrollment.prfOutput,
+    credentialId: enrollment.credentialId,
   };
 }
 

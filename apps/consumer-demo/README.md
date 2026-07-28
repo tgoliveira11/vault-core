@@ -91,6 +91,12 @@ keeps a relaxed CSP for Next.js dev tooling.
 Decrypted vault payloads use `decryptVaultPayloadWithSchema()` with `demoVaultPayloadSchema` in
 `vault-demo-crypto.ts`.
 
+The full unlock page treats the envelope's credential metadata as the explicit allow-list source and
+does not require the demo browser hint. The status dock intentionally has no binding and therefore
+does not expose or auto-start quick passkey unlock. Production apps must obtain the allow-list from
+their authenticated server and verify the assertion there; this local demo does not replace that
+boundary.
+
 See [docs/CONSUMER_SECURITY_REQUIREMENTS.md](../../docs/CONSUMER_SECURITY_REQUIREMENTS.md) for
 production integration requirements.
 

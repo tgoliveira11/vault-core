@@ -1,5 +1,5 @@
 /** @vitest-environment jsdom */
-import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { act, cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 vi.mock("./resolve-passkey-dock-availability.js", () => ({
@@ -85,6 +85,77 @@ describe("VaultDockQuickUnlock", () => {
 
     fireEvent.click(screen.getByRole("button", { name: /unlock with passkey/i }));
     expect(onUnlockPasskey).toHaveBeenCalled();
+  });
+
+  it("does not latch duress unless emergency mode is explicitly enabled", async () => {
+    vi.useFakeTimers();
+    try {
+      vi.mocked(resolveVaultDockPasskeyAvailability).mockReturnValue({
+        hasEnvelope: true,
+        showPasskey: true,
+        prfExplicitlyUnsupported: false,
+      });
+      const onDuressSignalChange = vi.fn();
+      render(
+        <VaultDockQuickUnlock
+          onUnlockPassword={vi.fn()}
+          onUnlockPasskey={vi.fn()}
+          autoStartPasskey={false}
+          onDuressSignalChange={onDuressSignalChange}
+        />
+      );
+      fireEvent.pointerDown(screen.getByRole("button", { name: /unlock with passkey/i }), {
+        pointerType: "touch",
+        button: 0,
+      });
+      await act(async () => {
+        vi.advanceTimersByTime(1_100);
+      });
+      expect(onDuressSignalChange).not.toHaveBeenCalledWith(true);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("latches passkey-button duress after opt-in and resets both latches after the attempt", async () => {
+    vi.useFakeTimers();
+    try {
+      vi.mocked(resolveVaultDockPasskeyAvailability).mockReturnValue({
+        hasEnvelope: true,
+        showPasskey: true,
+        prfExplicitlyUnsupported: false,
+      });
+      const onDuressSignalChange = vi.fn();
+      const resetDuressSignal = vi.fn();
+      const onUnlockPasskey = vi.fn().mockResolvedValue(undefined);
+      render(
+        <VaultDockQuickUnlock
+          onUnlockPassword={vi.fn()}
+          onUnlockPasskey={onUnlockPasskey}
+          autoStartPasskey={false}
+          emergencyModeEnabled
+          onDuressSignalChange={onDuressSignalChange}
+          resetDuressSignal={resetDuressSignal}
+        />
+      );
+      fireEvent.pointerDown(screen.getByRole("button", { name: /unlock with passkey/i }), {
+        pointerType: "touch",
+        button: 0,
+      });
+      await act(async () => {
+        vi.advanceTimersByTime(1_100);
+      });
+      expect(onDuressSignalChange).toHaveBeenCalledWith(true);
+      await act(async () => {
+        fireEvent.click(screen.getByRole("button", { name: /unlock with passkey/i }));
+        await Promise.resolve();
+      });
+      expect(onUnlockPasskey).toHaveBeenCalledTimes(1);
+      expect(resetDuressSignal).toHaveBeenCalledTimes(1);
+      expect(onDuressSignalChange).toHaveBeenLastCalledWith(false);
+    } finally {
+      vi.useRealTimers();
+    }
   });
 
   it("auto-starts passkey unlock when dock binds auto-start on expand", async () => {
@@ -216,6 +287,7 @@ describe("VaultDockQuickUnlock", () => {
     });
     const onUnlockPasskey = vi.fn().mockRejectedValue(new Error("PRF unavailable"));
     const onPasskeyUnlockFailed = vi.fn();
+    const resetDuressSignal = vi.fn();
     render(
       <VaultDockQuickUnlock
         onUnlockPassword={vi.fn()}
@@ -223,12 +295,14 @@ describe("VaultDockQuickUnlock", () => {
         passkeyReady
         autoStartPasskey={false}
         onPasskeyUnlockFailed={onPasskeyUnlockFailed}
+        resetDuressSignal={resetDuressSignal}
       />
     );
     fireEvent.click(screen.getByRole("button", { name: /unlock with passkey/i }));
     await waitFor(() => {
       expect(onPasskeyUnlockFailed).toHaveBeenCalled();
     });
+    expect(resetDuressSignal).toHaveBeenCalledTimes(1);
   });
 
   it("calls passkey cancelled handler without failure handler on user cancel", async () => {

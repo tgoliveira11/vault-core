@@ -118,6 +118,10 @@ export async function unlockVaultKeyEnvelopeWithAadRouting(
 ): Promise<CryptoKey> {
   const legacyEnabled = profile.legacyVaultKeyUnlock !== false;
 
+  if (!legacyEnabled && isLegacyVaultKeyEnvelope(payload, profile)) {
+    throw new Error("Vault key AAD context mismatch");
+  }
+
   if (legacyEnabled && isLegacyVaultKeyEnvelope(payload, profile)) {
     if (!isVaultKeyAadContextAllowed(payload.aad.context, profile)) {
       throw new Error("Vault key AAD context mismatch");
