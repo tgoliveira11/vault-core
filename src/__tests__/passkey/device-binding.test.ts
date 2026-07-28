@@ -150,6 +150,30 @@ describe("resolvePasskeyUnlockPlan", () => {
       bindingTarget: { credentialId: "credential-a" },
     })).toEqual({ status: "unavailable", reason: "prf_unavailable" });
   });
+
+  it("fails closed for malformed runtime booleans and intents", () => {
+    expect(resolvePasskeyUnlockPlan({
+      intent: "explicit",
+      hasPasskeyPrfEnvelope: "true",
+      preliminaryPrfAvailable: true,
+    } as unknown as Parameters<typeof resolvePasskeyUnlockPlan>[0])).toEqual({
+      status: "unavailable",
+      reason: "no_envelope",
+    });
+    expect(resolvePasskeyUnlockPlan({
+      intent: "quick",
+      hasPasskeyPrfEnvelope: true,
+      preliminaryPrfAvailable: 1,
+    } as unknown as Parameters<typeof resolvePasskeyUnlockPlan>[0])).toEqual({
+      status: "unavailable",
+      reason: "prf_unavailable",
+    });
+    expect(() => resolvePasskeyUnlockPlan({
+      intent: "invalid",
+      hasPasskeyPrfEnvelope: true,
+      preliminaryPrfAvailable: true,
+    } as unknown as Parameters<typeof resolvePasskeyUnlockPlan>[0])).toThrow(/intent/);
+  });
 });
 describe("scopeAuthenticationOptionsToDevice", () => {
   it("filters multiple allowCredentials", () => {

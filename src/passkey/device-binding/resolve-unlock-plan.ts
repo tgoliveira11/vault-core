@@ -59,10 +59,13 @@ function parseBindingTarget(
 export function resolvePasskeyUnlockPlan(
   input: ResolvePasskeyUnlockPlanInput
 ): PasskeyUnlockPlan {
-  if (!input.hasPasskeyPrfEnvelope) {
+  if (input.intent !== "quick" && input.intent !== "explicit") {
+    throw new TypeError("Passkey unlock intent must be quick or explicit");
+  }
+  if (input.hasPasskeyPrfEnvelope !== true) {
     return { status: "unavailable", reason: "no_envelope" };
   }
-  if (!input.preliminaryPrfAvailable) {
+  if (input.preliminaryPrfAvailable !== true) {
     return { status: "unavailable", reason: "prf_unavailable" };
   }
 

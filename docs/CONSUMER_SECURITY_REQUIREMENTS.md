@@ -40,6 +40,10 @@ Before marking vault integration complete, verify every item below.
   synced credential remains usable without a browser binding. Restrict exact selection and WebAuthn
   auto-start to the `quick` plan. On `VaultUnlockPanel`, pass that plan through `quickPasskeyPlan` and
   use the separate `onQuickUnlockPasskey`; stale/missing bindings must not hide the explicit action.
+- [ ] Prepare passkey creation with **`prepareVaultPasskeyPrfRegistrationOptions()`** and accept its
+  PRF only through **`resolvePasskeyPrfEnrollmentAfterRegistration()`** after server verification
+  returns the exact same credential ID. Use a second authentication only when the resolver returns
+  `authentication_required`; WebAuthn fallback cannot run silently in the background.
 - [ ] Scope bound credential requests fail closed. Use an explicit exact, allow-list, or discoverable
   selection and preserve stored transports unless a documented compatibility policy requires otherwise.
 - [ ] Verify the WebAuthn assertion server-side before returning at most five active variants for that

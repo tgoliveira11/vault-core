@@ -123,9 +123,11 @@ export function resolvePasskeyPrfCapability(
       results,
       input.verifiedCredentialId
     );
-    if (extractPasskeyPrfOutput(credentialScopedResults, {
+    const extracted = extractPasskeyPrfOutput(credentialScopedResults, {
       credentialId: input.verifiedCredentialId,
-    })) {
+    });
+    if (extracted) {
+      extracted.fill(0);
       return { state: "confirmed_authentication", source: "authentication" };
     }
     return {

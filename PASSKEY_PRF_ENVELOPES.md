@@ -18,8 +18,13 @@
 - Browser helpers: `buildPrfSaltBytes(prefix, userId)`, typed capability evaluation, strict credential
   selection, explicit transport policy, WebAuthn response sanitization, and emergency-aware candidate
   routing
+- New enrollment requests `prf.eval.first` during registration and uses the returned output only
+  after the server verifies the same credential ID. Authentication is a compatibility fallback only
+  when registration confirms PRF but omits a usable output.
 
 PRF output never goes to the server. Call `sanitizeWebAuthnResponseForServer()` before serializing a
 registration or authentication response. WebAuthn ceremony, credential verification,
 binding/envelope persistence, append-only variant storage, and revocation stay in the app. The core
 performs the local password/recovery authorization for compatibility-variant creation.
+WebAuthn cannot be completed silently in the background; an enrollment fallback may require another
+user gesture on Safari/mobile authenticators.

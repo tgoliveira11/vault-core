@@ -146,7 +146,7 @@ provided.
 - `isLegacyVaultKeyEnvelope(payload, profile)` / `isVaultKeyAadContextAllowed(context, profile)` / `unwrapVaultKeyWithLegacyAadFallback(...)` / `unlockVaultKeyEnvelopeWithAadRouting(...)`
 - `normalizeEnvelopeAadContext(payload, profile)`
 - `extractPasskeyPrfOutput(extensionResults, options?)` — prefers `evalByCredential[credentialId]` on Safari; coerces ArrayBuffer, views, base64url, and number arrays
-- `prfBytesForAes256Import(bytes)` — normalizes PRF output to 32 bytes for AES import
+- `prfBytesForAes256Import(bytes)` — returns an owned 32-byte PRF snapshot for AES import
 - `resolvePasskeyPrfCapability(input?)` — typed heuristic, registration-confirmed,
   authentication-confirmed, unavailable, or incompatible state; never returns PRF material
 - `isPasskeySupported()` / `isPrfExtensionHeuristicallyAvailable(options?)` — preliminary API/UA
@@ -365,13 +365,19 @@ boolean aliases that fail closed.
 - `clearVaultInnerKeyMaterialCache`, `getCachedVaultInnerKeyMaterial`, `resolveInnerVaultKeyBlobForWrap`
 - `INNER_VAULT_KEY_CACHE_MISMATCH_MESSAGE` — actionable error when cached material is stale
 - `prepareWebAuthnPrfExtensions(extensions)` — coerce JSON PRF salts to `ArrayBuffer`
+- `prepareVaultPasskeyPrfRegistrationOptions({ userId, prfSaltPrefix, serverOptions, prepareJson? })`
+  — requests the canonical PRF during creation so enrollment normally needs one WebAuthn ceremony
+- `resolvePasskeyPrfEnrollmentAfterRegistration({ registrationCredentialId, verifiedCredentialId, clientExtensionResults })`
+  — returns typed `ready`, `authentication_required`, `unavailable`, or `rejected`; `ready` includes
+  an owned browser-only PRF snapshot only when both credential IDs match, while fallback includes
+  exact `credentialSelection`
 - `alignPrfExtensionsForCredential(options, credentialId?)` — single-credential iOS `eval` parity
 - `applyVaultUnlockTransportPolicy(options, policy?, userAgent?)` — preserve (default), platform-only,
   discoverable, or explicit Apple-mobile workaround
 - `prepareVaultUnlockAuthenticationOptions(options, { credentialSelection?, transportPolicy?, ... })`
   — composed PRF ceremony prep with fail-closed explicit selection
 - `prepareVaultPasskeyPrfAuthenticationOptions({ userId, prfSaltPrefix, serverOptions, prepareJson?, credentialSelection?, transportPolicy?, ... })`
-  — full pipeline for unlock, enable, disable, and re-wrap
+  — full pipeline for unlock, enrollment fallback, disable, and re-wrap
 - `sanitizeWebAuthnResponseForServer(response)` — returns a non-mutating response copy without
   `clientExtensionResults.prf`; call before JSON serialization to a server
 - `isAppleMobileUserAgent(userAgent)`, `resolveVaultUnlockUserAgent(userAgent?)`

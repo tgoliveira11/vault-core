@@ -319,11 +319,86 @@ replace the old password envelope atomically on the server.
 what to import vs delete (inner-key cache, WebAuthn prep, legacy AAD, device binding, classifiers).
 
 The package does not run WebAuthn ceremonies. The application must request the PRF extension and pass
-the first PRF result to vault-core. Use the browser helpers below to prepare authentication options
-(iOS `eval` parity, salt coercion, fail-closed credential selection, and an explicit transport
-policy) before calling `navigator.credentials.get`. Stored transports are preserved by default.
+the first PRF result to vault-core. Use the browser helpers below for both creation and authentication
+options (canonical salt, iOS `eval` parity, salt coercion, fail-closed credential selection, and an
+explicit transport policy). Stored transports are preserved by default.
 
-### PRF authentication ceremonies (unlock **and** enroll/manage)
+### PRF registration and authentication ceremonies
+
+For a new passkey, ask for the canonical PRF salt during `navigator.credentials.create`. If the
+registration returns `prf.enabled: true` and a usable `prf.results.first`, the first envelope can be
+created from that one ceremony after server verification. Do not always authenticate the credential
+again. Use `navigator.credentials.get` only as a typed fallback when registration confirms PRF but
+does not return an output.
+
+```ts
+import {
+  prepareVaultPasskeyPrfRegistrationOptions,
+  resolvePasskeyPrfEnrollmentAfterRegistration,
+  sanitizeWebAuthnResponseForServer,
+  type PublicKeyCredentialCreationOptionsInput,
+} from "@tgoliveira/vault-core/browser";
+import type { PasskeyCredentialSelection } from "@tgoliveira/vault-core";
+
+declare const userId: string;
+declare const registrationOptionsJson: PublicKeyCredentialCreationOptionsInput;
+declare function prepareRegistrationOptions(
+  input: PublicKeyCredentialCreationOptionsInput
+): PublicKeyCredentialCreationOptionsInput;
+declare function serializeRegistrationResponse(
+  credential: PublicKeyCredential
+): { id: string; clientExtensionResults: Record<string, unknown> };
+declare function verifyRegistrationOnServer(
+  response: unknown
+): Promise<{ verifiedCredentialId: string }>;
+declare function createAndPersistPasskeyEnvelope(
+  credentialId: string,
+  prfOutput: Uint8Array
+): Promise<void>;
+declare function runExactCredentialAuthenticationFallback(
+  selection: Extract<PasskeyCredentialSelection, { mode: "exact" }>
+): Promise<void>;
+
+const publicKey = await prepareVaultPasskeyPrfRegistrationOptions({
+  userId,
+  prfSaltPrefix: "acme-passkey-prf-v1:",
+  serverOptions: registrationOptionsJson,
+  prepareJson: prepareRegistrationOptions,
+});
+const credential = await navigator.credentials.create({
+  publicKey: publicKey as PublicKeyCredentialCreationOptions,
+});
+if (!(credential instanceof PublicKeyCredential)) {
+  throw new Error("Passkey registration did not return a public-key credential");
+}
+
+const extensionResults = credential.getClientExtensionResults() as Record<string, unknown>;
+const registrationJson = serializeRegistrationResponse(credential);
+const verification = await verifyRegistrationOnServer(
+  sanitizeWebAuthnResponseForServer(registrationJson)
+);
+const enrollment = resolvePasskeyPrfEnrollmentAfterRegistration({
+  registrationCredentialId: credential.id,
+  verifiedCredentialId: verification.verifiedCredentialId,
+  clientExtensionResults: extensionResults,
+});
+
+if (enrollment.status === "ready") {
+  try {
+    await createAndPersistPasskeyEnvelope(enrollment.credentialId, enrollment.prfOutput);
+  } finally {
+    enrollment.prfOutput.fill(0);
+  }
+} else if (enrollment.status === "authentication_required") {
+  await runExactCredentialAuthenticationFallback(enrollment.credentialSelection);
+} else {
+  throw new Error("This credential cannot enable passkey PRF vault unlock");
+}
+```
+
+The serializer, server verification, short-lived persistence proof, and envelope persistence are
+application-owned. The proof should be single-use and bound to the verified registration. The raw
+extension results remain in the browser; the sanitizer removes PRF before the server call.
 
 Any client call to `navigator.credentials.get` that feeds PRF output into
 `createPasskeyPrfEnvelope*` or `unwrapVaultKeyFromPasskey*` **must** pass options through the
@@ -335,7 +410,7 @@ envelopes created at enable time cannot be decrypted at unlock.
 | Ceremony | Requires full vault-core PRF prep |
 | --- | --- |
 | Vault unlock | Yes |
-| Passkey vault unlock **enable** (post-register) | Yes |
+| Passkey vault unlock **enable fallback** (only when create omitted PRF output) | Yes |
 | Passkey vault unlock **disable** (PRF proof) | Yes |
 | Envelope **re-wrap / rotate** on device | Yes |
 

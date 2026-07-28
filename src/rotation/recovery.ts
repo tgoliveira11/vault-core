@@ -17,14 +17,14 @@ import {
   rewrapEncryptedVaultKeyForDerivedKeys,
   rewrapInnerVaultKeyMaterialForDerivedKeys,
 } from "../crypto/vault-key-envelope.js";
-import { importAesKwKey } from "../crypto/user-vault-key-crypto.js";
+import { importPrfAesGcmKey, importPrfAesKwKey } from "../crypto/prf-key.js";
 import { deriveVaultPasswordKeyPairFromMetadata } from "../kdf/argon2id.js";
 import {
   assertVaultRotationAuthorized,
   type VaultRotationAuthorization,
 } from "./authorization.js";
 import { unlockWithRecoveryEnvelope } from "../envelopes/recovery.js";
-import { toBufferSource, base64UrlToBytes } from "../crypto/encoding.js";
+import { base64UrlToBytes } from "../crypto/encoding.js";
 import { userVaultKeysEqual } from "../keys/user-vault-key.js";
 import { createRecoveryKitText } from "../recovery/kit.js";
 
@@ -113,21 +113,14 @@ export async function rotateRecoveryPhrase(
     );
   } else {
     const prfOutput = authorization.prfOutput;
-    const prfBytes = prfOutput.byteLength === 32 ? prfOutput : prfOutput.slice(0, 32);
-    const prfKey = await crypto.subtle.importKey(
-      "raw",
-      toBufferSource(prfBytes),
-      { name: "AES-GCM", length: 256 },
-      false,
-      ["encrypt", "decrypt"]
-    );
+    const prfKey = await importPrfAesGcmKey(prfOutput);
     const inner = await extractInnerVaultKeyBlob(
       authorization.passkeyEnvelope.encryptedVaultKey,
       prfKey
     );
     innerVaultKeyBlob = await rewrapInnerVaultKeyMaterialForDerivedKeys(
       inner,
-      { wrappingKey: await importAesKwKey(prfBytes) },
+      { wrappingKey: await importPrfAesKwKey(prfOutput) },
       { wrappingKey: recoveryWrappingKey },
       vaultKey
     );

@@ -111,7 +111,13 @@ Do not combine `credentialSelection` with the legacy `credentialId`, `scopeToDev
 credential/authenticator. Use typed states:
 
 ```ts
-import { resolvePasskeyPrfCapability } from "@tgoliveira/vault-core/browser";
+import {
+  resolvePasskeyPrfCapability,
+  resolvePasskeyPrfEnrollmentAfterRegistration,
+} from "@tgoliveira/vault-core/browser";
+
+declare const createdCredential: PublicKeyCredential;
+declare const registrationVerification: { verifiedCredentialId: string };
 
 const preliminary = resolvePasskeyPrfCapability();
 
@@ -122,10 +128,19 @@ const registration = resolvePasskeyPrfCapability({
 
 void preliminary;
 void registration;
+
+const enrollment = resolvePasskeyPrfEnrollmentAfterRegistration({
+  registrationCredentialId: createdCredential.id,
+  verifiedCredentialId: registrationVerification.verifiedCredentialId,
+  clientExtensionResults: createdCredential.getClientExtensionResults() as Record<string, unknown>,
+});
+// ready: use registration PRF once; authentication_required: run the exact get() fallback.
+void enrollment;
 ```
 
 - API/user-agent inspection returns only `heuristic` or `unavailable`.
-- Registration is confirmed only by `prf.enabled === true`.
+- Registration capability is confirmed by `prf.enabled === true`; enrollment is immediately ready
+  only when the server-verified credential ID matches and creation also returned a usable PRF output.
 - Authentication is confirmed only by a valid result for the asserted credential.
 - Missing/invalid ceremony results return `incompatible`.
 

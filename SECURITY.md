@@ -61,6 +61,12 @@ Consuming applications must implement authentication, RBAC, CSP, mandatory unloc
 `assertNoVaultPlaintextFields()` on server routes. See
 [docs/CONSUMER_SECURITY_REQUIREMENTS.md](docs/CONSUMER_SECURITY_REQUIREMENTS.md).
 
+Envelope `publicMetadata` is server-visible and untrusted. Consumers must keep it non-secret and
+apply route/schema size limits. `createPasskeyPrfEnvelopeAfterIndependentAuthorization()` additionally
+enforces JSON-only metadata, forbidden-plaintext field rejection, bounded depth/entries, and a
+4,096-byte limit. Legacy envelope parsing remains compatible and does not imply that old metadata is
+trusted.
+
 ## Logging
 
 Never log vault secrets, request bodies containing envelopes, or decrypted payloads.
@@ -77,11 +83,14 @@ not require a browser binding and defaults to the authenticated account's allow-
 auto-start. `VaultUnlockPanel` requires that ready quick plan and a separate quick callback for
 auto-start; it never auto-starts the explicit callback.
 
-Treat API/user-agent PRF detection as preliminary only. Confirm credential capability from registration
-`prf.enabled` and confirm a usable authentication result from `prf.results`. PRF output and hashes stay
-client-only; note that serializing a `PublicKeyCredential` can include extension results, so remove PRF
-results with `sanitizeWebAuthnResponseForServer()` (or an equally strict app-owned serializer) before
-sending WebAuthn data to a server.
+Treat API/user-agent PRF detection as preliminary only. During enrollment, request `prf.eval.first`
+in registration and accept its output only after server verification returns the exact same credential
+ID. `resolvePasskeyPrfEnrollmentAfterRegistration()` enforces that boundary and tells the app when a
+second authentication ceremony is actually required. Authentication PRF is confirmed only for the
+server-verified assertion credential. PRF output and hashes stay client-only; note that serializing a
+`PublicKeyCredential` can include extension results, so remove PRF results with
+`sanitizeWebAuthnResponseForServer()` (or an equally strict app-owned serializer) before sending
+WebAuthn data to a server.
 
 When compatibility requires multiple envelopes for one verified credential, pass only that
 credential's bounded active candidates to `unlockWithPasskeyPrfEnvelopeCandidates()`. A no-match must

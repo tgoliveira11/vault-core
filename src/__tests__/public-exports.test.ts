@@ -36,6 +36,8 @@ describe("public vault-key envelope exports", () => {
   it("exports WebAuthn response sanitization from the browser entry", async () => {
     const browserEntry = await import("../browser.js");
     expect(typeof browserEntry.sanitizeWebAuthnResponseForServer).toBe("function");
+    expect(typeof browserEntry.prepareVaultPasskeyPrfRegistrationOptions).toBe("function");
+    expect(typeof browserEntry.resolvePasskeyPrfEnrollmentAfterRegistration).toBe("function");
   });
 
   it("exports WrapUserVaultKeyOptions as a type", () => {

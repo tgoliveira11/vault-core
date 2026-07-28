@@ -2,7 +2,7 @@ import type { PasskeyPrfEnvelope, PasswordEnvelope, RecoveryPhraseEnvelope } fro
 import { deriveVaultPasswordKeyPairFromMetadata } from "../kdf/argon2id.js";
 import { deriveRecoveryPhraseKeyFromMetadata } from "../envelopes/recovery.js";
 import { extractInnerVaultKeyBlob } from "../crypto/vault-key-envelope.js";
-import { toBufferSource } from "../crypto/encoding.js";
+import { importPrfAesGcmKey } from "../crypto/prf-key.js";
 import {
   VaultInnerKeyMaterialCache,
   cacheVaultInnerKeyMaterialFromEnvelopeDecrypt,
@@ -28,17 +28,6 @@ export {
   resolveInnerVaultKeyBlobForWrap,
   type VaultInnerKeyMaterialCacheEntry,
 };
-
-async function importPrfAsAesKey(prfOutput: Uint8Array): Promise<CryptoKey> {
-  const keyBytes = prfOutput.byteLength === 32 ? prfOutput : prfOutput.slice(0, 32);
-  return crypto.subtle.importKey(
-    "raw",
-    toBufferSource(keyBytes),
-    { name: "AES-GCM", length: 256 },
-    false,
-    ["encrypt", "decrypt"]
-  );
-}
 
 /** Populates the inner-key cache after a successful password envelope unlock. */
 export async function cacheVaultInnerKeyMaterialAfterPasswordUnlock(
@@ -103,7 +92,7 @@ export async function cacheVaultInnerKeyMaterialFromPasskeyUnlock(
   options?: VaultSessionMutationOptions
 ): Promise<void> {
   assertVaultSessionMutationAllowed(options?.operation);
-  const prfKey = await importPrfAsAesKey(prfOutput);
+  const prfKey = await importPrfAesGcmKey(prfOutput);
   await cacheVaultInnerKeyMaterialFromPasskeyEnvelope(
     envelope.encryptedVaultKey,
     prfOutput,

@@ -304,6 +304,19 @@ describe("createPasskeyPrfEnvelopeAfterIndependentAuthorization", () => {
       ...base,
       prfOutput: "not-bytes" as unknown as Uint8Array,
     })).rejects.toThrow(VaultAuthorizationError);
+    await expect(createPasskeyPrfEnvelopeAfterIndependentAuthorization({
+      ...base,
+      publicMetadata: { password: FIXTURE_VAULT_PASSWORD },
+    })).rejects.toThrow(/Plaintext field/);
+    await expect(createPasskeyPrfEnvelopeAfterIndependentAuthorization({
+      ...base,
+      publicMetadata: null as unknown as Record<string, unknown>,
+    })).rejects.toThrow(/plain object/);
+    await expect(createPasskeyPrfEnvelopeAfterIndependentAuthorization({
+      ...base,
+      verifiedCredentialId: "c".repeat(2_048),
+      publicMetadata: { note: "x".repeat(3_000) },
+    })).rejects.toThrow(/4096 bytes/);
 
     const invalidPasswordEnvelope = {
       ...envelope,

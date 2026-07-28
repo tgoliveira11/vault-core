@@ -17,6 +17,7 @@ The behavior change is intentional:
 | Area | Required consumer change | Package API |
 | --- | --- | --- |
 | Status | Report `hasPasskeyPrfEnvelope` independently of browser binding | `resolvePasskeyUnlockPlan` |
+| Enrollment | Request PRF during `create()` and use it after exact server verification; call `get()` only on typed fallback | `prepareVaultPasskeyPrfRegistrationOptions`, `resolvePasskeyPrfEnrollmentAfterRegistration` |
 | Full unlock | Keep the passkey action available without binding; default to the authenticated user's allow-list | `resolvePasskeyUnlockPlan({ intent: "explicit" })` |
 | Dock/auto-start | Require a valid binding and scope to its exact credential | `resolvePasskeyUnlockPlan({ intent: "quick" })` |
 | Assertion transport | Extract PRF locally, sanitize the JSON, then send only the sanitized response | `extractPasskeyPrfOutput`, `sanitizeWebAuthnResponseForServer` |

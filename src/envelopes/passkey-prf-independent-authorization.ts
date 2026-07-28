@@ -1,10 +1,10 @@
 import { extractInnerVaultKeyBlob } from "../crypto/vault-key-envelope.js";
 import {
-  importAesKwKey,
   importUserVaultAesKey,
   isLegacyRawVaultKeyMaterial,
   unwrapAesKey,
 } from "../crypto/user-vault-key-crypto.js";
+import { importPrfAesKwKey } from "../crypto/prf-key.js";
 import { VaultAuthorizationError } from "../errors/vault-errors.js";
 import { deriveVaultPasswordKeyPairFromMetadata } from "../kdf/argon2id.js";
 import { vaultPasskeyOpaqueIdSchema } from "../passkey/model.js";
@@ -29,6 +29,7 @@ import {
 } from "./recovery.js";
 import { unlockVaultKeyEnvelopeWithAadRouting } from "./legacy-vault-key-unlock.js";
 import { createPasskeyPrfEnvelope } from "./passkey-prf.js";
+import { assertSafeVaultPublicMetadata } from "../validation/public-metadata.js";
 
 type AuthorizationScope = Pick<VaultAadScope, "userId" | "resourceId">;
 
@@ -108,8 +109,16 @@ export async function createPasskeyPrfEnvelopeAfterIndependentAuthorization(
   if (!(input.prfOutput instanceof Uint8Array) || input.prfOutput.byteLength < 32) {
     throw new VaultAuthorizationError("PRF output must be at least 32 bytes");
   }
-
-  const prfSnapshot = input.prfOutput.slice();
+  if (input.publicMetadata !== undefined) {
+    assertSafeVaultPublicMetadata(input.publicMetadata);
+  }
+  const publicMetadata = {
+    ...input.publicMetadata,
+    credentialId: credentialId.data,
+    prfRequired: true,
+  };
+  assertSafeVaultPublicMetadata(publicMetadata);
+  const prfSnapshot = input.prfOutput.slice(0, 32);
   const sensitiveBuffers: Uint8Array[] = [prfSnapshot];
   // A successful routing result necessarily invokes the callback and replaces this sentinel.
   let sourceInner: Uint8Array = new Uint8Array(0);
@@ -134,7 +143,7 @@ export async function createPasskeyPrfEnvelopeAfterIndependentAuthorization(
       }
     );
 
-    const prfWrappingKey = await importAesKwKey(prfSnapshot.subarray(0, 32));
+    const prfWrappingKey = await importPrfAesKwKey(prfSnapshot);
     const rewrappedInner = await rewrapInnerVaultKeyMaterialForWrappingKeys(
       sourceInner,
       derived.wrappingKey,
@@ -148,11 +157,7 @@ export async function createPasskeyPrfEnvelopeAfterIndependentAuthorization(
       prfSnapshot,
       input.expectedScope,
       input.profile,
-      {
-        ...input.publicMetadata,
-        credentialId: credentialId.data,
-        prfRequired: true,
-      },
+      publicMetadata,
       { innerVaultKeyBlob: rewrappedInner }
     );
 

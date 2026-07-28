@@ -16,6 +16,9 @@ major version; compatible corrections should retain explicit deprecation and mig
 - `createPasskeyPrfEnvelopeAfterIndependentAuthorization()` creates an additional PRF envelope only
   after locally reopening a password or recovery-phrase envelope. It returns the non-extractable UVK
   and new envelope without persistence, replacement, revocation, or PRF serialization.
+- `prepareVaultPasskeyPrfRegistrationOptions()` and
+  `resolvePasskeyPrfEnrollmentAfterRegistration()` make passkey enrollment a single WebAuthn
+  ceremony when creation returns PRF output, with a typed authentication fallback when it does not.
 
 ### Changed
 
@@ -23,6 +26,10 @@ major version; compatible corrections should retain explicit deprecation and mig
   capability, ready WebAuthn options, and callback exist. Browser binding remains required only for
   status-dock quick unlock. Full-page `autoStartPasskey` now requires a separate
   `quickPasskeyPlan` plus `onQuickUnlockPasskey`; the explicit callback is never auto-started.
+- PRF-derived Web Crypto imports now use an owned 32-byte snapshot and zero it after import. Newly
+  created compatibility-variant metadata is bounded, JSON-only, and rejected when it contains
+  forbidden plaintext fields. Runtime unlock planning now rejects malformed intents and truthy
+  non-booleans.
 
 ### Security
 

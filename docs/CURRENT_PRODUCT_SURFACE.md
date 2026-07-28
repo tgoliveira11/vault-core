@@ -33,7 +33,10 @@ Last reviewed: **2026-07-28** (package version **1.5.1**, unified passkey experi
 - Typed `sanitizeWebAuthnResponseForServer` removal of PRF extension results before server serialization
 - WebAuthn PRF ceremony prep (`prepareWebAuthnPrfExtensions`, `alignPrfExtensionsForCredential`,
   `applyVaultUnlockTransportPolicy`, `prepareVaultUnlockAuthenticationOptions`,
-  `prepareVaultPasskeyPrfAuthenticationOptions`)
+  `prepareVaultPasskeyPrfAuthenticationOptions`, `prepareVaultPasskeyPrfRegistrationOptions`)
+- One-ceremony passkey enrollment resolution through
+  `resolvePasskeyPrfEnrollmentAfterRegistration`, with exact server-verified credential matching and
+  typed authentication fallback when registration omits PRF output
 - Typed PRF capability (`resolvePasskeyPrfCapability`) separating heuristic/API availability from
   registration `prf.enabled`, authentication `prf.results`, and incompatible/missing results
 - BIP39 12/24-word recovery phrases and recovery kit text

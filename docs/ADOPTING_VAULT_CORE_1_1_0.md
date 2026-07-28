@@ -120,8 +120,13 @@ Wire these to the package `VaultPasskeyBindingStore` contract (`getBindingId`,
 
 #### b. After passkey registration or enroll success
 
-When WebAuthn registration verifies and the passkey PRF envelope is persisted, create an opaque
-binding so this browser routes to the new credential:
+Prepare registration with `prepareVaultPasskeyPrfRegistrationOptions()` and resolve it with
+`resolvePasskeyPrfEnrollmentAfterRegistration()` after server verification. When its status is
+`ready`, create the envelope from that registration PRF without a second prompt. Run the existing
+exact-credential authentication path only for `authentication_required`.
+
+After the envelope is persisted, create an opaque binding so this browser routes to the new
+credential:
 
 ```ts
 const { credentialId } = await verifyRegistrationResponse(/* @simplewebauthn/server */);
@@ -161,9 +166,9 @@ Pass `false` when there is no binding on this browser. The dock and
 #### d. Before WebAuthn authenticate (unlock **and** PRF-gated management)
 
 Any `navigator.credentials.get` that feeds PRF output into vault envelope wrap/unwrap must use the
-**same** preparation pipeline — not only vault unlock. That includes passkey enable (post-register),
-disable (PRF proof), and on-device envelope re-wrap. See
-[IMPLEMENTATION_GUIDE.md](./IMPLEMENTATION_GUIDE.md) §9 (“PRF authentication ceremonies”) for the
+**same** preparation pipeline — not only vault unlock. That includes the passkey enable fallback
+(when registration omitted PRF output), disable (PRF proof), and on-device envelope re-wrap. See
+[IMPLEMENTATION_GUIDE.md](./IMPLEMENTATION_GUIDE.md) §9 (“PRF registration and authentication ceremonies”) for the
 full ceremony table and anti-patterns.
 
 **Unlock** on a device-bound credential:
@@ -174,9 +179,9 @@ full ceremony table and anti-patterns.
 4. Run `navigator.credentials.get` in the browser.
 5. `touchLastUsed(bindingId)` after successful verification.
 
-**Enable, disable, re-wrap** — same PRF prep as unlock; device scoping is optional when the server
-already returns a single credential (typical post-register enable). Prefer one shared client helper
-for all ceremonies:
+**Enable fallback, disable, re-wrap** — same PRF prep as unlock; device scoping is optional when the
+server already returns a single credential. Prefer one shared client helper for all authentication
+ceremonies:
 
 ```ts
 import { prepareAuthenticationOptions } from "@tgoliveira/secure-auth/client";
@@ -197,7 +202,7 @@ const unlockPublicKey = await prepareVaultPasskeyPrfAuthenticationOptions({
   transportPolicy: "preserve",
 });
 
-// Enable / disable / re-wrap (same helper — do not use prepareAuthenticationOptions alone):
+// Enrollment fallback / disable / re-wrap (do not use prepareAuthenticationOptions alone):
 const managePublicKey = await prepareVaultPasskeyPrfAuthenticationOptions({
   userId,
   prfSaltPrefix: "acme-passkey-prf-v1:",
@@ -602,7 +607,10 @@ See [IMPLEMENTATION_GUIDE.md](./IMPLEMENTATION_GUIDE.md) §12 and
 - [ ] Safari and Chrome passkey unlock extract PRF via `extractPasskeyPrfOutput`.
 - [ ] Preliminary PRF heuristic is not treated as a confirmed credential capability; password/recovery remains offered.
 - [ ] iOS 18+ passkey unlock uses `prepareVaultUnlockAuthenticationOptions` (single-credential `eval`).
-- [ ] Passkey **enable**, **disable**, and **re-wrap** ceremonies use the same PRF prep helper as unlock (shared function or `prepareVaultPasskeyPrfAuthenticationOptions`).
+- [ ] Registration uses `prepareVaultPasskeyPrfRegistrationOptions()` and consumes its PRF after
+  exact server-verified credential matching; `get()` runs only for typed enrollment fallback.
+- [ ] Passkey enable **fallback**, disable, and re-wrap authentication ceremonies use the same PRF
+  prep helper as unlock (`prepareVaultPasskeyPrfAuthenticationOptions`).
 - [ ] Preserve known-good envelopes; after recovery authorization, add a compatibility variant when a
   platform path returns a different PRF result.
 - [ ] Legacy envelope fixtures decrypt without app-local legacy modules.

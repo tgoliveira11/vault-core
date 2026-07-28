@@ -2,12 +2,12 @@ import type { VaultCryptoProfile, VaultAadScope } from "../profile.js";
 import type { EncryptedVaultPayload } from "../validation/schemas.js";
 import { bytesToBase64Url, base64UrlToBytes } from "./encoding.js";
 import {
-  importAesKwKey,
   importUserVaultAesKey,
   isLegacyRawVaultKeyMaterial,
   unwrapAesKey,
   wrapAesKey,
 } from "./user-vault-key-crypto.js";
+import { importPrfAesKwKey } from "./prf-key.js";
 import { decryptField, encryptField } from "./aes-gcm.js";
 import { VaultAuthorizationError, VaultKeyNotExtractableError } from "../errors/vault-errors.js";
 import { userVaultKeysEqual } from "../keys/user-vault-key.js";
@@ -165,12 +165,8 @@ export async function rewrapInnerVaultKeyMaterialForPrfOutput(
   newPrfOutput: Uint8Array,
   sessionVaultKey: CryptoKey
 ): Promise<Uint8Array> {
-  const oldWrappingKey = await importAesKwKey(
-    oldPrfOutput.byteLength === 32 ? oldPrfOutput : oldPrfOutput.slice(0, 32)
-  );
-  const newWrappingKey = await importAesKwKey(
-    newPrfOutput.byteLength === 32 ? newPrfOutput : newPrfOutput.slice(0, 32)
-  );
+  const oldWrappingKey = await importPrfAesKwKey(oldPrfOutput);
+  const newWrappingKey = await importPrfAesKwKey(newPrfOutput);
 
   return rewrapInnerVaultKeyMaterialForWrappingKeys(
     inner,
@@ -188,9 +184,7 @@ export async function wrapUserVaultKeyWithPrfOutput(
   prfEncryptionKey: CryptoKey,
   options?: WrapUserVaultKeyOptions
 ): Promise<EncryptedVaultPayload> {
-  const wrappingKey = await importAesKwKey(
-    prfOutput.byteLength === 32 ? prfOutput : prfOutput.slice(0, 32)
-  );
+  const wrappingKey = await importPrfAesKwKey(prfOutput);
   const inner = await materializeInnerVaultKeyBlob(vaultKey, wrappingKey, options);
   return encryptField(bytesToBase64Url(inner), prfEncryptionKey, {
     userId: scope.userId,
@@ -209,8 +203,6 @@ export async function unwrapUserVaultKeyWithPrfOutput(
     return importUserVaultAesKey(inner);
   }
 
-  const wrappingKey = await importAesKwKey(
-    prfOutput.byteLength === 32 ? prfOutput : prfOutput.slice(0, 32)
-  );
+  const wrappingKey = await importPrfAesKwKey(prfOutput);
   return unwrapAesKey(inner, wrappingKey);
 }

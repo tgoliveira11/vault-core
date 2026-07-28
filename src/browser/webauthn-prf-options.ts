@@ -27,6 +27,11 @@ export type PublicKeyCredentialRequestOptionsInput = {
   [key: string]: unknown;
 };
 
+export type PublicKeyCredentialCreationOptionsInput = {
+  extensions?: WebAuthnExtensionsInput;
+  [key: string]: unknown;
+};
+
 function bytesToArrayBuffer(bytes: Uint8Array): ArrayBuffer {
   return bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength) as ArrayBuffer;
 }
