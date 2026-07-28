@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   assertInnerVaultKeyBlobMatchesVaultKey,
+  buildPasskeyPrfAuthenticationExtensionsJson,
   extractInnerVaultKeyBlob,
   rewrapInnerVaultKeyMaterialForDerivedKeys,
   rewrapInnerVaultKeyMaterialForPrfOutput,
@@ -19,6 +20,7 @@ import {
 describe("public vault-key envelope exports", () => {
   it("exports vault-key envelope helpers from the package root", () => {
     expect(typeof assertInnerVaultKeyBlobMatchesVaultKey).toBe("function");
+    expect(typeof buildPasskeyPrfAuthenticationExtensionsJson).toBe("function");
     expect(typeof extractInnerVaultKeyBlob).toBe("function");
     expect(typeof rewrapInnerVaultKeyMaterialForDerivedKeys).toBe("function");
     expect(typeof rewrapInnerVaultKeyMaterialForPrfOutput).toBe("function");
@@ -36,6 +38,7 @@ describe("public vault-key envelope exports", () => {
   it("exports WebAuthn response sanitization from the browser entry", async () => {
     const browserEntry = await import("../browser.js");
     expect(typeof browserEntry.sanitizeWebAuthnResponseForServer).toBe("function");
+    expect(typeof browserEntry.buildPasskeyPrfAuthenticationExtensionsJson).toBe("function");
     expect(typeof browserEntry.prepareVaultPasskeyPrfRegistrationOptions).toBe("function");
     expect(typeof browserEntry.resolvePasskeyPrfEnrollmentAfterRegistration).toBe("function");
   });

@@ -25,7 +25,9 @@ The authentication package and vault-core must not import one another. The consu
 composes optional browser callbacks:
 
 1. The authentication package obtains server options and verifies the WebAuthn response.
-2. A consumer callback may compose those browser options with a vault-core PRF preparation helper.
+2. When the account is resolved before the ceremony, a generic server-side authentication-options
+   hook may add `buildPasskeyPrfAuthenticationExtensionsJson()` output. Otherwise, a consumer
+   callback may compose browser options with the vault-core PRF preparation helper.
 3. Extension results remain in browser memory while the response sent to the server is sanitized.
 4. A vault callback runs only after the server returns the exact verified credential ID and, for
    login, after the fully authenticated account session exists.
@@ -73,6 +75,38 @@ native `ArrayBuffer` it passes through to `navigator.credentials.create()`.
 `sanitizeWebAuthnResponseForServer()` is safe defense in depth for app-owned routes. An
 authentication package that offers composable hooks must also sanitize internally and its server
 must fail closed if PRF is present.
+
+For a first login in an isolated PWA or new browser, do not depend on a local account hint to request
+PRF. If account login is already scoped by email or another non-secret identifier, the authentication
+server can resolve the user and add only the public salt input through a bounded, application-owned
+options-extension callback:
+
+```ts
+import { buildPasskeyPrfAuthenticationExtensionsJson } from "@tgoliveira/vault-core";
+import {
+  prepareVaultUnlockAuthenticationOptions,
+  type PublicKeyCredentialRequestOptionsInput,
+} from "@tgoliveira/vault-core/browser";
+
+declare const userId: string;
+declare const prfSaltPrefix: string;
+declare const serverOptions: PublicKeyCredentialRequestOptionsInput;
+
+const extensions = await buildPasskeyPrfAuthenticationExtensionsJson(prfSaltPrefix, userId);
+const responseOptions = {
+  ...serverOptions,
+  extensions: { ...serverOptions.extensions, ...extensions },
+};
+
+const browserOptions = prepareVaultUnlockAuthenticationOptions(responseOptions, {
+  credentialSelection: { mode: "allow-list" },
+  transportPolicy: "preserve",
+});
+```
+
+The server callback receives the resolved user only inside the trusted composition boundary. It
+must not expose the user ID as separate unauthenticated response metadata. The serialized salt is
+public WebAuthn input; PRF output remains browser-only and is still stripped before verification.
 
 ## Account-first: creation plus vault PRF confirmation
 

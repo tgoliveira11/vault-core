@@ -71,7 +71,11 @@ export {
   type WebAuthnResponseWithoutPrfResults,
 } from "./browser/webauthn-response-sanitize.js";
 
-export { buildPrfSaltBytes } from "./browser/prf-salt-bytes.js";
+export {
+  buildPasskeyPrfAuthenticationExtensionsJson,
+  buildPrfSaltBytes,
+  type PasskeyPrfAuthenticationExtensionsJson,
+} from "./browser/prf-salt-bytes.js";
 
 export function createRecoveryKitDownload(
   content: string,

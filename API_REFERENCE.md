@@ -358,6 +358,9 @@ boolean aliases that fail closed.
 ### Browser UX and passkey helpers
 
 - `buildPrfSaltBytes(prefix, userId)`
+- `buildPasskeyPrfAuthenticationExtensionsJson(prefix, userId)` — builds JSON-safe public PRF input
+  for a server-composed account-login ceremony; hydrate it in the browser with
+  `prepareVaultUnlockAuthenticationOptions()` before WebAuthn
 - `createRecoveryKitDownload(content, filename)`
 - `printRecoveryKitContent(content)`
 - `extractPasskeyPrfOutput`, `isPasskeySupported`, `isPrfExtensionHeuristicallyAvailable`,

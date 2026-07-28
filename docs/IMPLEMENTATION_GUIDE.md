@@ -481,6 +481,34 @@ const publicKey = prepareVaultUnlockAuthenticationOptions(options, {
 });
 ```
 
+**First login in a new browser or isolated PWA:** do not depend on a client-side login hint to know
+which user-scoped salt to request. If the account-auth server has already resolved the account from
+the submitted email, use its bounded application callback to add JSON-safe extensions without
+exposing the user ID as separate response metadata:
+
+```ts
+import { buildPasskeyPrfAuthenticationExtensionsJson } from "@tgoliveira/vault-core";
+import { prepareVaultUnlockAuthenticationOptions } from "@tgoliveira/vault-core/browser";
+
+// Server-only account-auth callback. `userId` was resolved inside the trusted login service.
+const extensions = await buildPasskeyPrfAuthenticationExtensionsJson(
+  "acme-passkey-prf-v1:",
+  userId
+);
+
+// Browser-only option preparation. This hydrates the public base64url salt to ArrayBuffer.
+const publicKey = prepareVaultUnlockAuthenticationOptions(
+  { ...serverOptionsJson, extensions },
+  {
+    credentialSelection: { mode: "allow-list" },
+    transportPolicy: "preserve",
+  }
+);
+```
+
+The serialized salt is public input. Authentication PRF output remains browser-only and must be
+removed from the assertion copy sent to the account-auth server.
+
 **Troubleshooting:** If unlock fails immediately after enable with `decrypt_failed` or “Could not
 decrypt your vault with this passkey”, the enable ceremony likely used JSON-only prep while unlock
 used vault-core prep. Re-enable the passkey on each affected device (or re-wrap the envelope) after

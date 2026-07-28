@@ -8,6 +8,12 @@ major version; compatible corrections should retain explicit deprecation and mig
 
 ## [Unreleased]
 
+### Added
+
+- `buildPasskeyPrfAuthenticationExtensionsJson()` lets an account-auth server compose the public,
+  user-scoped PRF salt into its first WebAuthn login options response. The browser hydrates that
+  JSON input with the existing vault unlock preparation helper, while PRF output remains local.
+
 ## [1.6.1] - 2026-07-28
 
 ### Fixed
