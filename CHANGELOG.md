@@ -8,6 +8,8 @@ major version; compatible corrections should retain explicit deprecation and mig
 
 ## [Unreleased]
 
+## [1.6.0] - 2026-07-28
+
 ### Added
 
 - `resolvePasskeyUnlockPlan()` separates explicit passkey use from bound-browser quick unlock. The
