@@ -14,6 +14,11 @@ export type ResolvePasskeyPrfEnrollmentAfterRegistrationInput = {
 
 export type PasskeyPrfEnrollmentAfterRegistrationResult =
   | {
+      /**
+       * @deprecated Registration PRF output is not authoritative for future authentication
+       * ceremonies. Retained in the public union for source compatibility; it is no longer
+       * returned at runtime.
+       */
       status: "ready";
       source: "registration";
       credentialId: string;
@@ -24,7 +29,9 @@ export type PasskeyPrfEnrollmentAfterRegistrationResult =
       status: "authentication_required";
       credentialId: string;
       credentialSelection: Extract<PasskeyCredentialSelection, { mode: "exact" }>;
-      reason: "registration_prf_output_unavailable";
+      reason:
+        | "registration_prf_output_unavailable"
+        | "authentication_prf_confirmation_required";
     }
   | {
       status: "unavailable";
@@ -40,8 +47,10 @@ export type PasskeyPrfEnrollmentAfterRegistrationResult =
     };
 
 /**
- * Resolves whether registration already produced the PRF needed for the first envelope.
- * The result is accepted only for the exact credential id confirmed by server verification.
+ * Resolves the next safe enrollment step after registration. Registration can confirm PRF
+ * capability, but its PRF output is not authoritative for later authentication ceremonies across
+ * browser/provider implementations. A confirmed credential therefore always requires one exact
+ * authentication ceremony before the first durable envelope is created.
  */
 export function resolvePasskeyPrfEnrollmentAfterRegistration(
   input: ResolvePasskeyPrfEnrollmentAfterRegistrationInput
@@ -93,10 +102,15 @@ export function resolvePasskeyPrfEnrollmentAfterRegistration(
     };
   }
 
+  // Do not expose registration-derived key material for durable envelope creation. Some
+  // implementations return a different PRF result for the subsequent authentication ceremony,
+  // even for the same credential, provider, browser, and device. Zero the owned snapshot and make
+  // the exact get() ceremony authoritative for every future unwrap.
+  prfOutput.fill(0);
   return {
-    status: "ready",
-    source: "registration",
+    status: "authentication_required",
     credentialId: verifiedCredentialId.data,
-    prfOutput,
+    credentialSelection: { mode: "exact", credentialId: verifiedCredentialId.data },
+    reason: "authentication_prf_confirmation_required",
   };
 }

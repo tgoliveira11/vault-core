@@ -112,8 +112,9 @@ more append-only envelope variants. Bindings are UX/routing hints, not authentic
 - explicit unlock uses `resolvePasskeyUnlockPlan({ intent: "explicit", ... })` and remains available
   without a binding;
 - auto-start quick unlock uses an exact valid binding;
-- registration requests PRF once and resolves through
-  `resolvePasskeyPrfEnrollmentAfterRegistration()` after exact server credential verification;
+- registration confirms PRF capability through
+  `resolvePasskeyPrfEnrollmentAfterRegistration()` after exact server credential verification, then
+  an exact authentication supplies the authoritative PRF for the first durable envelope;
 - authentication responses are sanitized before the server and PRF output stays in browser memory;
 - candidate no-match preserves known-good variants and requires local password/recovery
   authorization before appending a compatibility variant.
@@ -134,7 +135,7 @@ transactions, and legacy readers local unless a separate migration explicitly re
 Functional:
 
 - setup, unlock, lock, reload, auto-lock, password rotation, recovery rotation, and deletion;
-- passkey registration with one ceremony plus typed fallback;
+- passkey registration followed by exact-credential PRF authentication;
 - explicit synced-passkey unlock without a binding and exact bound quick unlock;
 - multiple variants, legacy AAD/KDF records, and recovery after PRF mismatch;
 - logout/account switch cancelling stale async vault work.

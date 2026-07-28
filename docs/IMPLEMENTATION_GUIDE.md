@@ -325,11 +325,11 @@ explicit transport policy). Stored transports are preserved by default.
 
 ### PRF registration and authentication ceremonies
 
-For a new passkey, ask for the canonical PRF salt during `navigator.credentials.create`. If the
-registration returns `prf.enabled: true` and a usable `prf.results.first`, the first envelope can be
-created from that one ceremony after server verification. Do not always authenticate the credential
-again. Use `navigator.credentials.get` only as a typed fallback when registration confirms PRF but
-does not return an output.
+For a new passkey, ask for canonical PRF capability during `navigator.credentials.create`. After the
+server verifies the exact credential, always run one exact `navigator.credentials.get` ceremony and
+create the first durable envelope from that authentication PRF. Registration `prf.results.first` is
+not authoritative for future unlocks: some browser/provider implementations return a different
+value during authentication even on the same browser and device.
 
 The example below converts all fields for native `navigator.credentials.create()`. Browser libraries
 such as SimpleWebAuthn convert challenge/user/credential fields but pass extension inputs through.
@@ -389,13 +389,7 @@ const enrollment = resolvePasskeyPrfEnrollmentAfterRegistration({
   clientExtensionResults: extensionResults,
 });
 
-if (enrollment.status === "ready") {
-  try {
-    await createAndPersistPasskeyEnvelope(enrollment.credentialId, enrollment.prfOutput);
-  } finally {
-    enrollment.prfOutput.fill(0);
-  }
-} else if (enrollment.status === "authentication_required") {
+if (enrollment.status === "authentication_required") {
   await runExactCredentialAuthenticationFallback(enrollment.credentialSelection);
 } else {
   throw new Error("This credential cannot enable passkey PRF vault unlock");
@@ -403,8 +397,9 @@ if (enrollment.status === "ready") {
 ```
 
 The serializer, server verification, short-lived persistence proof, and envelope persistence are
-application-owned. The proof should be single-use and bound to the verified registration. The raw
-extension results remain in the browser; the sanitizer removes PRF before the server call.
+application-owned. Registration verification must not authorize durable envelope persistence. Mint
+the single-use proof only after verifying the exact post-registration authentication assertion. The
+raw extension results remain in the browser; the sanitizer removes PRF before each server call.
 
 Any client call to `navigator.credentials.get` that feeds PRF output into
 `createPasskeyPrfEnvelope*` or `unwrapVaultKeyFromPasskey*` **must** pass options through the
@@ -416,7 +411,7 @@ envelopes created at enable time cannot be decrypted at unlock.
 | Ceremony | Requires full vault-core PRF prep |
 | --- | --- |
 | Vault unlock | Yes |
-| Passkey vault unlock **enable fallback** (only when create omitted PRF output) | Yes |
+| Passkey vault unlock **post-registration enable** | Yes |
 | Passkey vault unlock **disable** (PRF proof) | Yes |
 | Envelope **re-wrap / rotate** on device | Yes |
 

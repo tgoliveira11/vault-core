@@ -371,11 +371,12 @@ boolean aliases that fail closed.
 - `INNER_VAULT_KEY_CACHE_MISMATCH_MESSAGE` — actionable error when cached material is stale
 - `prepareWebAuthnPrfExtensions(extensions)` — coerce JSON PRF salts to `ArrayBuffer`
 - `prepareVaultPasskeyPrfRegistrationOptions({ userId, prfSaltPrefix, serverOptions, prepareJson? })`
-  — requests the canonical PRF during creation so enrollment normally needs one WebAuthn ceremony
+  — requests canonical PRF capability during creation; registration PRF output is not authoritative
+  for durable vault envelopes
 - `resolvePasskeyPrfEnrollmentAfterRegistration({ registrationCredentialId, verifiedCredentialId, clientExtensionResults })`
-  — returns typed `ready`, `authentication_required`, `unavailable`, or `rejected`; `ready` includes
-  an owned browser-only PRF snapshot only when both credential IDs match, while fallback includes
-  exact `credentialSelection`
+  — returns typed `authentication_required`, `unavailable`, or `rejected`; confirmed registrations
+  require an exact `credentialSelection` authentication before the first durable envelope is created.
+  The deprecated `ready` union member is retained for source compatibility but is not returned
 - `alignPrfExtensionsForCredential(options, credentialId?)` — single-credential iOS `eval` parity
 - `applyVaultUnlockTransportPolicy(options, policy?, userAgent?)` — preserve (default), platform-only,
   discoverable, or explicit Apple-mobile workaround

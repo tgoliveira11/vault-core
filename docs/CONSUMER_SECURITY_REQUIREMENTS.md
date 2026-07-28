@@ -40,10 +40,13 @@ Before marking vault integration complete, verify every item below.
   synced credential remains usable without a browser binding. Restrict exact selection and WebAuthn
   auto-start to the `quick` plan. On `VaultUnlockPanel`, pass that plan through `quickPasskeyPlan` and
   use the separate `onQuickUnlockPasskey`; stale/missing bindings must not hide the explicit action.
-- [ ] Prepare passkey creation with **`prepareVaultPasskeyPrfRegistrationOptions()`** and accept its
-  PRF only through **`resolvePasskeyPrfEnrollmentAfterRegistration()`** after server verification
-  returns the exact same credential ID. Use a second authentication only when the resolver returns
-  `authentication_required`; WebAuthn fallback cannot run silently in the background.
+- [ ] Prepare passkey creation with **`prepareVaultPasskeyPrfRegistrationOptions()`** and resolve it
+  through **`resolvePasskeyPrfEnrollmentAfterRegistration()`** after server verification returns the
+  exact same credential ID. Always create the durable envelope from the resolver-requested exact
+  authentication PRF; WebAuthn authentication cannot run silently in the background.
+- [ ] Do not let registration verification authorize durable passkey-envelope persistence. Mint and
+  consume the short-lived persistence proof only after server verification of the exact
+  post-registration authentication assertion.
 - [ ] If a WebAuthn library converts challenge/credential JSON but passes extension inputs through
   (for example SimpleWebAuthn), call the existing preparation helper without `prepareJson`: encoded
   server fields stay intact while the PRF salt remains the native `ArrayBuffer` required by WebAuthn.

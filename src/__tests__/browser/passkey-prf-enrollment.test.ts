@@ -13,17 +13,15 @@ function resolve(clientExtensionResults: Record<string, unknown>) {
 }
 
 describe("resolvePasskeyPrfEnrollmentAfterRegistration", () => {
-  it("returns an owned PRF snapshot only after credential verification matches", () => {
+  it("requires exact authentication even when registration returns PRF output", () => {
     const source = PRF_OUTPUT.buffer.slice(0);
     const result = resolve({ prf: { enabled: true, results: { first: source } } });
-    expect(result).toMatchObject({
-      status: "ready",
-      source: "registration",
+    expect(result).toEqual({
+      status: "authentication_required",
       credentialId: CREDENTIAL_ID,
+      credentialSelection: { mode: "exact", credentialId: CREDENTIAL_ID },
+      reason: "authentication_prf_confirmation_required",
     });
-    if (result.status !== "ready") throw new Error("Expected ready enrollment");
-    expect(result.prfOutput).toEqual(PRF_OUTPUT);
-    result.prfOutput.fill(0);
     expect(new Uint8Array(source)).toEqual(PRF_OUTPUT);
   });
 
@@ -61,7 +59,12 @@ describe("resolvePasskeyPrfEnrollmentAfterRegistration", () => {
           [CREDENTIAL_ID]: { first: new Uint8Array(32).fill(0x11) },
         },
       },
-    })).toMatchObject({ status: "ready", prfOutput: PRF_OUTPUT });
+    })).toEqual({
+      status: "authentication_required",
+      credentialId: CREDENTIAL_ID,
+      credentialSelection: { mode: "exact", credentialId: CREDENTIAL_ID },
+      reason: "authentication_prf_confirmation_required",
+    });
     expect(resolve({
       prf: {
         enabled: true,

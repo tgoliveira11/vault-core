@@ -2,7 +2,8 @@
 
 Living inventory of what `@tgoliveira/vault-core` exposes today. Update this file when exports, admin screens, published artifacts, or shipped/planned status changes.
 
-Last reviewed: **2026-07-28** (package version **1.5.1**, unified passkey experience in Unreleased)
+Last reviewed: **2026-07-28** (package version **1.6.0**, authentication-confirmed passkey enrollment
+in Unreleased)
 
 
 ## Package entry points (shipped)
@@ -35,9 +36,9 @@ Last reviewed: **2026-07-28** (package version **1.5.1**, unified passkey experi
   `applyVaultUnlockTransportPolicy`, `prepareVaultUnlockAuthenticationOptions`,
   `prepareVaultPasskeyPrfAuthenticationOptions`, `prepareVaultPasskeyPrfRegistrationOptions`),
   including mixed server-JSON/native-extension composition for browser libraries
-- One-ceremony passkey enrollment resolution through
+- Post-registration passkey enrollment resolution through
   `resolvePasskeyPrfEnrollmentAfterRegistration`, with exact server-verified credential matching and
-  typed authentication fallback when registration omits PRF output
+  mandatory exact authentication PRF confirmation for durable envelopes
 - Typed PRF capability (`resolvePasskeyPrfCapability`) separating heuristic/API availability from
   registration `prf.enabled`, authentication `prf.results`, and incompatible/missing results
 - BIP39 12/24-word recovery phrases and recovery kit text
