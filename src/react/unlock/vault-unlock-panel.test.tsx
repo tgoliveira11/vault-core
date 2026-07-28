@@ -1,28 +1,10 @@
 /** @vitest-environment jsdom */
 import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-
-vi.mock("../status-dock/resolve-passkey-dock-availability.js", () => ({
-  resolveVaultDockPasskeyAvailability: vi.fn(() => ({
-    hasEnvelope: false,
-    showPasskey: false,
-    prfExplicitlyUnsupported: false,
-  })),
-}));
-
-import { resolveVaultDockPasskeyAvailability } from "../status-dock/resolve-passkey-dock-availability.js";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import { createVaultUnlockRateLimiter } from "../../rate-limit/vault-unlock-rate-limit.js";
 import { VaultUnlockPanel } from "./vault-unlock-panel.js";
 
 describe("VaultUnlockPanel", () => {
-  beforeEach(() => {
-    vi.mocked(resolveVaultDockPasskeyAvailability).mockReturnValue({
-      hasEnvelope: false,
-      showPasskey: false,
-      prfExplicitlyUnsupported: false,
-    });
-  });
-
   afterEach(() => cleanup());
 
   it("submits vault password unlock", async () => {
@@ -64,18 +46,18 @@ describe("VaultUnlockPanel", () => {
     });
   });
 
-  it("shows passkey unlock when envelope exists", async () => {
-    vi.mocked(resolveVaultDockPasskeyAvailability).mockReturnValue({
-      hasEnvelope: true,
-      showPasskey: true,
-      prfExplicitlyUnsupported: false,
-    });
+  it("shows explicit passkey unlock without a browser binding", async () => {
     const onUnlockPasskey = vi.fn().mockResolvedValue(undefined);
     render(
       <VaultUnlockPanel
         onUnlockPassword={vi.fn()}
         onUnlockRecoveryPhrase={vi.fn()}
         onUnlockPasskey={onUnlockPasskey}
+        serverStatus={{
+          configured: true,
+          hasPasskeyPrfEnvelope: true,
+          passkeyUnlockAvailableOnThisBrowser: false,
+        }}
         passkeyReady
       />
     );
@@ -100,25 +82,84 @@ describe("VaultUnlockPanel", () => {
   });
 
   it("auto-starts passkey unlock on mount when configured", async () => {
-    vi.mocked(resolveVaultDockPasskeyAvailability).mockReturnValue({
-      hasEnvelope: true,
-      showPasskey: true,
-      prfExplicitlyUnsupported: false,
-    });
     const onUnlockPasskey = vi.fn().mockResolvedValue(undefined);
+    const onQuickUnlockPasskey = vi.fn().mockResolvedValue(undefined);
     render(
       <VaultUnlockPanel
         onUnlockPassword={vi.fn()}
         onUnlockRecoveryPhrase={vi.fn()}
         onUnlockPasskey={onUnlockPasskey}
+        onQuickUnlockPasskey={onQuickUnlockPasskey}
+        quickPasskeyPlan={{
+          status: "ready",
+          intent: "quick",
+          credentialSelection: { mode: "exact", credentialId: "credential-a" },
+          selectedEnvelopeVariantId: "variant-a",
+        }}
+        serverStatus={{
+          configured: true,
+          hasPasskeyPrfEnvelope: true,
+          passkeyUnlockAvailableOnThisBrowser: true,
+        }}
         passkeyReady
         autoStartPasskey
       />
     );
 
     await waitFor(() => {
-      expect(onUnlockPasskey).toHaveBeenCalledTimes(1);
+      expect(onQuickUnlockPasskey).toHaveBeenCalledWith({
+        status: "ready",
+        intent: "quick",
+        credentialSelection: { mode: "exact", credentialId: "credential-a" },
+        selectedEnvelopeVariantId: "variant-a",
+      });
     });
+    expect(onUnlockPasskey).not.toHaveBeenCalled();
+  });
+
+  it("never auto-starts the explicit callback even when legacy binding status is true", async () => {
+    const onUnlockPasskey = vi.fn().mockResolvedValue(undefined);
+    render(
+      <VaultUnlockPanel
+        onUnlockPassword={vi.fn()}
+        onUnlockRecoveryPhrase={vi.fn()}
+        onUnlockPasskey={onUnlockPasskey}
+        serverStatus={{
+          configured: true,
+          hasPasskeyPrfEnvelope: true,
+          passkeyUnlockAvailableOnThisBrowser: true,
+        }}
+        passkeyReady
+        autoStartPasskey
+      />
+    );
+
+    await Promise.resolve();
+    expect(onUnlockPasskey).not.toHaveBeenCalled();
+  });
+
+  it("does not auto-start explicit passkey unlock without a browser binding", async () => {
+    const onUnlockPasskey = vi.fn().mockResolvedValue(undefined);
+    render(
+      <VaultUnlockPanel
+        onUnlockPassword={vi.fn()}
+        onUnlockRecoveryPhrase={vi.fn()}
+        onUnlockPasskey={onUnlockPasskey}
+        serverStatus={{
+          configured: true,
+          hasPasskeyPrfEnvelope: true,
+          passkeyUnlockAvailableOnThisBrowser: false,
+        }}
+        passkeyReady
+        autoStartPasskey
+      />
+    );
+
+    await Promise.resolve();
+    expect(onUnlockPasskey).not.toHaveBeenCalled();
+    expect(
+      (screen.getByRole("button", { name: /unlock with passkey/i }) as HTMLButtonElement).disabled
+    ).toBe(false);
   });
 
   it("auto-focuses vault password when passkey is not primary", () => {
@@ -142,16 +183,13 @@ describe("VaultUnlockPanel", () => {
   });
 
   it("shows passkey unavailable note when PRF is unsupported", () => {
-    vi.mocked(resolveVaultDockPasskeyAvailability).mockReturnValue({
-      hasEnvelope: true,
-      showPasskey: true,
-      prfExplicitlyUnsupported: true,
-    });
     render(
       <VaultUnlockPanel
         onUnlockPassword={vi.fn()}
         onUnlockRecoveryPhrase={vi.fn()}
         onUnlockPasskey={vi.fn()}
+        serverStatus={{ configured: true, hasPasskeyPrfEnvelope: true }}
+        prfSupported={false}
         passkeyReady
       />
     );
@@ -253,11 +291,6 @@ describe("VaultUnlockPanel", () => {
   });
 
   it("shows rate limit error on passkey unlock", async () => {
-    vi.mocked(resolveVaultDockPasskeyAvailability).mockReturnValue({
-      hasEnvelope: true,
-      showPasskey: true,
-      prfExplicitlyUnsupported: false,
-    });
     const limiter = createVaultUnlockRateLimiter({
       maxFailures: 0,
       failureWindowMs: 60_000,
@@ -269,6 +302,7 @@ describe("VaultUnlockPanel", () => {
         onUnlockPassword={vi.fn()}
         onUnlockRecoveryPhrase={vi.fn()}
         onUnlockPasskey={vi.fn()}
+        serverStatus={{ configured: true, hasPasskeyPrfEnvelope: true }}
         passkeyReady
         autoStartPasskey={false}
       />

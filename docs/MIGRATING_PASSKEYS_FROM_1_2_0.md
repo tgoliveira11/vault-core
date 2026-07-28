@@ -281,23 +281,36 @@ if (result.status === "matched") {
 
 It chooses primary/decoy candidates first, performs bounded matching, and changes session role only
 after a successful match. A decoy-targeted candidate flow must supply explicit decoy candidates.
+If it returns `no_match`, keep the vault locked and use password/recovery routing. Do not call and
+install the stateless compatibility helper while primary/decoy target is unresolved; repair later in
+a confirmed normal primary context.
 
 ## Availability and rebinding
 
-`resolvePasskeyUnlockAvailableOnDevice()` now fails closed when binding state is omitted. Prefer:
+`resolvePasskeyUnlockAvailableOnDevice()` fails closed because it represents quick unlock. Prefer the
+typed plan so the full unlock page and the bound shortcut cannot be confused:
 
 ```ts
-import { resolvePasskeyUnlockAvailable } from "@tgoliveira/vault-core";
+import { resolvePasskeyUnlockPlan } from "@tgoliveira/vault-core";
 
-const quickUnlockAvailable = resolvePasskeyUnlockAvailable({
+const explicitPlan = resolvePasskeyUnlockPlan({
+  intent: "explicit",
   hasPasskeyPrfEnvelope: activeEnvelopeVariantCount > 0,
-  passkeyUnlockAvailableOnThisBrowser: binding != null,
+  preliminaryPrfAvailable: browserSupportsPrf,
+});
+
+const quickPlan = resolvePasskeyUnlockPlan({
+  intent: "quick",
+  hasPasskeyPrfEnvelope: activeEnvelopeVariantCount > 0,
+  preliminaryPrfAvailable: browserSupportsPrf,
+  bindingTarget: binding,
 });
 ```
 
-This boolean controls bound-browser quick unlock only. An unbound browser can still offer an explicit
-**Use an existing passkey** flow, verify a discoverable/allow-listed credential, match variants
-locally, and create another binding after success.
+The explicit plan defaults to `credentialSelection: { mode: "allow-list" }` and remains ready without
+a binding. Discoverable selection requires opt-in. The quick plan requires a valid target, returns
+exact selection, and is the only plan suitable for auto-start. After a candidate match, persist a new
+binding with the returned `envelopeVariantId` as its selected routing hint.
 
 ## No-match recovery flow
 
@@ -305,12 +318,15 @@ If no active variant matches:
 
 1. preserve every existing envelope and binding;
 2. keep the vault locked;
-3. require vault password or recovery phrase locally;
-4. create a new passkey PRF envelope for the current result;
+3. call `createPasskeyPrfEnvelopeAfterIndependentAuthorization()` with vault password or recovery
+   phrase locally;
+4. use its returned non-extractable UVK and PRF envelope;
 5. persist it as an additional opaque variant;
 6. select it for the current browser binding.
 
-A binding alone must never authorize step 4, replacement, deletion, or revocation.
+A binding, another passkey, or possession of a session UVK alone must never authorize step 3,
+replacement, deletion, or revocation. The helper has no persistence side effects, so the app must
+revalidate the current account/session operation before the append.
 
 ## Validation matrix
 

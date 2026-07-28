@@ -8,6 +8,7 @@ import {
   resolvePasskeyUnlockAvailable,
   resolvePasskeyUnlockAvailableOnDevice,
 } from "../../passkey/device-binding/resolve-availability.js";
+import { resolvePasskeyUnlockPlan } from "../../passkey/device-binding/resolve-unlock-plan.js";
 import {
   selectAuthenticationCredentials,
   scopeAuthenticationOptionsToCredential,
@@ -56,6 +57,98 @@ describe("resolvePasskeyUnlockAvailableOnDevice", () => {
       hasPasskeyPrfEnvelope: true,
       passkeyUnlockAvailableOnThisDevice: true,
     })).toBe(true);
+  });
+});
+describe("resolvePasskeyUnlockPlan", () => {
+  it("uses the authenticated account allow-list for explicit unlock without a binding", () => {
+    expect(resolvePasskeyUnlockPlan({
+      intent: "explicit",
+      hasPasskeyPrfEnvelope: true,
+      preliminaryPrfAvailable: true,
+    })).toEqual({
+      status: "ready",
+      intent: "explicit",
+      credentialSelection: { mode: "allow-list" },
+    });
+  });
+
+  it("ignores stale binding metadata for explicit unlock", () => {
+    expect(resolvePasskeyUnlockPlan({
+      intent: "explicit",
+      hasPasskeyPrfEnvelope: true,
+      preliminaryPrfAvailable: true,
+      bindingTarget: { credentialId: " invalid" },
+    })).toMatchObject({ status: "ready", intent: "explicit" });
+  });
+
+  it("requires a valid binding and exact credential selection for quick unlock", () => {
+    expect(resolvePasskeyUnlockPlan({
+      intent: "quick",
+      hasPasskeyPrfEnvelope: true,
+      preliminaryPrfAvailable: true,
+      bindingTarget: { credentialId: "credential-a" },
+    })).toEqual({
+      status: "ready",
+      intent: "quick",
+      credentialSelection: { mode: "exact", credentialId: "credential-a" },
+    });
+    expect(resolvePasskeyUnlockPlan({
+      intent: "quick",
+      hasPasskeyPrfEnvelope: true,
+      preliminaryPrfAvailable: true,
+    })).toEqual({ status: "unavailable", reason: "binding_required" });
+    expect(resolvePasskeyUnlockPlan({
+      intent: "quick",
+      hasPasskeyPrfEnvelope: true,
+      preliminaryPrfAvailable: true,
+      bindingTarget: {
+        credentialId: "credential-a",
+        selectedEnvelopeVariantId: "variant-b",
+      },
+    })).toEqual({
+      status: "ready",
+      intent: "quick",
+      credentialSelection: { mode: "exact", credentialId: "credential-a" },
+      selectedEnvelopeVariantId: "variant-b",
+    });
+  });
+
+  it("fails closed for malformed quick targets", () => {
+    expect(resolvePasskeyUnlockPlan({
+      intent: "quick",
+      hasPasskeyPrfEnvelope: true,
+      preliminaryPrfAvailable: true,
+      bindingTarget: { credentialId: "credential-a", selectedEnvelopeVariantId: " " },
+    })).toEqual({ status: "unavailable", reason: "binding_required" });
+    expect(resolvePasskeyUnlockPlan({
+      intent: "quick",
+      hasPasskeyPrfEnvelope: true,
+      preliminaryPrfAvailable: true,
+      bindingTarget: 42 as unknown as { credentialId: string },
+    })).toEqual({ status: "unavailable", reason: "binding_required" });
+  });
+
+  it("requires an explicit opt-in for discoverable selection", () => {
+    expect(resolvePasskeyUnlockPlan({
+      intent: "explicit",
+      hasPasskeyPrfEnvelope: true,
+      preliminaryPrfAvailable: true,
+      explicitSelectionMode: "discoverable",
+    })).toMatchObject({ credentialSelection: { mode: "discoverable" } });
+  });
+
+  it("reports missing envelopes and preliminary PRF unavailability", () => {
+    expect(resolvePasskeyUnlockPlan({
+      intent: "explicit",
+      hasPasskeyPrfEnvelope: false,
+      preliminaryPrfAvailable: true,
+    })).toEqual({ status: "unavailable", reason: "no_envelope" });
+    expect(resolvePasskeyUnlockPlan({
+      intent: "quick",
+      hasPasskeyPrfEnvelope: true,
+      preliminaryPrfAvailable: false,
+      bindingTarget: { credentialId: "credential-a" },
+    })).toEqual({ status: "unavailable", reason: "prf_unavailable" });
   });
 });
 describe("scopeAuthenticationOptionsToDevice", () => {

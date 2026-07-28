@@ -25,3 +25,9 @@ export {
   type ResolvePasskeyUnlockAvailableInput,
   type ResolvePasskeyUnlockAvailableOnDeviceInput,
 } from "./resolve-availability.js";
+export {
+  resolvePasskeyUnlockPlan,
+  type PasskeyUnlockIntent,
+  type PasskeyUnlockPlan,
+  type ResolvePasskeyUnlockPlanInput,
+} from "./resolve-unlock-plan.js";

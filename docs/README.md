@@ -15,6 +15,9 @@ Use this page as the documentation router for `@tgoliveira/vault-core`.
   capability, and explicit transports.
 - [`MIGRATING_SESSION_OWNERSHIP_FROM_1_4_0.md`](MIGRATING_SESSION_OWNERSHIP_FROM_1_4_0.md): prevent
   stale async browser vault work from crossing account switches with opaque owner/epoch operations.
+- [`ADOPTING_UNIFIED_PASSKEY_UNLOCK_FROM_1_5_1.md`](ADOPTING_UNIFIED_PASSKEY_UNLOCK_FROM_1_5_1.md):
+  make synced credentials usable without a binding while preserving exact bound quick unlock and
+  password/recovery-authorized append-only variant repair.
 - [`INTEGRATING_EMERGENCY_DURESS_MODE.md`](INTEGRATING_EMERGENCY_DURESS_MODE.md): emergency / duress
   mode — decoy vault enrollment, unlock routing, dock long-press, exit flow.
 - [`../apps/consumer-demo/README.md`](../apps/consumer-demo/README.md): runnable local reference app

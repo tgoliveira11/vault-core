@@ -236,9 +236,14 @@ export async function unlockDemoVaultWithPasskey(options?: {
       throw new Error("Passkey unlock is not configured");
     }
 
-    const credentialId = loadPasskeyCredentialId();
+    const metadataCredentialId = record.passkeyPrfEnvelope.publicMetadata?.credentialId;
+    const credentialId = loadPasskeyCredentialId() ?? (
+      typeof metadataCredentialId === "string" && metadataCredentialId.trim() === metadataCredentialId
+        ? metadataCredentialId
+        : null
+    );
     if (!credentialId) {
-      throw new Error("No passkey credential is linked on this device");
+      throw new Error("No verified passkey credential is linked to this vault");
     }
 
     const prfOutput = await authenticateDemoPasskey(credentialId);
@@ -299,7 +304,12 @@ export function verifyDemoEmergencyExitOtp(otp: string): boolean {
 export function isDemoPasskeyUnlockAvailable(): boolean {
   const record = loadVaultRecord();
   if (!record?.passkeyPrfEnvelope) return false;
-  return loadPasskeyCredentialId() != null;
+  const metadataCredentialId = record.passkeyPrfEnvelope.publicMetadata?.credentialId;
+  return loadPasskeyCredentialId() != null || (
+    typeof metadataCredentialId === "string" &&
+    metadataCredentialId.length > 0 &&
+    metadataCredentialId.trim() === metadataCredentialId
+  );
 }
 
 export async function loadDecryptedDemoPayload(): Promise<DemoVaultPayload | null> {

@@ -2,7 +2,7 @@
 
 Living inventory of what `@tgoliveira/vault-core` exposes today. Update this file when exports, admin screens, published artifacts, or shipped/planned status changes.
 
-Last reviewed: **2026-07-27** (package version **1.5.0**, lease-aware auto-lock preference in Unreleased)
+Last reviewed: **2026-07-28** (package version **1.5.1**, unified passkey experience in Unreleased)
 
 
 ## Package entry points (shipped)
@@ -21,6 +21,8 @@ Last reviewed: **2026-07-27** (package version **1.5.0**, lease-aware auto-lock 
   for apps and agents (auth/RBAC, rate limits, CSP, plaintext guards, unlock access control)
 - [docs/ADOPTING_VAULT_CORE_1_1_0.md](./ADOPTING_VAULT_CORE_1_1_0.md) — 1.0.x → 1.1.0 upgrade:
   package vs consumer matrix, phased duplicate removal, dock/React wiring
+- [docs/ADOPTING_UNIFIED_PASSKEY_UNLOCK_FROM_1_5_1.md](./ADOPTING_UNIFIED_PASSKEY_UNLOCK_FROM_1_5_1.md)
+  — explicit synced-passkey reuse without binding and independently authorized variant repair
 
 ## Core capabilities (shipped)
 
@@ -56,9 +58,13 @@ Last reviewed: **2026-07-27** (package version **1.5.0**, lease-aware auto-lock 
   browser `VaultInnerKeyMaterialCache` (memory-only, cleared on lock)
 - Passkey credential/binding/variant model (`VaultPasskeyBindingStore`, runtime state schemas,
   `scopeAuthenticationOptionsToCredential`, `PasskeyCredentialSelection`,
-  `resolvePasskeyUnlockAvailable`, `parsePasskeyBindingId`; deprecated device aliases retained)
+  `resolvePasskeyUnlockAvailable`, `resolvePasskeyUnlockPlan`, `parsePasskeyBindingId`; deprecated
+  device aliases retained)
 - Passkey PRF envelope candidates (`unlockWithPasskeyPrfEnvelopeCandidates`, maximum 5) and
   emergency-aware `unlockVaultWithPasskeyCandidateRouting`
+- Independent password/recovery-authorized compatibility variant creation through
+  `createPasskeyPrfEnvelopeAfterIndependentAuthorization` (local/stateless, append-only persistence
+  remains consumer-owned)
 - Passkey crypto failure classifier (`classifyPasskeyCryptoError`, `getDefaultPasskeyCryptoErrorMessage`, `PasskeyCryptoFailureKind`)
 
 ## Emergency / duress mode (shipped)

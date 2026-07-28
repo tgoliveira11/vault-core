@@ -8,6 +8,33 @@ major version; compatible corrections should retain explicit deprecation and mig
 
 ## [Unreleased]
 
+### Added
+
+- `resolvePasskeyUnlockPlan()` separates explicit passkey use from bound-browser quick unlock. The
+  explicit plan defaults to the authenticated user's credential allow-list without requiring a
+  binding; quick unlock requires a valid binding and returns exact credential/variant routing.
+- `createPasskeyPrfEnvelopeAfterIndependentAuthorization()` creates an additional PRF envelope only
+  after locally reopening a password or recovery-phrase envelope. It returns the non-extractable UVK
+  and new envelope without persistence, replacement, revocation, or PRF serialization.
+
+### Changed
+
+- `VaultUnlockPanel` now enables explicit passkey unlock whenever an envelope, preliminary PRF
+  capability, ready WebAuthn options, and callback exist. Browser binding remains required only for
+  status-dock quick unlock. Full-page `autoStartPasskey` now requires a separate
+  `quickPasskeyPlan` plus `onQuickUnlockPasskey`; the explicit callback is never auto-started.
+
+### Security
+
+- Candidate `no_match` repair now has a package-owned high-level path that cannot accept a binding or
+  another passkey as authorization. Consumers must append its envelope as a new variant and must not
+  overwrite known-good variants.
+- Full-page auto-start cannot accidentally run the explicit allow-list callback. Emergency/duress
+  candidate no-match remains locked and must fall back to package password/recovery routing; variant
+  repair is deferred until a confirmed normal primary context.
+- `legacyVaultKeyUnlock: false` now rejects missing/null vault-key AAD context before normalization,
+  matching the profile contract and preventing a disabled compatibility fallback from remaining open.
+
 ## [1.5.1] - 2026-07-27
 
 ### Fixed

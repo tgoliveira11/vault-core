@@ -134,6 +134,10 @@ provided.
 
 - `createPasskeyPrfEnvelope(vaultKey, prfOutput, scope, profile, publicMetadata?, options?)` — optional `WrapUserVaultKeyOptions` for re-wrap with `innerVaultKeyBlob`
 - `createPasskeyPrfEnvelopeWithSessionCache(...)` — uses in-memory inner-key cache when `innerVaultKeyBlob` is omitted
+- `createPasskeyPrfEnvelopeAfterIndependentAuthorization(input)` — locally reopens a password or
+  recovery envelope and returns `{ vaultKey, envelope }` for append-only no-match repair; it accepts
+  no binding/passkey authorization and has no persistence side effects. Defer it when
+  emergency/duress candidate routing has not resolved primary vs decoy.
 - `unlockWithPasskeyPrfEnvelope(envelope, prfOutput, expectedScope, profile, options?)`
 - `unlockWithPasskeyPrfEnvelopeCandidates(input)` — tries at most
   `MAX_PASSKEY_PRF_ENVELOPE_CANDIDATES` (5) variants for one verified credential; returns matched
@@ -159,6 +163,7 @@ provided.
 | `scopeAuthenticationOptionsToCredential(...)` | Strictly filters to one credential or throws `PasskeyCredentialScopeError` |
 | `selectAuthenticationCredentials(...)` | Applies explicit selection mode |
 | `resolvePasskeyUnlockAvailable(...)` | Bound-browser quick-unlock status; missing binding fails closed |
+| `resolvePasskeyUnlockPlan(...)` | Typed explicit-vs-quick plan; explicit defaults to allow-list without binding, quick requires exact binding target |
 | Deprecated device-named aliases | Compatibility only; see migration guide |
 
 Example: [`docs/examples/device-binding/README.md`](docs/examples/device-binding/README.md).
@@ -513,8 +518,12 @@ Import styles once (includes `vc-vault-unlock-*` classes).
 
 - `VaultUnlockPanel` / `VaultUnlockPanelProps` — password, recovery phrase, and optional passkey unlock
   (`autoFocusPassword` default `true`; `autoStartPasskey` default `false` on the full unlock page;
-  passkey auto-start remains opt-in). Optional `unlockRateLimiter` + `rateLimitScopeKey` (default
-  `"default"`) assert before unlock and record failures/successes. Customizable `labels`, `passkeyReady`, etc.
+  passkey auto-start remains opt-in and requires `quickPasskeyPlan` plus the separate exact-bound
+  `onQuickUnlockPasskey`; `onUnlockPasskey` is explicit-only). Optional `unlockRateLimiter` +
+  `rateLimitScopeKey` (default `"default"`) assert before unlock and record failures/successes.
+  Customizable `labels`, `passkeyReady`, etc.
+- `ReadyQuickPasskeyUnlockPlan` — ready `intent: "quick"` plan accepted by the full-page exact-bound
+  auto-start callback
 - `VAULT_UNLOCK_RETURN_QUERY_PARAM` — default query key for post-unlock navigation (`"next"`)
 - `resolveVaultUnlockReturnPath(raw, options?)` — sanitize a return path (relative `/…` only)
 - `readVaultUnlockReturnPath(searchParams, options?)` — read and sanitize from URL search params

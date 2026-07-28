@@ -133,6 +133,19 @@ describe("legacy vault key unlock", () => {
         (candidate) => decryptField(candidate, key).then(() => key)
       )
     ).rejects.toThrow("context mismatch");
+
+    const missingContextPayload = {
+      ...encrypted,
+      aad: { ...encrypted.aad, context: undefined },
+    };
+    await expect(
+      unlockVaultKeyEnvelopeWithAadRouting(
+        missingContextPayload,
+        SCOPE,
+        { ...PROFILE, legacyVaultKeyUnlock: false },
+        (candidate) => decryptField(candidate, key).then(() => key)
+      )
+    ).rejects.toThrow("context mismatch");
   });
 
   it("throws when legacy fallback cannot decrypt", async () => {

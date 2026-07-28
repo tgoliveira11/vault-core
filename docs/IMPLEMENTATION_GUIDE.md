@@ -547,11 +547,16 @@ if (candidateResult.status === "matched") {
 }
 ```
 
-`no_match` must leave all variants intact and the vault locked. Require password or recovery locally
-before adding a compatibility variant. When emergency/duress mode is enabled, use
+`no_match` must leave all variants intact and the vault locked. Call
+`createPasskeyPrfEnvelopeAfterIndependentAuthorization()` with password or recovery locally, then
+append its returned envelope as a new variant and install its non-extractable UVK. Do not use the
+session cache, binding, or another passkey as authorization for this repair path. When
+emergency/duress mode is enabled, use
 `unlockVaultWithPasskeyCandidateRouting()` so candidate matching preserves primary/decoy routing and
 session roles. After either matched flow, populate the memory-only inner-key cache from the matched
 envelope when later passkey enrollment or re-wrap must work with the non-extractable session UVK.
+If emergency/duress candidate routing returns `no_match`, do not run or install the stateless repair
+result: fall back to password/recovery routing and defer variant repair until normal primary context.
 
 ### Passkey enroll after unlock (non-extractable session UVK)
 
@@ -887,14 +892,21 @@ export function VaultUnlockPage() {
     <VaultUnlockPanel
       serverStatus={serverStatus}
       prfSupported={browserSupportsPrf}
-      passkeyReady={passkeyReadyOnDevice}
+      passkeyReady={explicitPasskeyOptionsReady}
       onUnlockPassword={(password) => unlockWithPassword(password)}
       onUnlockRecoveryPhrase={(phrase) => unlockWithRecovery(phrase)}
-      onUnlockPasskey={passkeyReadyOnDevice ? () => unlockWithPasskey() : undefined}
+      onUnlockPasskey={explicitPasskeyOptionsReady ? () => unlockWithPasskey() : undefined}
     />
   );
 }
 ```
+
+`explicitPasskeyOptionsReady` means the authenticated user's allow-listed WebAuthn request options
+are loaded. Do not derive it from a browser binding. Use `resolvePasskeyUnlockPlan({ intent:
+"explicit", ... })` for this page. A binding is required only for exact dock/auto-start quick unlock.
+If this full page opts into `autoStartPasskey`, pass the ready `intent: "quick"` plan through
+`quickPasskeyPlan` and implement `onQuickUnlockPasskey(plan)` separately. The explicit
+`onUnlockPasskey` callback is never auto-started.
 
 Link to the unlock page from the status dock or protected gates:
 

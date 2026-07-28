@@ -71,6 +71,12 @@ A synced/multi-device WebAuthn credential is one logical credential, not one cre
 device. Optional browser bindings are opaque routing/UX state; possession of a binding is not WebAuthn
 proof and cannot authorize envelope creation, replacement, or deletion.
 
+Use `resolvePasskeyUnlockPlan({ intent: "explicit", ... })` for a user-initiated unlock page. It does
+not require a browser binding and defaults to the authenticated account's allow-list. Use `intent:
+"quick"` (or `resolvePasskeyUnlockAvailable()`) only for exact bound-credential routing and optional
+auto-start. `VaultUnlockPanel` requires that ready quick plan and a separate quick callback for
+auto-start; it never auto-starts the explicit callback.
+
 Treat API/user-agent PRF detection as preliminary only. Confirm credential capability from registration
 `prf.enabled` and confirm a usable authentication result from `prf.results`. PRF output and hashes stay
 client-only; note that serializing a `PublicKeyCredential` can include extension results, so remove PRF
@@ -80,8 +86,15 @@ sending WebAuthn data to a server.
 When compatibility requires multiple envelopes for one verified credential, pass only that
 credential's bounded active candidates to `unlockWithPasskeyPrfEnvelopeCandidates()`. A no-match must
 preserve every candidate and require password/recovery authorization before adding another variant.
+Use `createPasskeyPrfEnvelopeAfterIndependentAuthorization()` for that local authorization and
+creation step; do not authorize it from a session UVK, binding cookie, or another passkey alone.
 Use `unlockVaultWithPasskeyCandidateRouting()` when emergency/duress mode is enabled so candidate
 selection cannot bypass primary/decoy session routing.
+
+If emergency/duress candidate routing returns `no_match`, keep the vault locked and fall back to
+`unlockVaultWithPasswordRouting()` or the package recovery/exit flow. Do not install the UVK returned
+by the stateless compatibility helper in that ambiguous context. Defer variant repair until the app
+has a confirmed normal primary context.
 
 Candidate AAD context checks use the exact profile when `legacyVaultKeyUnlock` is disabled. While
 legacy routing is enabled, only missing/null contexts and strings explicitly listed in

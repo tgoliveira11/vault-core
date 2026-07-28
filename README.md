@@ -9,6 +9,8 @@ Framework-independent vault crypto primitives extracted from LiqSense.
 - Argon2id password and recovery phrase envelopes
 - Passkey PRF envelope wrap/unwrap, synced-credential metadata, and bounded local variant matching
   (PRF bytes only — no WebAuthn ceremony)
+- Unified passkey unlock planning: explicit synced-passkey reuse without browser binding, with binding
+  reserved for exact quick unlock and auto-start
 - BIP39 12/24-word recovery phrases
 - No-plaintext validation helpers
 
@@ -59,6 +61,8 @@ See [CONTRIBUTING.md](CONTRIBUTING.md) and [docs/contributing.md](docs/contribut
   multiple bindings/envelope variants, strict scoping, PRF capability, and transport policy
 - [Migrating browser session ownership from 1.4.0](docs/MIGRATING_SESSION_OWNERSHIP_FROM_1_4_0.md)
   — cancel stale async unlock/cache work across account switches
+- [Adopting unified passkey unlock from 1.5.1](docs/ADOPTING_UNIFIED_PASSKEY_UNLOCK_FROM_1_5_1.md)
+  — reuse synced credentials without binding; reserve binding for quick unlock
 - [Complete implementation guide](docs/IMPLEMENTATION_GUIDE.md)
 - [Documentation index](docs/README.md)
 - [API reference](API_REFERENCE.md)
