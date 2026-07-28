@@ -143,6 +143,14 @@ export const VAULT_ADMIN_ENV_CATALOG: VaultAdminEnvVarDefinition[] = [
     example: "true",
   },
   {
+    envVar: "VAULT_EMERGENCY_MODE_ENABLED",
+    label: "Emergency mode",
+    description:
+      "Opt-in emergency/duress mode. Keep false to remove emergency behavior and screens from the consuming app.",
+    group: "features",
+    example: "false",
+  },
+  {
     envVar: "VAULT_UNLOCK_MAX_FAILURES",
     label: "Unlock max failures",
     description: "Failed unlock attempts allowed per scope before lockout.",

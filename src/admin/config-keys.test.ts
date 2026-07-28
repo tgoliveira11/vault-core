@@ -8,6 +8,7 @@ import {
 describe("config-keys", () => {
   it("identifies overridable keys", () => {
     expect(isVaultOverridableConfigKey("passwordMinLength")).toBe(true);
+    expect(isVaultOverridableConfigKey("emergencyModeEnabled")).toBe(true);
     expect(isVaultOverridableConfigKey("encryptionAlgorithm")).toBe(false);
   });
 
@@ -18,6 +19,7 @@ describe("config-keys", () => {
 
   it("validates booleans", () => {
     validateVaultAdminOverride("enabled", true);
+    validateVaultAdminOverride("emergencyModeEnabled", false);
     expect(() => validateVaultAdminOverride("enabled", "true")).toThrow(/boolean/i);
   });
 

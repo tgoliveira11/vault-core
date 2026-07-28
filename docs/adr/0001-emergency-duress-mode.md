@@ -5,7 +5,7 @@
 | **Status** | Accepted |
 | **Date** | 2026-07-06 |
 | **Authors** | vault-core maintainers (design review) |
-| **Related** | [Issue breakdown](./0001-emergency-duress-mode-issues.md), [SECURITY.md](../../SECURITY.md), [IMPLEMENTATION_GUIDE.md](../IMPLEMENTATION_GUIDE.md) |
+| **Related** | [SECURITY.md](../../SECURITY.md), [IMPLEMENTATION_GUIDE.md](../IMPLEMENTATION_GUIDE.md), [integration guide](../INTEGRATING_EMERGENCY_DURESS_MODE.md) |
 
 ## Context
 
@@ -133,6 +133,10 @@ perform WebAuthn.
 
 ### 3. Passkey auto-start delay (dock)
 
+> Implementation amendment (2026-07-28): emergency mode is opt-in and disabled by default. The
+> runtime delay is therefore `0` normally and becomes `2000` only after explicit emergency-mode
+> enablement. The original decision below describes the enabled-mode behavior.
+
 To allow long-press on the dock handle before auto-start fires, change the dock passkey auto-start
 from **immediate** (`triggerPasskeyAutoStart` on expand) to a **default 2000 ms delay** after
 expand, configurable via prop (e.g. `passkeyAutoStartDelayMs`).
@@ -221,7 +225,8 @@ Extend `VaultServerStatusSnapshot`:
 export type VaultServerStatusSnapshot = {
   configured: boolean;
   hasPasskeyPrfEnvelope?: boolean;
-  passkeyUnlockAvailableOnThisDevice?: boolean;
+  passkeyUnlockAvailableOnThisBrowser?: boolean;
+  emergencyModeEnabled?: boolean;
   emergencyModeActive?: boolean;
   decoyConfigured?: boolean;
 };
@@ -292,16 +297,15 @@ Exact names and signatures will be finalized in implementation PRs and `API_REFE
 - **Enrollment complexity:** users must set up decoy vault, sequence, and duress password.
 - **Passkey duress without decoy passkey envelope:** if user has passkey but no decoy passkey
   envelope, long-press path must still work (PRF routing); document enrollment expectations.
-- **2 s auto-start delay:** slightly slower passkey UX for all dock users (mitigated by explicit
-  button and configurable delay).
+- **2 s auto-start delay:** slightly slower dock passkey UX while emergency mode is explicitly
+  enabled (mitigated by the explicit button and configurable delay); normal mode remains immediate.
 - **Sequence in password:** users must remember a substring pattern, not a separate short PIN only.
 
 ### Follow-up
 
-- Implementation issues: [0001-emergency-duress-mode-issues.md](./0001-emergency-duress-mode-issues.md)
-- Update `CHANGELOG.md`, `API_REFERENCE.md`, `IMPLEMENTATION_GUIDE.md`, and
-  `CURRENT_PRODUCT_SURFACE.md` when shipped.
-- Consumer migration guide for SelahKeep (separate repo).
+The implementation is shipped as an opt-in feature that is disabled by default. Current operating
+instructions live in [the integration guide](../INTEGRATING_EMERGENCY_DURESS_MODE.md); this ADR
+retains the original decision and trade-offs.
 
 ## Alternatives considered
 

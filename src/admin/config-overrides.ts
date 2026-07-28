@@ -79,6 +79,9 @@ export function applyVaultAdminOverrides(
       case "passkeyPrfUnlockEnabled":
         next.features = { ...next.features, passkeyPrfUnlockEnabled: rawValue as boolean };
         break;
+      case "emergencyModeEnabled":
+        next.features = { ...next.features, emergencyModeEnabled: rawValue as boolean };
+        break;
       case "unlockMaxFailures":
         next.rateLimit = { ...next.rateLimit, unlockMaxFailures: rawValue as number };
         break;

@@ -331,6 +331,12 @@ created from that one ceremony after server verification. Do not always authenti
 again. Use `navigator.credentials.get` only as a typed fallback when registration confirms PRF but
 does not return an output.
 
+The example below converts all fields for native `navigator.credentials.create()`. Browser libraries
+such as SimpleWebAuthn convert challenge/user/credential fields but pass extension inputs through.
+For those libraries, call the same helper without `prepareJson`: the encoded server fields remain
+unchanged while the PRF salt is a native `ArrayBuffer` when the library calls WebAuthn. See
+[the account-auth interoperability contract](./PASSKEY_ACCOUNT_AUTH_INTEROPERABILITY.md).
+
 ```ts
 import {
   prepareVaultPasskeyPrfRegistrationOptions,
@@ -1217,6 +1223,10 @@ See [INTEGRATING_EMERGENCY_DURESS_MODE.md](./INTEGRATING_EMERGENCY_DURESS_MODE.m
 consumer integration guide (phased checklist, dock wiring, server metadata, testing). See
 [ADR 0001](./adr/0001-emergency-duress-mode.md) for the threat model and design decisions.
 
+This feature is disabled by default. Do not render or execute any flow in this section unless the
+resolved admin configuration has `features.emergencyModeEnabled === true`. Enable it explicitly
+with `VAULT_EMERGENCY_MODE_ENABLED=true` in `.env.local` or the authenticated admin override.
+
 ### Enrollment (trusted session)
 
 ```ts
@@ -1289,7 +1299,8 @@ await persistEmergencyModeActive(false);
 ### Dock integration
 
 - Wire `VaultStatusDock.onDuressSignalChange` and pass `duressSignaled` into passkey unlock.
-- Default `passkeyAutoStartDelayMs={2000}` allows 1 s handle long-press before auto-start.
+- Set `emergencyModeEnabled`; the dock then defaults `passkeyAutoStartDelayMs` to 2000 so a 1 s
+  handle long-press can complete. With emergency mode disabled, the default is immediate (`0`).
 - Use `useLongPressDuressSignal` on custom unlock UIs when not using the dock.
 
 ### Testing

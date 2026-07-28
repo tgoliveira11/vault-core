@@ -6,6 +6,12 @@ Account login, password reset, TOTP, OAuth, and passkey **login** must not unloc
 
 Vault unlock requires a separate vault password, recovery phrase, or passkey PRF envelope.
 
+One WebAuthn credential may be explicitly opted into both passkey login and vault PRF, but the
+capabilities, challenges, verification outcomes, server sessions, and lifecycle flags remain
+independent. Login never implies vault unlock. A shared credential increases compromise blast radius
+compared with separate credentials and requires informed user choice. See
+[the interoperability contract](docs/PASSKEY_ACCOUNT_AUTH_INTEROPERABILITY.md).
+
 ## Server must never receive
 
 - Vault password
@@ -91,6 +97,15 @@ server-verified assertion credential. PRF output and hashes stay client-only; no
 `PublicKeyCredential` can include extension results, so remove PRF results with
 `sanitizeWebAuthnResponseForServer()` (or an equally strict app-owned serializer) before sending
 WebAuthn data to a server.
+
+Browser libraries such as SimpleWebAuthn may convert challenge, user, and credential IDs while
+passing extension inputs through unchanged. Compose their server options with the existing
+`prepareVaultPasskeyPrfRegistrationOptions()` / `prepareVaultPasskeyPrfAuthenticationOptions()`
+without `prepareJson` so those JSON fields remain encoded and the local PRF salt remains a native
+`ArrayBuffer`. When account authentication and vault use the same credential, keep one authoritative
+server counter with atomic monotonic compare-and-swap, one verifier per assertion, distinct
+challenge audiences, and no vault unwrap before the fully authenticated account session (including
+2FA).
 
 When compatibility requires multiple envelopes for one verified credential, pass only that
 credential's bounded active candidates to `unlockWithPasskeyPrfEnvelopeCandidates()`. A no-match must

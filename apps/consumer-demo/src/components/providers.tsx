@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, type ReactNode } from "react";
+import { createContext, useContext, useEffect, type ReactNode } from "react";
 import {
   clampVaultAutoLockMinutes,
   readUserVaultAutoLockMinutes,
@@ -9,16 +9,24 @@ import {
 import { VaultSessionProvider } from "@tgoliveira/vault-core/react";
 import { hydrateDemoEmergencyFromServer } from "@/lib/vault-demo-crypto";
 
+const DemoVaultFeatureContext = createContext({ emergencyModeEnabled: false });
+
+export function useDemoVaultFeatures() {
+  return useContext(DemoVaultFeatureContext);
+}
+
 export function Providers({
   children,
   autoLockMinutes,
+  emergencyModeEnabled,
 }: {
   children: ReactNode;
   autoLockMinutes: number;
+  emergencyModeEnabled: boolean;
 }) {
   useEffect(() => {
-    hydrateDemoEmergencyFromServer();
-  }, []);
+    hydrateDemoEmergencyFromServer(emergencyModeEnabled);
+  }, [emergencyModeEnabled]);
 
   const sessionConfig = {
     autoLockMinutes,
@@ -33,8 +41,10 @@ export function Providers({
   };
 
   return (
-    <VaultSessionProvider sessionConfig={sessionConfig} registerUnloadGuard>
-      {children}
-    </VaultSessionProvider>
+    <DemoVaultFeatureContext.Provider value={{ emergencyModeEnabled }}>
+      <VaultSessionProvider sessionConfig={sessionConfig} registerUnloadGuard>
+        {children}
+      </VaultSessionProvider>
+    </DemoVaultFeatureContext.Provider>
   );
 }

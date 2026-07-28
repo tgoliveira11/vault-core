@@ -228,9 +228,12 @@ Associated inferred types include `EncryptedVaultPayload`, `Argon2idKdfMetadata`
 | Export | Purpose |
 | --- | --- |
 | `useLongPressDuressSignal(options?)` | 1 s long-press latch for dock/passkey duress |
+| `VaultServerStatusSnapshot.emergencyModeEnabled` | Explicit opt-in gate; false/omitted ignores emergency status |
 | `VaultServerStatusSnapshot.emergencyModeActive` | Server-persisted emergency flag |
 | `VaultServerStatusSnapshot.decoyConfigured` | Decoy enrollment completed |
-| `VaultStatusDock.passkeyAutoStartDelayMs` | Default `2000` — delay before dock passkey auto-start |
+| `VaultStatusDock.emergencyModeEnabled` | Enables emergency status and dock long-press; default false |
+| `VaultDockQuickUnlock.emergencyModeEnabled` | Enables passkey-button long-press; default false |
+| `VaultStatusDock.passkeyAutoStartDelayMs` | Default `0`, or `2000` while emergency mode is enabled |
 | `VaultStatusDock.onDuressSignalChange` | Duress latch callback |
 | `resolveVaultClientStatus` | Returns `emergency_locked` / `emergency_unlocked` when applicable |
 
@@ -243,6 +246,8 @@ Associated inferred types include `EncryptedVaultPayload`, `Argon2idKdfMetadata`
 **Security preconditions:** Never decrypt primary `encryptedBlob` in emergency mode. Exit requires
 primary recovery phrase; normal password does not exit. Duress sequence is a signal, not a secret key.
 Consumer must persist `emergencyModeActive` atomically and rate-limit `emergency_exit`.
+The feature is disabled by default through `VAULT_EMERGENCY_MODE_ENABLED=false` and the admin key
+`emergencyModeEnabled`.
 
 **Integration guide:** [docs/INTEGRATING_EMERGENCY_DURESS_MODE.md](docs/INTEGRATING_EMERGENCY_DURESS_MODE.md)
 

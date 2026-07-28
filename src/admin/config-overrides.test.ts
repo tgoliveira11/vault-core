@@ -98,6 +98,7 @@ describe("admin config overrides", () => {
       passwordMinScore: 1,
       passwordStrengthPosition: "above",
       passkeyPrfUnlockEnabled: false,
+      emergencyModeEnabled: true,
     });
 
     expect(next.enabled).toBe(true);
@@ -116,6 +117,7 @@ describe("admin config overrides", () => {
     expect(next.passwordPolicy.minScore).toBe(1);
     expect(next.passwordPolicy.strengthPosition).toBe("above");
     expect(next.features.passkeyPrfUnlockEnabled).toBe(false);
+    expect(next.features.emergencyModeEnabled).toBe(true);
     expect(next.rateLimit.unlockMaxFailures).toBe(5);
     expect(next.rateLimit.apiMaxRequests).toBe(120);
   });

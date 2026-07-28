@@ -45,4 +45,17 @@ describe("prepareVaultPasskeyPrfRegistrationOptions", () => {
     });
     expect(prepared.extensions?.prf?.eval?.first).toBeInstanceOf(ArrayBuffer);
   });
+
+  it("preserves server JSON fields while adding a native PRF extension for browser libraries", async () => {
+    const serverOptions = { challenge: "base64url-challenge" };
+    const prepared = await prepareVaultPasskeyPrfRegistrationOptions({
+      userId: USER_ID,
+      prfSaltPrefix: PRF_PREFIX,
+      serverOptions,
+    });
+
+    expect(prepared.challenge).toBe("base64url-challenge");
+    expect(prepared.extensions?.prf?.eval?.first).toBeInstanceOf(ArrayBuffer);
+    expect(serverOptions).not.toHaveProperty("extensions");
+  });
 });

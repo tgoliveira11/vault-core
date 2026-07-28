@@ -19,6 +19,10 @@ major version; compatible corrections should retain explicit deprecation and mig
 - `prepareVaultPasskeyPrfRegistrationOptions()` and
   `resolvePasskeyPrfEnrollmentAfterRegistration()` make passkey enrollment a single WebAuthn
   ceremony when creation returns PRF output, with a typed authentication fallback when it does not.
+- Emergency/duress mode is now an explicit, admin-overridable feature flag
+  (`VAULT_EMERGENCY_MODE_ENABLED` / `emergencyModeEnabled`) that defaults to disabled.
+- Added a cross-package passkey interoperability contract for optional account-login and vault-PRF
+  credential reuse while keeping authorization, challenges, 2FA, counters, and lifecycle separate.
 
 ### Changed
 
@@ -30,6 +34,10 @@ major version; compatible corrections should retain explicit deprecation and mig
   created compatibility-variant metadata is bounded, JSON-only, and rejected when it contains
   forbidden plaintext fields. Runtime unlock planning now rejects malformed intents and truthy
   non-booleans.
+- Emergency status and long-press handlers are ignored unless explicitly enabled. Dock passkey
+  auto-start is immediate by default and retains the 2 s duress window only after opt-in.
+- Removed completed extraction/issue-planning documents and the redundant release redirect; current
+  and historical migration docs are now separated in the documentation index.
 
 ### Security
 

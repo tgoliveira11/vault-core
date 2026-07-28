@@ -33,7 +33,8 @@ Last reviewed: **2026-07-28** (package version **1.5.1**, unified passkey experi
 - Typed `sanitizeWebAuthnResponseForServer` removal of PRF extension results before server serialization
 - WebAuthn PRF ceremony prep (`prepareWebAuthnPrfExtensions`, `alignPrfExtensionsForCredential`,
   `applyVaultUnlockTransportPolicy`, `prepareVaultUnlockAuthenticationOptions`,
-  `prepareVaultPasskeyPrfAuthenticationOptions`, `prepareVaultPasskeyPrfRegistrationOptions`)
+  `prepareVaultPasskeyPrfAuthenticationOptions`, `prepareVaultPasskeyPrfRegistrationOptions`),
+  including mixed server-JSON/native-extension composition for browser libraries
 - One-ceremony passkey enrollment resolution through
   `resolvePasskeyPrfEnrollmentAfterRegistration`, with exact server-verified credential matching and
   typed authentication fallback when registration omits PRF output
@@ -70,7 +71,10 @@ Last reviewed: **2026-07-28** (package version **1.5.1**, unified passkey experi
   remains consumer-owned)
 - Passkey crypto failure classifier (`classifyPasskeyCryptoError`, `getDefaultPasskeyCryptoErrorMessage`, `PasskeyCryptoFailureKind`)
 
-## Emergency / duress mode (shipped)
+## Emergency / duress mode (shipped, opt-in)
+
+Disabled by default (`VAULT_EMERGENCY_MODE_ENABLED=false`). Consumer screens, status, long-press
+gestures, and the 2 s passkey delay appear only after explicit env/admin opt-in.
 
 - Decoy vault record schemas (`vaultDecoyRecordSchema`, `vaultSetupWithDecoySchema`)
 - Server metadata schema (`vaultEmergencyServerMetadataSchema`)
@@ -80,7 +84,8 @@ Last reviewed: **2026-07-28** (package version **1.5.1**, unified passkey experi
 - Browser session mode (`VaultSessionMode`, `getVaultSessionMode`, `isVaultEmergencyMode`)
 - Emergency unlock/exit (`unlockVaultWithPasswordRouting`, `unlockVaultWithPasskeyRouting`, `exitEmergencyMode`)
 - React long-press hook (`useLongPressDuressSignal`)
-- Dock 2 s passkey auto-start delay (`passkeyAutoStartDelayMs`)
+- Explicit React/status feature gate (`emergencyModeEnabled`); dock passkey auto-start is immediate
+  by default and uses the 2 s delay only while emergency mode is enabled
 - Testing fixtures (`assertVaultSessionMode`, `createPrimaryDecoyVaultFixture`)
 
 See [ADR 0001](./adr/0001-emergency-duress-mode.md).
@@ -177,7 +182,7 @@ Exported from `@tgoliveira/vault-core/react` (styles: `vc-status-dock-*` in `vau
 
 | Export | Purpose |
 | --- | --- |
-| `VaultStatusDock` | Header-attached collapsible lock/unlock handle and expanded panel (`passkeyAutoStartDelayMs` default 2000, `onDuressSignalChange`, handle long-press) |
+| `VaultStatusDock` | Header-attached collapsible lock/unlock handle and expanded panel (`passkeyAutoStartDelayMs` default 0, or 2000 after emergency opt-in; optional long-press) |
 | `VaultDockQuickUnlock` | Compact password or passkey primary unlock for the dock (auto-focus password, expand-sync passkey auto-start via `bindAutoStartPasskey`, `passkeyOptionsReady`, passkey button long-press) |
 | `classifyPasskeyUnlockFailure` / `PasskeyUnlockFailureKind` | Passkey failure classification for dock redirect and callbacks |
 | `tryConsumePasskeyAutoStart` / `resetPasskeyAutoStartDedupe` | Short-TTL sessionStorage dedupe for dock passkey auto-start |
@@ -244,8 +249,3 @@ paths only (`/vault`, not `//evil` or `https://…`).
 - Product-specific payload schemas on the default entry
 - Automatic npm publish on merge or tag
 - **`apps/consumer-demo/`** — local Next.js reference app in the git repo only (not in npm tarball); mounts all vault admin UI pages at `/admin/vault/*`, persists admin overrides in Postgres, exposes `/api/vault/admin/config`
-
-## Planned / not yet shipped
-
-- Consumer demo: vault setup and unlock flows (custom app UI — not exported as pages from vault-core;
-  demo uses `VaultUnlockPanel` at `/vault/unlock` with `next` return-path support)

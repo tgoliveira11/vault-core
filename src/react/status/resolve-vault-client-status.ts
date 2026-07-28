@@ -14,6 +14,8 @@ export type VaultServerStatusSnapshot = {
   passkeyUnlockAvailableOnThisBrowser?: boolean;
   /** @deprecated Use passkeyUnlockAvailableOnThisBrowser. */
   passkeyUnlockAvailableOnThisDevice?: boolean;
+  /** Explicit feature gate. Emergency state is ignored unless this is true. */
+  emergencyModeEnabled?: boolean;
   emergencyModeActive?: boolean;
   decoyConfigured?: boolean;
 };
@@ -27,7 +29,8 @@ export function resolveVaultClientStatus(
     return "not_setup";
   }
 
-  const emergencyActive = status.emergencyModeActive === true;
+  const emergencyActive =
+    status.emergencyModeEnabled === true && status.emergencyModeActive === true;
 
   if (unlocked) {
     return emergencyActive ? "emergency_unlocked" : "unlocked";

@@ -10,7 +10,6 @@ import {
   type VaultStatusDockLinkProps,
 } from "@tgoliveira/vault-core/react";
 import {
-  hydrateDemoEmergencyFromServer,
   isDemoPasskeyUnlockAvailable,
   unlockDemoVault,
   unlockDemoVaultWithPasskey,
@@ -30,12 +29,12 @@ function DemoLink({ href, className, children, onClick }: VaultStatusDockLinkPro
 
 const UNLOCK_PATH = "/vault/unlock";
 
-function VaultStatusDockClientInner() {
+function VaultStatusDockClientInner({ emergencyModeEnabled }: { emergencyModeEnabled: boolean }) {
   const router = useRouter();
   const pathname = usePathname();
   const [configured, setConfigured] = useState(false);
   const [serverStatus, setServerStatus] = useState(
-    getDemoServerStatusSnapshot(false, false)
+    getDemoServerStatusSnapshot(false, false, emergencyModeEnabled)
   );
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -43,20 +42,23 @@ function VaultStatusDockClientInner() {
   const passkeySupport = getDemoPasskeySupport();
 
   useEffect(() => {
-    hydrateDemoEmergencyFromServer();
     const vaultConfigured = isVaultConfigured();
     setConfigured(vaultConfigured);
     const record = loadVaultRecord();
     setServerStatus(
-      getDemoServerStatusSnapshot(vaultConfigured, Boolean(record?.passkeyPrfEnvelope))
+      getDemoServerStatusSnapshot(
+        vaultConfigured,
+        Boolean(record?.passkeyPrfEnvelope),
+        emergencyModeEnabled
+      )
     );
-  }, [pathname]);
+  }, [emergencyModeEnabled, pathname]);
 
   const handleUnlockPassword = useCallback(async (password: string) => {
     setError(null);
     setLoading(true);
     try {
-      await unlockDemoVault(password);
+      await unlockDemoVault(password, { emergencyModeEnabled });
     } catch {
       setError("Unlock failed. Check your vault password and try again.");
       throw new Error("unlock failed");
@@ -64,14 +66,15 @@ function VaultStatusDockClientInner() {
       setLoading(false);
       duressSignaledRef.current = false;
     }
-  }, []);
+  }, [emergencyModeEnabled]);
 
   const handleUnlockPasskey = useCallback(async () => {
     setError(null);
     setLoading(true);
     try {
       await unlockDemoVaultWithPasskey({
-        duressSignaled: duressSignaledRef.current,
+        duressSignaled: emergencyModeEnabled && duressSignaledRef.current,
+        emergencyModeEnabled,
       });
     } catch (caught) {
       setError(caught instanceof Error ? caught.message : "Passkey unlock failed.");
@@ -80,7 +83,7 @@ function VaultStatusDockClientInner() {
       setLoading(false);
       duressSignaledRef.current = false;
     }
-  }, []);
+  }, [emergencyModeEnabled]);
 
   const handleNavigateToUnlock = useCallback(
     (href: string) => {
@@ -98,9 +101,14 @@ function VaultStatusDockClientInner() {
       unlockPath={UNLOCK_PATH}
       buildUnlockHref={(returnPath) => buildVaultUnlockHref(UNLOCK_PATH, returnPath)}
       onNavigateToUnlock={handleNavigateToUnlock}
-      onDuressSignalChange={(signaled) => {
-        duressSignaledRef.current = signaled;
-      }}
+      emergencyModeEnabled={emergencyModeEnabled}
+      onDuressSignalChange={
+        emergencyModeEnabled
+          ? (signaled) => {
+              duressSignaledRef.current = signaled;
+            }
+          : undefined
+      }
       loading={loading}
       unlockError={error}
       LinkComponent={DemoLink}
@@ -126,6 +134,7 @@ function VaultStatusDockClientInner() {
           passkeyReady={isDemoPasskeyUnlockAvailable()}
           passkeyOptionsReady={passkeySupport.prf}
           bindAutoStartPasskey={bindAutoStartPasskey}
+          emergencyModeEnabled={emergencyModeEnabled}
           onPasskeyUnlockFailed={onPasskeyUnlockFailed}
           onPasskeyUnlockCancelled={onPasskeyUnlockCancelled}
           duressSignaled={duressSignaled}
@@ -139,6 +148,10 @@ function VaultStatusDockClientInner() {
   );
 }
 
-export function VaultStatusDockClient() {
-  return <VaultStatusDockClientInner />;
+export function VaultStatusDockClient({
+  emergencyModeEnabled,
+}: {
+  emergencyModeEnabled: boolean;
+}) {
+  return <VaultStatusDockClientInner emergencyModeEnabled={emergencyModeEnabled} />;
 }

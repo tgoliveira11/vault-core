@@ -44,6 +44,13 @@ Before marking vault integration complete, verify every item below.
   PRF only through **`resolvePasskeyPrfEnrollmentAfterRegistration()`** after server verification
   returns the exact same credential ID. Use a second authentication only when the resolver returns
   `authentication_required`; WebAuthn fallback cannot run silently in the background.
+- [ ] If a WebAuthn library converts challenge/credential JSON but passes extension inputs through
+  (for example SimpleWebAuthn), call the existing preparation helper without `prepareJson`: encoded
+  server fields stay intact while the PRF salt remains the native `ArrayBuffer` required by WebAuthn.
+- [ ] If one credential is opted into both account login and vault unlock, use one authoritative
+  server counter/verifier, distinct challenge audiences, PRF sanitization plus server rejection,
+  and never unwrap before the account session (including 2FA) is complete. Follow
+  [`PASSKEY_ACCOUNT_AUTH_INTEROPERABILITY.md`](./PASSKEY_ACCOUNT_AUTH_INTEROPERABILITY.md).
 - [ ] Scope bound credential requests fail closed. Use an explicit exact, allow-list, or discoverable
   selection and preserve stored transports unless a documented compatibility policy requires otherwise.
 - [ ] Verify the WebAuthn assertion server-side before returning at most five active variants for that
@@ -65,10 +72,13 @@ Before marking vault integration complete, verify every item below.
 - [ ] If emergency/duress passkey candidate routing returns `no_match`, keep the vault locked and use
   password/recovery routing. Do not install or persist a compatibility result until a confirmed normal
   primary context.
-- [ ] Persist **`emergencyModeActive`** server-side; hydrate with **`hydrateVaultEmergencyModeFromServer()`**
-  on authenticated load. Clear the flag only through **`exitEmergencyMode()`** (primary recovery phrase).
-- [ ] Rate-limit **`emergency_exit`** unlock action separately from password/passkey unlock.
-- [ ] Wire dock **`onDuressSignalChange`** / long-press latch into passkey unlock orchestration.
+- [ ] When emergency/duress mode is explicitly enabled, persist **`emergencyModeActive`**
+  server-side; hydrate with **`hydrateVaultEmergencyModeFromServer()`** on authenticated load. Clear
+  the flag only through **`exitEmergencyMode()`** (primary recovery phrase).
+- [ ] When emergency/duress mode is explicitly enabled, rate-limit **`emergency_exit`** unlock
+  action separately from password/passkey unlock.
+- [ ] When emergency/duress mode is explicitly enabled, wire dock **`onDuressSignalChange`** /
+  long-press latch into passkey unlock orchestration.
 
 ### 3. Locked vs unlocked access in application code
 

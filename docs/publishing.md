@@ -127,7 +127,3 @@ Requires `id-token: write`, Node ≥ 22.14, npm ≥ 11.5.1. The workflow uses No
 The publish workflow merges release metadata to `main` via an automated pull request when the version changes. Branch protection must allow PR merge without human approval (`required_approving_review_count: 0`). See [repo-settings.md](./repo-settings.md).
 
 Human contributors and AI agents must not push directly to `main`.
-
-## Legacy doc
-
-[RELEASING.md](./RELEASING.md) redirects here for the canonical release documentation.

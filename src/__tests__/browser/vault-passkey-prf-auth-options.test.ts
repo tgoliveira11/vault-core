@@ -87,6 +87,26 @@ describe("prepareVaultPasskeyPrfAuthenticationOptions", () => {
     expect(prepared.extensions?.prf?.eval?.first).toBeInstanceOf(ArrayBuffer);
   });
 
+  it("preserves server JSON fields while adding a native PRF extension for browser libraries", async () => {
+    const serverOptions = {
+      challenge: "base64url-challenge",
+      allowCredentials: [{ id: CREDENTIAL_ID, type: "public-key" as const }],
+    };
+    const prepared = await prepareVaultPasskeyPrfAuthenticationOptions({
+      userId: USER_ID,
+      prfSaltPrefix: PRF_PREFIX,
+      serverOptions,
+      credentialSelection: { mode: "exact", credentialId: CREDENTIAL_ID },
+    });
+
+    expect(prepared.challenge).toBe("base64url-challenge");
+    expect(prepared.allowCredentials).toEqual([
+      { id: CREDENTIAL_ID, type: "public-key" },
+    ]);
+    expect(prepared.extensions?.prf?.eval?.first).toBeInstanceOf(ArrayBuffer);
+    expect(serverOptions).not.toHaveProperty("extensions");
+  });
+
   it("fails when strict scoping omits the credential id", async () => {
     await expect(prepareVaultPasskeyPrfAuthenticationOptions({
       userId: USER_ID,

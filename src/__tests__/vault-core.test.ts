@@ -546,7 +546,7 @@ describe("package boundary", () => {
       "SECURITY.md",
       "docs/README.md",
       "docs/IMPLEMENTATION_GUIDE.md",
-      "docs/RELEASING.md",
+      "docs/publishing.md",
     ]) {
       expect(
         readFileSync(path.join(__dirname, "..", "..", documentationPath), "utf8").length,
