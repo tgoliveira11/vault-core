@@ -8,6 +8,21 @@ major version; compatible corrections should retain explicit deprecation and mig
 
 ## [Unreleased]
 
+### Fixed
+
+- Passkey PRF enrollment now always requires one exact post-registration authentication ceremony
+  before creating the first durable vault envelope. Registration can still confirm PRF capability,
+  but its `create()` output is no longer treated as authoritative for later `get()` unlocks.
+
+### Security
+
+- Prevented consumers from persisting registration-derived PRF output as the only envelope variant.
+  Some browser/provider implementations can return a different PRF output during subsequent
+  authentication even for the same credential, browser, provider, and device. The owned
+  registration snapshot is zeroed and the typed result now requires exact-credential authentication.
+  Consumer guidance now forbids registration verification from authorizing durable envelope
+  persistence; that single-use proof must follow verified authentication.
+
 ## [1.6.0] - 2026-07-28
 
 ### Added

@@ -74,19 +74,19 @@ native `ArrayBuffer` it passes through to `navigator.credentials.create()`.
 authentication package that offers composable hooks must also sanitize internally and its server
 must fail closed if PRF is present.
 
-## Account-first: one creation ceremony
+## Account-first: creation plus vault PRF confirmation
 
 1. Start normal account passkey registration with account-auth server options.
 2. In its optional preparation hook, call
    `prepareVaultPasskeyPrfRegistrationOptions({ userId, prfSaltPrefix, serverOptions })`.
-3. Run one WebAuthn creation ceremony. Retain `clientExtensionResults` only in memory and send the
+3. Run the WebAuthn creation ceremony. Retain `clientExtensionResults` only in memory and send the
    sanitized registration response to the authentication server.
 4. After verification, require the browser registration credential ID to equal the server-verified
    ID and call `resolvePasskeyPrfEnrollmentAfterRegistration()`.
-5. Create the vault envelope only while the primary vault is unlocked or after independent local
-   password/recovery authorization. Persist the envelope append-only and enable the vault capability
-   atomically. If registration did not return PRF output, use the resolver's exact-credential
-   authentication fallback; do not repeat registration.
+5. Run the resolver's exact-credential authentication, verify and sanitize that assertion, and use
+   only its authentication PRF to create the first durable vault envelope. The primary vault must be
+   unlocked or independently authorized by local password/recovery. Persist append-only and enable
+   the vault capability atomically; never repeat registration.
 
 Failure to add the vault capability must leave a valid account-login credential. Retrying vault
 enrollment is an independent operation.

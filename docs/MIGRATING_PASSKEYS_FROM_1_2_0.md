@@ -134,13 +134,13 @@ const enrollment = resolvePasskeyPrfEnrollmentAfterRegistration({
   verifiedCredentialId: registrationVerification.verifiedCredentialId,
   clientExtensionResults: createdCredential.getClientExtensionResults() as Record<string, unknown>,
 });
-// ready: use registration PRF once; authentication_required: run the exact get() fallback.
+// authentication_required: run the exact get() ceremony before creating a durable envelope.
 void enrollment;
 ```
 
 - API/user-agent inspection returns only `heuristic` or `unavailable`.
-- Registration capability is confirmed by `prf.enabled === true`; enrollment is immediately ready
-  only when the server-verified credential ID matches and creation also returned a usable PRF output.
+- Registration capability is confirmed by `prf.enabled === true`; confirmed enrollment still
+  requires exact-credential authentication before creating a durable envelope.
 - Authentication is confirmed only by a valid result for the asserted credential.
 - Missing/invalid ceremony results return `incompatible`.
 

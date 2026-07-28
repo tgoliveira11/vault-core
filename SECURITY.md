@@ -89,14 +89,21 @@ not require a browser binding and defaults to the authenticated account's allow-
 auto-start. `VaultUnlockPanel` requires that ready quick plan and a separate quick callback for
 auto-start; it never auto-starts the explicit callback.
 
-Treat API/user-agent PRF detection as preliminary only. During enrollment, request `prf.eval.first`
-in registration and accept its output only after server verification returns the exact same credential
-ID. `resolvePasskeyPrfEnrollmentAfterRegistration()` enforces that boundary and tells the app when a
-second authentication ceremony is actually required. Authentication PRF is confirmed only for the
-server-verified assertion credential. PRF output and hashes stay client-only; note that serializing a
-`PublicKeyCredential` can include extension results, so remove PRF results with
+Treat API/user-agent PRF detection as preliminary only. During enrollment, registration may confirm
+PRF capability, but never persist its `create()` output as the only durable envelope variant.
+`resolvePasskeyPrfEnrollmentAfterRegistration()` validates the exact server-verified credential and
+always requires a post-registration authentication ceremony for confirmed PRF credentials. Only the
+PRF returned by that exact `get()` ceremony is authoritative for future unlocks. Authentication PRF
+is confirmed only for the server-verified assertion credential. PRF output and hashes stay
+client-only; note that serializing a `PublicKeyCredential` can include extension results, so remove
+PRF results with
 `sanitizeWebAuthnResponseForServer()` (or an equally strict app-owned serializer) before sending
 WebAuthn data to a server.
+
+Registration verification must not mint a proof that authorizes durable passkey-envelope
+persistence. The application may issue that short-lived, single-use persistence proof only after it
+has verified the exact post-registration authentication assertion. This prevents a consumer from
+bypassing the authentication-confirmed PRF requirement while still using the safe resolver result.
 
 Browser libraries such as SimpleWebAuthn may convert challenge, user, and credential IDs while
 passing extension inputs through unchanged. Compose their server options with the existing

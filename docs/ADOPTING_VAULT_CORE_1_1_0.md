@@ -121,9 +121,9 @@ Wire these to the package `VaultPasskeyBindingStore` contract (`getBindingId`,
 #### b. After passkey registration or enroll success
 
 Prepare registration with `prepareVaultPasskeyPrfRegistrationOptions()` and resolve it with
-`resolvePasskeyPrfEnrollmentAfterRegistration()` after server verification. When its status is
-`ready`, create the envelope from that registration PRF without a second prompt. Run the existing
-exact-credential authentication path only for `authentication_required`.
+`resolvePasskeyPrfEnrollmentAfterRegistration()` after server verification. A confirmed credential
+returns `authentication_required`; run the existing exact-credential authentication path and create
+the durable envelope only from its `get()` PRF output.
 
 After the envelope is persisted, create an opaque binding so this browser routes to the new
 credential:
@@ -607,8 +607,8 @@ See [IMPLEMENTATION_GUIDE.md](./IMPLEMENTATION_GUIDE.md) §12 and
 - [ ] Safari and Chrome passkey unlock extract PRF via `extractPasskeyPrfOutput`.
 - [ ] Preliminary PRF heuristic is not treated as a confirmed credential capability; password/recovery remains offered.
 - [ ] iOS 18+ passkey unlock uses `prepareVaultUnlockAuthenticationOptions` (single-credential `eval`).
-- [ ] Registration uses `prepareVaultPasskeyPrfRegistrationOptions()` and consumes its PRF after
-  exact server-verified credential matching; `get()` runs only for typed enrollment fallback.
+- [ ] Registration uses `prepareVaultPasskeyPrfRegistrationOptions()` for capability confirmation;
+  after exact server verification, a credential-scoped `get()` supplies the durable-envelope PRF.
 - [ ] Passkey enable **fallback**, disable, and re-wrap authentication ceremonies use the same PRF
   prep helper as unlock (`prepareVaultPasskeyPrfAuthenticationOptions`).
 - [ ] Preserve known-good envelopes; after recovery authorization, add a compatibility variant when a
