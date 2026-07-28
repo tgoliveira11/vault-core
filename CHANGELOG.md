@@ -8,6 +8,8 @@ major version; compatible corrections should retain explicit deprecation and mig
 
 ## [Unreleased]
 
+## [1.6.1] - 2026-07-28
+
 ### Fixed
 
 - Passkey PRF enrollment now always requires one exact post-registration authentication ceremony
