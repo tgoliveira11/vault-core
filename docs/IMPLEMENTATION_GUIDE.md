@@ -102,8 +102,9 @@ export type StoredVaultRecord = {
 
 Each passkey state keeps three identities separate: one logical WebAuthn credential, zero or many
 opaque browser bindings, and one or more PRF envelope variants. A synced multi-device credential can
-be used from another device without creating a second credential. Treat bindings only as routing
-metadata; they are neither credential IDs nor authorization factors.
+authenticate from another device without creating a second credential, but that does not guarantee
+the same PRF-derived vault key there. Treat bindings only as routing metadata; they are neither
+credential IDs nor authorization factors.
 
 The server may store these structures because ciphertext, IV, salt, bounded KDF metadata, and AAD are
 not plaintext secrets. The server must never receive the vault password, recovery phrase, UVK, PRF
@@ -118,7 +119,7 @@ const record = vaultSetupEnvelopeFieldsSchema.parse(untrustedDatabaseValue);
 ```
 
 The envelope schemas are discriminated by `method`. Password and recovery envelopes require
-Argon2id metadata; passkey PRF envelopes require `kdfMetadata: null`. Validate each portable passkey
+Argon2id metadata; passkey PRF envelopes require `kdfMetadata: null`. Validate each logical passkey
 record with `vaultPasskeyCredentialStateSchema`. See
 [MIGRATING_PASSKEYS_FROM_1_2_0.md](./MIGRATING_PASSKEYS_FROM_1_2_0.md) before migrating existing
 single-binding records.
@@ -315,13 +316,19 @@ replace the old password envelope atomically on the server.
 
 ## 9. Passkey PRF integration
 
+> **Legacy records only.** PRF output is not a guaranteed cross-device secret even when the
+> WebAuthn credential syncs. For new one-enrollment cross-device passkey unlock, use
+> [the portable broker flow](./PORTABLE_PASSKEY_BROKER.md). Keep this section only to read, migrate,
+> and safely retire existing `passkey_prf` envelopes.
+
 **Upgrading from 1.0.x?** See [ADOPTING_VAULT_CORE_1_1_0.md](./ADOPTING_VAULT_CORE_1_1_0.md) for
 what to import vs delete (inner-key cache, WebAuthn prep, legacy AAD, device binding, classifiers).
 
 The package does not run WebAuthn ceremonies. The application must request the PRF extension and pass
 the first PRF result to vault-core. Use the browser helpers below for both creation and authentication
-options (canonical salt, iOS `eval` parity, salt coercion, fail-closed credential selection, and an
-explicit transport policy). Stored transports are preserved by default.
+options. Authentication preparation replaces any server PRF input with one canonical user-scoped
+`prf.eval.first`, requires user verification, coerces the salt, applies fail-closed credential
+selection, and uses an explicit transport policy. Stored transports are preserved by default.
 
 ### PRF registration and authentication ceremonies
 

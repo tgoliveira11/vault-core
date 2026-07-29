@@ -4,7 +4,8 @@
 
 Account login, password reset, TOTP, OAuth, and passkey **login** must not unlock the vault.
 
-Vault unlock requires a separate vault password, recovery phrase, or passkey PRF envelope.
+Vault unlock requires a separate vault password, recovery phrase, legacy passkey PRF envelope, or
+an explicitly authorized portable-broker envelope.
 
 One WebAuthn credential may be explicitly opted into both passkey login and vault PRF, but the
 capabilities, challenges, verification outcomes, server sessions, and lifecycle flags remain
@@ -12,13 +13,21 @@ independent. Login never implies vault unlock. A shared credential increases com
 compared with separate credentials and requires informed user choice. See
 [the interoperability contract](docs/PASSKEY_ACCOUNT_AUTH_INTEROPERABILITY.md).
 
-## Server must never receive
+## Application server must never receive
 
 - Vault password
 - Recovery phrase (plaintext)
 - User Vault Key
 - PRF output
 - Decrypted vault payload
+
+The optional portable broker is a separate trusted security boundary. It receives a random PUK
+during enrollment and can recover that PUK at runtime; the application server must not proxy or log
+it. A PUK plus its encrypted UVK envelope can restore the UVK, so this architecture is not
+zero-knowledge against simultaneous compromise of broker runtime, KEK, and database. Use isolated
+application-specific KEKs, pairwise opaque subjects, short-lived single-use grants, ephemeral-key
+binding, completion receipts, replay protection, rate limits, and audited key rotation. See
+[the portable broker security contract](docs/PORTABLE_PASSKEY_BROKER.md).
 
 Use `assertNoVaultPlaintextFields()` on API request bodies. The guard recursively checks nested
 objects and arrays and safely handles cyclic in-memory objects.
@@ -78,6 +87,11 @@ trusted.
 Never log vault secrets, request bodies containing envelopes, or decrypted payloads.
 
 ## Passkey credential and PRF boundaries
+
+PRF envelopes are a legacy compatibility mechanism, not the recommended cross-device portability
+contract. A synced WebAuthn credential does not guarantee stable PRF output across devices,
+providers, platforms, or `create()`/`get()` ceremonies. Preserve these APIs for existing ciphertext;
+use the trusted portable broker for a one-enrollment cross-device product requirement.
 
 A synced/multi-device WebAuthn credential is one logical credential, not one credential per physical
 device. Optional browser bindings are opaque routing/UX state; possession of a binding is not WebAuthn

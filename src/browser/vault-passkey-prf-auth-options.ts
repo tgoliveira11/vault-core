@@ -36,51 +36,16 @@ export type PrepareVaultPasskeyPrfAuthenticationOptionsInput<
   prepareJson?: (options: T) => PublicKeyCredentialRequestOptionsInput;
 };
 
-function resolveCredentialIdForPrf(
-  options: PublicKeyCredentialRequestOptionsInput,
-  credentialId?: string
-): string | undefined {
-  if (credentialId) {
-    return credentialId;
-  }
-
-  if (options.allowCredentials?.length === 1) {
-    return options.allowCredentials[0]?.id;
-  }
-
-  return undefined;
-}
-
 function mergePrfSaltExtensions(
   options: PublicKeyCredentialRequestOptionsInput,
-  salt: ArrayBuffer,
-  credentialId?: string
+  salt: ArrayBuffer
 ): PublicKeyCredentialRequestOptionsInput {
-  const targetCredentialId = resolveCredentialIdForPrf(options, credentialId);
-  const existingPrf = options.extensions?.prf;
-
-  if (targetCredentialId) {
-    return {
-      ...options,
-      extensions: {
-        ...options.extensions,
-        prf: {
-          ...existingPrf,
-          evalByCredential: {
-            ...existingPrf?.evalByCredential,
-            [targetCredentialId]: { first: salt },
-          },
-        },
-      },
-    };
-  }
-
   return {
     ...options,
+    userVerification: "required",
     extensions: {
       ...options.extensions,
       prf: {
-        ...existingPrf,
         eval: { first: salt },
       },
     },
@@ -92,9 +57,10 @@ function mergePrfSaltExtensions(
  * passkey enable/disable, envelope re-wrap, or other management flows that feed PRF output into
  * `createPasskeyPrfEnvelope*` or `unwrapVaultKeyFromPasskey*`.
  *
- * Pipeline: optional JSON preparer → merge PRF salt from `buildPrfSaltBytes` → optional strict
- * credential scoping → `prepareVaultUnlockAuthenticationOptions` (salt coercion, iOS `eval`
- * parity, explicit transport policy).
+ * Pipeline: optional JSON preparer → replace any server PRF input with one canonical
+ * `prf.eval.first` from `buildPrfSaltBytes` and require user verification → optional strict
+ * credential scoping → `prepareVaultUnlockAuthenticationOptions` (salt coercion and explicit
+ * transport policy).
  */
 export async function prepareVaultPasskeyPrfAuthenticationOptions<
   T extends PublicKeyCredentialRequestOptionsInput,
@@ -151,7 +117,7 @@ export async function prepareVaultPasskeyPrfAuthenticationOptions<
     : credentialSelection?.mode === "exact"
       ? credentialSelection.credentialId
       : credentialId;
-  options = mergePrfSaltExtensions(options, salt, effectiveCredentialId);
+  options = mergePrfSaltExtensions(options, salt);
 
   if (credentialSelection) {
     options = selectAuthenticationCredentials(options, credentialSelection);

@@ -77,6 +77,20 @@ export {
   type PasskeyPrfAuthenticationExtensionsJson,
 } from "./browser/prf-salt-bytes.js";
 
+export {
+  createPortableVaultBrokerEnrollmentPackage,
+  createPortableVaultBrokerUnlockSession,
+  isPortableVaultBrokerUnlockResponse,
+  portableVaultBrokerEnrollmentRequestSchema,
+  serializePortableVaultBrokerEnrollmentPackage,
+  unlockPortableVaultBrokerResponse,
+  type PortableVaultBrokerClientUnlockResult,
+  type PortableVaultBrokerEnrollmentPackage,
+  type PortableVaultBrokerEnrollmentRequest,
+  type PortableVaultBrokerEphemeralPublicJwk,
+  type PortableVaultBrokerUnlockSession,
+} from "./browser/portable-vault-broker.js";
+
 export function createRecoveryKitDownload(
   content: string,
   filename: string

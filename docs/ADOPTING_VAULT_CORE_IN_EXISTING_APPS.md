@@ -1,5 +1,9 @@
 # Adopting vault-core in an existing application
 
+> For new one-enrollment cross-device passkey unlock, the canonical target is
+> [the portable broker architecture](./PORTABLE_PASSKEY_BROKER.md). PRF guidance below applies only
+> to preserving and migrating legacy `passkey_prf` records.
+
 Use this guide to replace duplicated app-local vault primitives with
 `@tgoliveira/vault-core` without changing existing ciphertext, AAD, PRF derivation, or product
 payload contracts.
@@ -107,7 +111,8 @@ localStorage, sessionStorage, IndexedDB, cookies, URLs, or server sessions.
 ### 6. Migrate passkeys as logical credentials
 
 A synced WebAuthn credential is one logical credential with optional browser bindings and one or
-more append-only envelope variants. Bindings are UX/routing hints, not authentication proof.
+more append-only legacy PRF envelope variants. Bindings are UX/routing hints, not authentication
+proof, and credential sync does not guarantee PRF-key sync.
 
 - explicit unlock uses `resolvePasskeyUnlockPlan({ intent: "explicit", ... })` and remains available
   without a binding;

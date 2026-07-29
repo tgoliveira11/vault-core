@@ -1,5 +1,9 @@
 # Adopting unified passkey unlock from 1.5.1
 
+> **Historical PRF migration guide.** This model does not guarantee that one synced credential
+> produces one PRF key on every device. Do not use it as the target architecture for new portable
+> unlock. Use [the trusted portable broker](./PORTABLE_PASSKEY_BROKER.md).
+
 This release does not change the database model, PRF salt, AAD, credential ID, or existing envelope
 ciphertext. Existing passkeys do not need to be deleted or recreated.
 
@@ -206,7 +210,8 @@ quick unlock.
 ## Acceptance checks
 
 - Existing passkey unlock still works in its original browser.
-- The same synced credential unlocks from a new browser with no binding or cookie.
+- A synced credential can authenticate from a new browser with no binding or cookie; vault unwrap
+  succeeds only when that provider happens to return a PRF matching an existing legacy variant.
 - A missing/stale binding does not hide the full-page action and does not auto-start WebAuthn.
 - A successful later candidate persists its opaque selected variant ID.
 - `no_match` cannot create a variant from session UVK/binding/passkey alone.

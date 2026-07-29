@@ -1,5 +1,10 @@
 # Passkey account-auth and vault interoperability
 
+> The portable broker contract now supersedes PRF as the recommended cross-device vault-unlock
+> architecture. The PRF sections below remain valid only for legacy envelopes. Reusing one WebAuthn
+> credential still does not merge account-login and vault-unlock authorization domains. See
+> [PORTABLE_PASSKEY_BROKER.md](./PORTABLE_PASSKEY_BROKER.md).
+
 This guide defines how one WebAuthn credential may be used for both account authentication and
 vault PRF unlock without merging their authorization domains. The capability is optional: consumers
 must continue to support separate account and vault credentials.

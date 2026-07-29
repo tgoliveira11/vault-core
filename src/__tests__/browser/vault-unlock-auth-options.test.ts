@@ -36,8 +36,39 @@ describe("prepareVaultUnlockAuthenticationOptions", () => {
     expect(prepared.allowCredentials).toHaveLength(1);
     expect(prepared.allowCredentials?.[0]?.id).toBe(CREDENTIAL_A);
     expect(prepared.allowCredentials?.[0]?.transports).toEqual(["internal"]);
+    expect(prepared.userVerification).toBe("required");
     expect(prepared.extensions?.prf?.eval?.first).toBeInstanceOf(ArrayBuffer);
     expect(prepared.extensions?.prf?.evalByCredential).toBeUndefined();
+  });
+
+  it("canonicalizes a hydrated server eval across an allow-list", () => {
+    const prepared = prepareVaultUnlockAuthenticationOptions(
+      {
+        challenge: new Uint8Array(32),
+        userVerification: "preferred",
+        allowCredentials: [
+          { id: CREDENTIAL_A, type: "public-key" },
+          { id: CREDENTIAL_B, type: "public-key" },
+        ],
+        extensions: {
+          credProps: true,
+          prf: {
+            eval: { first: bytesToBase64Url(SALT), second: new Uint8Array(32).fill(7) },
+            evalByCredential: {
+              [CREDENTIAL_A]: { first: new Uint8Array(32).fill(8) },
+            },
+          },
+        },
+      },
+      { credentialSelection: { mode: "allow-list" } }
+    );
+
+    expect(prepared.userVerification).toBe("required");
+    expect(prepared.extensions?.credProps).toBe(true);
+    expect(prepared.extensions?.prf?.eval?.first).toBeInstanceOf(ArrayBuffer);
+    expect(prepared.extensions?.prf?.eval?.second).toBeUndefined();
+    expect(prepared.extensions?.prf?.evalByCredential).toBeUndefined();
+    expect(new Uint8Array(prepared.extensions?.prf?.eval?.first as ArrayBuffer)).toEqual(SALT);
   });
 
   it("fails closed when credentialId is not in allowCredentials", () => {
