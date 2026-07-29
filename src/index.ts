@@ -109,3 +109,8 @@ export type { VaultUnlockResult } from "./profile.js";
 
 export * from "./admin/index.js";
 export * from "./rate-limit/index.js";
+
+export {
+  buildPasskeyPrfAuthenticationExtensionsJson,
+  type PasskeyPrfAuthenticationExtensionsJson,
+} from "./browser/prf-salt-bytes.js";

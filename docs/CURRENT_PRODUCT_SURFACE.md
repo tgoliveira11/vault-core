@@ -2,8 +2,7 @@
 
 Living inventory of what `@tgoliveira/vault-core` exposes today. Update this file when exports, admin screens, published artifacts, or shipped/planned status changes.
 
-Last reviewed: **2026-07-28** (package version **1.6.0**, authentication-confirmed passkey enrollment
-in Unreleased)
+Last reviewed: **2026-07-28** (package version **1.7.0**, server-side PRF salt options helper)
 
 
 ## Package entry points (shipped)
@@ -32,7 +31,8 @@ in Unreleased)
 - Passkey PRF envelope wrap/unwrap, including bounded local candidate-variant matching (no WebAuthn ceremony)
 - Robust `extractPasskeyPrfOutput` with Safari `evalByCredential` preference and byte coercion
 - Typed `sanitizeWebAuthnResponseForServer` removal of PRF extension results before server serialization
-- WebAuthn PRF ceremony prep (`prepareWebAuthnPrfExtensions`, `alignPrfExtensionsForCredential`,
+- WebAuthn PRF ceremony prep (`buildPasskeyPrfAuthenticationExtensionsJson`,
+  `prepareWebAuthnPrfExtensions`, `alignPrfExtensionsForCredential`,
   `applyVaultUnlockTransportPolicy`, `prepareVaultUnlockAuthenticationOptions`,
   `prepareVaultPasskeyPrfAuthenticationOptions`, `prepareVaultPasskeyPrfRegistrationOptions`),
   including mixed server-JSON/native-extension composition for browser libraries
