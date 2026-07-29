@@ -54,20 +54,23 @@ import {
   type VaultCryptoProfile,
 } from "@tgoliveira/vault-core";
 import {
-  createPortableVaultBrokerEnrollmentPackage,
+  createPortableVaultBrokerEnrollmentPackageWithSessionCache,
   serializePortableVaultBrokerEnrollmentPackage,
+  type VaultSessionOperation,
 } from "@tgoliveira/vault-core/browser";
 
 declare const vaultKey: CryptoKey;
 declare const brokerEnrollmentGrant: string;
 declare const brokerUrl: string;
 declare const profile: VaultCryptoProfile;
+declare const operation: VaultSessionOperation;
 
 const opaqueScope = generatePortableVaultOpaqueAadScope();
-const enrollment = await createPortableVaultBrokerEnrollmentPackage({
+const enrollment = await createPortableVaultBrokerEnrollmentPackageWithSessionCache({
   vaultKey,
   opaqueScope,
   profile,
+  operation,
 });
 
 try {
@@ -89,6 +92,11 @@ try {
 
 Send the PUK directly from the browser to the trusted broker. Never proxy it through the application
 server, store it in browser storage, log it, add it to analytics, or retain the serialized request.
+The cache-aware helper is the required enrollment API for an already-open vault: it re-wraps the
+inner key material retained only in the current owner-scoped browser session, so a non-extractable
+UVK is never exported and the user does not have to enter a password or recovery phrase again. The
+lower-level `createPortableVaultBrokerEnrollmentPackage()` remains appropriate only for the first
+envelope created immediately with a fresh extractable `createUserVaultKey()` result.
 
 ## Unlock
 
@@ -100,12 +108,15 @@ import type {
 import {
   createPortableVaultBrokerUnlockSession,
   unlockPortableVaultBrokerResponse,
+  type VaultSessionOperation,
 } from "@tgoliveira/vault-core/browser";
 
 declare const brokerEnvelopeId: string;
 declare const brokerUrl: string;
 declare const expectedOpaqueScope: PortableVaultOpaqueAadScope;
 declare const profile: VaultCryptoProfile;
+declare const operation: VaultSessionOperation;
+declare function verifyAndConsumeBrokerReceipt(receipt: string): Promise<void>;
 declare function requestVerifiedUnlockGrant(input: {
   brokerEnvelopeId: string;
   ephemeralKeyThumbprint: string;
@@ -130,15 +141,23 @@ const result = await unlockPortableVaultBrokerResponse({
   session,
   expectedOpaqueScope,
   profile,
+  operation,
+  verifyAndConsumeCompletionReceipt: verifyAndConsumeBrokerReceipt,
 });
 
 if (result.status !== "unlocked") {
   throw new Error(`Portable vault unlock failed: ${result.status}`);
 }
-declare function verifyAndConsumeBrokerReceipt(receipt: string): Promise<void>;
-await verifyAndConsumeBrokerReceipt(result.completionReceipt);
-// Only now install result.vaultKey through the owner-scoped vault session lifecycle.
+// Receipt verification and cache commit have succeeded. Only now install result.vaultKey through
+// the owner-scoped vault session lifecycle.
 ```
+
+Passing the current `operation` requires `verifyAndConsumeCompletionReceipt`. The core invokes that
+consumer-owned callback after local unwrap but before committing the memory-only re-wrap cache or
+returning an unlocked result. Receipt rejection returns `completion_receipt_rejected` and zeroes the
+pending inner material. A successful commit permits later portable enrollment while the same vault
+session remains open. Lock, logout, account change, or cache mismatch clears that material; stale
+operations cannot read or mutate it.
 
 Do not retry with the same ephemeral session. Create a new key and obtain a new grant for every
 attempt. A malformed response, PUK unseal failure, or UVK unwrap failure must leave the vault locked.

@@ -8,6 +8,17 @@ major version; compatible corrections should retain explicit deprecation and mig
 
 ## [Unreleased]
 
+### Fixed
+
+- Portable broker enrollment can now re-wrap the owner-scoped, memory-only inner vault-key
+  material after password, recovery, legacy passkey, or portable broker unlock. Consumers can
+  enroll an already-open non-extractable UVK without exporting it or asking the user to unlock the
+  vault again. Portable broker unlock can repopulate that cache when given the current session
+  operation and a consumer-owned completion-receipt verifier. Cache commit occurs only after receipt
+  verification; rejection zeroes pending material and returns a typed result. Ordinary unwrap and
+  all failure paths now zero decrypted inner material; stale operations and cache mismatches fail
+  closed.
+
 ## [1.8.0] - 2026-07-29
 
 ### Added

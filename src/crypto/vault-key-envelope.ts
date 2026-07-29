@@ -86,12 +86,36 @@ export async function unwrapUserVaultKeyWithDerivedKeys(
   encryptedVaultKey: EncryptedVaultPayload,
   derivedKeys: { encryptionKey: CryptoKey; wrappingKey: CryptoKey }
 ): Promise<CryptoKey> {
-  const inner = base64UrlToBytes(await decryptField(encryptedVaultKey, derivedKeys.encryptionKey));
-  if (isLegacyRawVaultKeyMaterial(inner)) {
-    return importUserVaultAesKey(inner);
+  const unwrapped = await unwrapUserVaultKeyWithDerivedKeysAndInnerMaterial(
+    encryptedVaultKey,
+    derivedKeys
+  );
+  try {
+    return unwrapped.vaultKey;
+  } finally {
+    unwrapped.innerVaultKeyBlob.fill(0);
   }
+}
 
-  return unwrapAesKey(inner, derivedKeys.wrappingKey);
+/** @internal Browser session integrations use this to retain re-wrap material in memory. */
+export async function unwrapUserVaultKeyWithDerivedKeysAndInnerMaterial(
+  encryptedVaultKey: EncryptedVaultPayload,
+  derivedKeys: { encryptionKey: CryptoKey; wrappingKey: CryptoKey }
+): Promise<{ vaultKey: CryptoKey; innerVaultKeyBlob: Uint8Array }> {
+  const inner = base64UrlToBytes(await decryptField(encryptedVaultKey, derivedKeys.encryptionKey));
+  try {
+    if (isLegacyRawVaultKeyMaterial(inner)) {
+      return { vaultKey: await importUserVaultAesKey(inner), innerVaultKeyBlob: inner };
+    }
+
+    return {
+      vaultKey: await unwrapAesKey(inner, derivedKeys.wrappingKey),
+      innerVaultKeyBlob: inner,
+    };
+  } catch (error) {
+    inner.fill(0);
+    throw error;
+  }
 }
 
 /**

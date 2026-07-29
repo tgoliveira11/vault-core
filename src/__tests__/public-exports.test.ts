@@ -50,6 +50,9 @@ describe("public vault-key envelope exports", () => {
     expect(typeof browserEntry.prepareVaultPasskeyPrfRegistrationOptions).toBe("function");
     expect(typeof browserEntry.resolvePasskeyPrfEnrollmentAfterRegistration).toBe("function");
     expect(typeof browserEntry.createPortableVaultBrokerEnrollmentPackage).toBe("function");
+    expect(typeof browserEntry.createPortableVaultBrokerEnrollmentPackageWithSessionCache).toBe(
+      "function"
+    );
     expect(typeof browserEntry.createPortableVaultBrokerUnlockSession).toBe("function");
     expect(typeof browserEntry.unlockPortableVaultBrokerResponse).toBe("function");
   });

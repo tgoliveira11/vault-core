@@ -2,7 +2,7 @@
 
 Living inventory of what `@tgoliveira/vault-core` exposes today. Update this file when exports, admin screens, published artifacts, or shipped/planned status changes.
 
-Last reviewed: **2026-07-29** (package version **1.7.0**, portable passkey broker client pending release)
+Last reviewed: **2026-07-29** (package version **1.8.0**)
 
 
 ## Package entry points (shipped)
@@ -31,7 +31,8 @@ Last reviewed: **2026-07-29** (package version **1.7.0**, portable passkey broke
 - AES-256-GCM encrypted payloads with canonical AAD
 - Argon2id password and recovery envelopes (`kdf-v1` legacy, `kdf-v2` recommended)
 - Portable broker crypto/browser client: random PUK, opaque AAD, domain-separated UVK envelope,
-  one-use ephemeral P-256 binding, strict response validation, PUK unseal/zeroing, typed results
+  cache-aware enrollment for an already-open non-extractable UVK, one-use ephemeral P-256 binding,
+  strict response validation, PUK unseal/zeroing, typed results
 - Legacy passkey PRF envelope wrap/unwrap, including bounded local candidate-variant matching (no
   cross-device key guarantee)
 - Robust `extractPasskeyPrfOutput` with Safari `evalByCredential` compatibility and byte coercion

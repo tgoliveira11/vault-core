@@ -4,7 +4,9 @@ import { assertVaultKeyAad } from "../validation/aad-assert.js";
 import { randomBytes } from "./random.js";
 import { toBufferSource } from "./encoding.js";
 import {
+  rewrapInnerVaultKeyMaterialForWrappingKeys,
   unwrapUserVaultKeyWithDerivedKeys,
+  unwrapUserVaultKeyWithDerivedKeysAndInnerMaterial,
   wrapUserVaultKeyWithDerivedKeys,
   type WrapUserVaultKeyOptions,
 } from "./vault-key-envelope.js";
@@ -105,6 +107,34 @@ export async function createPortableVaultBrokerEncryptedVaultKey(
   );
 }
 
+/** @internal Re-wraps cached session material directly to a fresh PUK-derived wrapping key. */
+export async function createPortableVaultBrokerEncryptedVaultKeyFromCachedMaterial(
+  vaultKey: CryptoKey,
+  puk: Uint8Array,
+  opaqueScope: PortableVaultOpaqueAadScope,
+  profile: VaultCryptoProfile,
+  cached: { innerVaultKeyBlob: Uint8Array; wrappingKey: CryptoKey }
+): Promise<EncryptedVaultPayload> {
+  const derivedKeys = await derivePortableVaultKeys(puk);
+  const rewrappedInner = await rewrapInnerVaultKeyMaterialForWrappingKeys(
+    cached.innerVaultKeyBlob,
+    cached.wrappingKey,
+    derivedKeys.wrappingKey,
+    vaultKey
+  );
+  try {
+    return await wrapUserVaultKeyWithDerivedKeys(
+      vaultKey,
+      derivedKeys,
+      opaqueScope,
+      profile,
+      { innerVaultKeyBlob: rewrappedInner }
+    );
+  } finally {
+    rewrappedInner.fill(0);
+  }
+}
+
 /** Restores a non-extractable UVK after strictly validating the opaque AAD scope and profile. */
 export async function unlockPortableVaultBrokerEncryptedVaultKey(
   encryptedVaultKey: EncryptedVaultPayload,
@@ -115,4 +145,20 @@ export async function unlockPortableVaultBrokerEncryptedVaultKey(
   assertVaultKeyAad(expectedOpaqueScope, encryptedVaultKey, profile);
   const derivedKeys = await derivePortableVaultKeys(puk);
   return unwrapUserVaultKeyWithDerivedKeys(encryptedVaultKey, derivedKeys);
+}
+
+/** @internal Restores the UVK plus PUK-wrapped inner material for the memory-only session cache. */
+export async function unlockPortableVaultBrokerEncryptedVaultKeyWithInnerMaterial(
+  encryptedVaultKey: EncryptedVaultPayload,
+  puk: Uint8Array,
+  expectedOpaqueScope: PortableVaultOpaqueAadScope,
+  profile: VaultCryptoProfile
+): Promise<{ vaultKey: CryptoKey; innerVaultKeyBlob: Uint8Array; wrappingKey: CryptoKey }> {
+  assertVaultKeyAad(expectedOpaqueScope, encryptedVaultKey, profile);
+  const derivedKeys = await derivePortableVaultKeys(puk);
+  const unwrapped = await unwrapUserVaultKeyWithDerivedKeysAndInnerMaterial(
+    encryptedVaultKey,
+    derivedKeys
+  );
+  return { ...unwrapped, wrappingKey: derivedKeys.wrappingKey };
 }
