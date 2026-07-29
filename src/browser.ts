@@ -79,11 +79,13 @@ export {
 
 export {
   createPortableVaultBrokerEnrollmentPackage,
+  createPortableVaultBrokerEnrollmentPackageWithSessionCache,
   createPortableVaultBrokerUnlockSession,
   isPortableVaultBrokerUnlockResponse,
   portableVaultBrokerEnrollmentRequestSchema,
   serializePortableVaultBrokerEnrollmentPackage,
   unlockPortableVaultBrokerResponse,
+  type PortableVaultBrokerClientUnlockInput,
   type PortableVaultBrokerClientUnlockResult,
   type PortableVaultBrokerEnrollmentPackage,
   type PortableVaultBrokerEnrollmentRequest,

@@ -147,11 +147,15 @@ Browser entry:
 
 - `createPortableVaultBrokerEnrollmentPackage(input)` — creates PUK + encrypted UVK package with an
   explicit zeroing `dispose()` method
+- `createPortableVaultBrokerEnrollmentPackageWithSessionCache(input)` — required for an already-open
+  non-extractable UVK; re-wraps owner-scoped inner key material retained only in memory
 - `serializePortableVaultBrokerEnrollmentPackage(package)` — exact direct-to-broker JSON body
 - `createPortableVaultBrokerUnlockSession()` — non-extractable one-use P-256 key, public JWK, and
   RFC 7638 thumbprint
 - `unlockPortableVaultBrokerResponse(input)` — validates/unseals/unwraps and returns typed
-  `unlocked`, `malformed_response`, `puk_unseal_failed`, or `vault_key_unwrap_failed` status
+  `unlocked`, `malformed_response`, `puk_unseal_failed`, `completion_receipt_rejected`, or
+  `vault_key_unwrap_failed` status; passing the current session operation requires a consumer-owned
+  receipt verifier and commits the memory-only re-wrap cache only after that verifier succeeds
 - `isPortableVaultBrokerUnlockResponse(value)` — runtime response guard
 
 The broker is a separate trusted boundary and the app owns WebAuthn, signed grants, completion

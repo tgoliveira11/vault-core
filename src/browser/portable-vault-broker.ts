@@ -1,8 +1,10 @@
 import { z } from "zod";
 import {
+  createPortableVaultBrokerEncryptedVaultKeyFromCachedMaterial,
   createPortableVaultBrokerEncryptedVaultKey,
   generatePortableVaultUnlockKey,
   unlockPortableVaultBrokerEncryptedVaultKey,
+  unlockPortableVaultBrokerEncryptedVaultKeyWithInnerMaterial,
   type CreatePortableVaultBrokerEnvelopeOptions,
   type PortableVaultOpaqueAadScope,
 } from "../crypto/portable-vault-broker-envelope.js";
@@ -15,6 +17,17 @@ import {
   type PortableVaultBrokerUnlockResponse,
   type PortableVaultBrokerSealedPuk,
 } from "../validation/schemas.js";
+import { VaultAuthorizationError } from "../errors/vault-errors.js";
+import {
+  cacheVaultInnerKeyMaterialFromEnvelopeDecrypt,
+  clearVaultInnerKeyMaterialCache,
+  getCachedVaultInnerKeyMaterial,
+  INNER_VAULT_KEY_CACHE_MISMATCH_MESSAGE,
+} from "../session/inner-key-material-cache.js";
+import {
+  assertVaultSessionMutationAllowed,
+  type VaultSessionOperation,
+} from "../session/vault-session-operation.js";
 
 const PUK_BYTES = 32;
 const ECDH_SALT_BYTES = 32;
@@ -50,6 +63,52 @@ export async function createPortableVaultBrokerEnrollmentPackage(input: {
     };
   } catch (error) {
     puk.fill(0);
+    throw error;
+  }
+}
+
+/**
+ * Creates a portable enrollment package from a non-extractable session UVK by re-wrapping the
+ * memory-only inner-key cache directly to the fresh PUK-derived wrapping key.
+ */
+export async function createPortableVaultBrokerEnrollmentPackageWithSessionCache(input: {
+  vaultKey: CryptoKey;
+  opaqueScope: PortableVaultOpaqueAadScope;
+  profile: VaultCryptoProfile;
+  operation?: VaultSessionOperation;
+}): Promise<PortableVaultBrokerEnrollmentPackage> {
+  assertVaultSessionMutationAllowed(input.operation);
+  const sessionOptions = { operation: input.operation };
+  const cached = getCachedVaultInnerKeyMaterial(sessionOptions);
+  if (!cached) {
+    const enrollment = await createPortableVaultBrokerEnrollmentPackage(input);
+    try {
+      assertVaultSessionMutationAllowed(input.operation);
+      return enrollment;
+    } catch (error) {
+      enrollment.dispose();
+      throw error;
+    }
+  }
+
+  const puk = generatePortableVaultUnlockKey();
+  try {
+    const encryptedVaultKey = await createPortableVaultBrokerEncryptedVaultKeyFromCachedMaterial(
+      input.vaultKey,
+      puk,
+      input.opaqueScope,
+      input.profile,
+      { innerVaultKeyBlob: cached.inner, wrappingKey: cached.wrappingKey }
+    );
+    assertVaultSessionMutationAllowed(input.operation);
+    return { puk, encryptedVaultKey, dispose: () => puk.fill(0) };
+  } catch (error) {
+    puk.fill(0);
+    assertVaultSessionMutationAllowed(input.operation);
+    clearVaultInnerKeyMaterialCache(sessionOptions);
+    if (error instanceof VaultAuthorizationError) {
+      throw new VaultAuthorizationError(INNER_VAULT_KEY_CACHE_MISMATCH_MESSAGE);
+    }
     throw error;
   }
 }
@@ -199,18 +258,38 @@ export type PortableVaultBrokerClientUnlockResult =
     }
   | { status: "malformed_response"; error: unknown }
   | { status: "puk_unseal_failed"; error: unknown }
+  | { status: "completion_receipt_rejected"; error: unknown }
   | { status: "vault_key_unwrap_failed"; error: unknown };
+
+export type PortableVaultBrokerClientUnlockInput = {
+  response: unknown;
+  session: PortableVaultBrokerUnlockSession;
+  expectedOpaqueScope: PortableVaultOpaqueAadScope;
+  profile: VaultCryptoProfile;
+} & (
+  | {
+      operation: VaultSessionOperation;
+      verifyAndConsumeCompletionReceipt: (receipt: string) => Promise<void>;
+    }
+  | {
+      operation?: undefined;
+      verifyAndConsumeCompletionReceipt?: undefined;
+    }
+);
 
 /**
  * Validates the broker response, opens the PUK only in the bound browser session, then restores a
  * non-extractable UVK. The PUK bytes are zeroed before this function returns.
  */
-export async function unlockPortableVaultBrokerResponse(input: {
-  response: unknown;
-  session: PortableVaultBrokerUnlockSession;
-  expectedOpaqueScope: PortableVaultOpaqueAadScope;
-  profile: VaultCryptoProfile;
-}): Promise<PortableVaultBrokerClientUnlockResult> {
+export async function unlockPortableVaultBrokerResponse(
+  input: PortableVaultBrokerClientUnlockInput
+): Promise<PortableVaultBrokerClientUnlockResult> {
+  assertVaultSessionMutationAllowed(input.operation);
+  if (input.operation && !input.verifyAndConsumeCompletionReceipt) {
+    throw new TypeError(
+      "A completion receipt verifier is required when portable unlock populates the session cache."
+    );
+  }
   let response: PortableVaultBrokerUnlockResponse;
   try {
     response = portableVaultBrokerUnlockResponseSchema.parse(input.response);
@@ -228,12 +307,41 @@ export async function unlockPortableVaultBrokerResponse(input: {
   }
 
   try {
+    if (input.operation) {
+      const restored = await unlockPortableVaultBrokerEncryptedVaultKeyWithInnerMaterial(
+        response.encryptedVaultKey,
+        puk,
+        input.expectedOpaqueScope,
+        input.profile
+      );
+      try {
+        await input.verifyAndConsumeCompletionReceipt!(response.completionReceipt);
+      } catch (error) {
+        restored.innerVaultKeyBlob.fill(0);
+        return { status: "completion_receipt_rejected", error };
+      }
+      await cacheVaultInnerKeyMaterialFromEnvelopeDecrypt(
+        restored.innerVaultKeyBlob,
+        restored.wrappingKey,
+        restored.vaultKey,
+        { operation: input.operation }
+      );
+      assertVaultSessionMutationAllowed(input.operation);
+      return {
+        status: "unlocked",
+        vaultKey: restored.vaultKey,
+        requestId: response.requestId,
+        completionReceipt: response.completionReceipt,
+      };
+    }
+
     const vaultKey = await unlockPortableVaultBrokerEncryptedVaultKey(
       response.encryptedVaultKey,
       puk,
       input.expectedOpaqueScope,
       input.profile
     );
+    assertVaultSessionMutationAllowed(input.operation);
     return {
       status: "unlocked",
       vaultKey,

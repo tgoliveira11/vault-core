@@ -1,12 +1,19 @@
-import { describe, expect, it } from "vitest";
+import { beforeEach, describe, expect, it } from "vitest";
 import {
   createPortableVaultBrokerEnrollmentPackage,
+  createPortableVaultBrokerEnrollmentPackageWithSessionCache,
   createPortableVaultBrokerUnlockSession,
   isPortableVaultBrokerUnlockResponse,
   serializePortableVaultBrokerEnrollmentPackage,
   unlockPortableVaultBrokerResponse,
   type PortableVaultBrokerEphemeralPublicJwk,
 } from "../../browser/portable-vault-broker.js";
+import {
+  createPasswordEnvelope,
+  deriveVaultPasswordKeyPairFromMetadata,
+  extractInnerVaultKeyBlob,
+  unlockWithPasswordEnvelope,
+} from "../../index.js";
 import { bytesToBase64Url, toBufferSource } from "../../crypto/encoding.js";
 import {
   generatePortableVaultOpaqueAadScope,
@@ -15,6 +22,13 @@ import {
 import { createUserVaultKey, userVaultKeysEqual } from "../../keys/user-vault-key.js";
 import { generateUserVaultAesKey } from "../../crypto/user-vault-key-crypto.js";
 import type { PortableVaultBrokerSealedPuk } from "../../validation/schemas.js";
+import {
+  cacheVaultInnerKeyMaterialFromEnvelopeDecrypt,
+  clearVaultInnerKeyMaterialCache,
+  getCachedVaultInnerKeyMaterial,
+} from "../../session/inner-key-material-cache.js";
+import { beginVaultSessionOperation } from "../../session/auto-lock.js";
+import { resetVaultSessionOperationsForTests } from "../../session/vault-session-operation.js";
 
 const profile = {
   cryptoVersion: "vault-v1",
@@ -107,6 +121,11 @@ async function fixture(scope: PortableVaultOpaqueAadScope = generatePortableVaul
 }
 
 describe("portable vault broker browser client", () => {
+  beforeEach(() => {
+    resetVaultSessionOperationsForTests();
+    clearVaultInnerKeyMaterialCache();
+  });
+
   it("creates a disposable enrollment request without identity fields", async () => {
     const { enrollment } = await fixture();
     const request = serializePortableVaultBrokerEnrollmentPackage(enrollment);
@@ -161,6 +180,189 @@ describe("portable vault broker browser client", () => {
     expect(result.vaultKey.extractable).toBe(false);
     expect(await userVaultKeysEqual(vaultKey, result.vaultKey)).toBe(true);
     expect(isPortableVaultBrokerUnlockResponse(response)).toBe(true);
+  });
+
+  it("enrolls a non-extractable password-unlocked UVK from the owner-scoped memory cache", async () => {
+    const scope = generatePortableVaultOpaqueAadScope();
+    const originalVaultKey = await createUserVaultKey();
+    const passwordEnvelope = await createPasswordEnvelope(
+      originalVaultKey,
+      "portable cache test password",
+      scope,
+      profile
+    );
+    const sessionVaultKey = await unlockWithPasswordEnvelope(
+      "portable cache test password",
+      passwordEnvelope.envelope,
+      scope,
+      profile
+    );
+    const passwordKeys = await deriveVaultPasswordKeyPairFromMetadata(
+      "portable cache test password",
+      passwordEnvelope.kdfMetadata
+    );
+    const inner = await extractInnerVaultKeyBlob(
+      passwordEnvelope.envelope.encryptedVaultKey,
+      passwordKeys.encryptionKey
+    );
+    const operation = beginVaultSessionOperation("portable-cache-owner");
+    await cacheVaultInnerKeyMaterialFromEnvelopeDecrypt(
+      inner,
+      passwordKeys.wrappingKey,
+      sessionVaultKey,
+      { operation }
+    );
+
+    const enrollment = await createPortableVaultBrokerEnrollmentPackageWithSessionCache({
+      vaultKey: sessionVaultKey,
+      opaqueScope: scope,
+      profile,
+      operation,
+    });
+    const unlockSession = await createPortableVaultBrokerUnlockSession();
+    const response = {
+      encryptedVaultKey: enrollment.encryptedVaultKey,
+      sealedPuk: await sealForBrowser(enrollment.puk, unlockSession.publicJwk),
+      requestId: "00000000-0000-4000-8000-000000000002",
+      completionReceipt: "signed.receipt.value",
+    };
+    enrollment.dispose();
+    clearVaultInnerKeyMaterialCache({ operation });
+
+    const result = await unlockPortableVaultBrokerResponse({
+      response,
+      session: unlockSession,
+      expectedOpaqueScope: scope,
+      profile,
+      operation,
+      verifyAndConsumeCompletionReceipt: async (receipt) => {
+        expect(receipt).toBe(response.completionReceipt);
+        expect(getCachedVaultInnerKeyMaterial({ operation })).toBeNull();
+      },
+    });
+    expect(result.status).toBe("unlocked");
+    if (result.status !== "unlocked") throw new Error("expected unlock");
+    expect(result.vaultKey.extractable).toBe(false);
+    expect(await userVaultKeysEqual(originalVaultKey, result.vaultKey)).toBe(true);
+    expect(getCachedVaultInnerKeyMaterial({ operation })).not.toBeNull();
+  });
+
+  it("uses the fresh-key path when no session cache exists", async () => {
+    const enrollment = await createPortableVaultBrokerEnrollmentPackageWithSessionCache({
+      vaultKey: await createUserVaultKey(),
+      opaqueScope: generatePortableVaultOpaqueAadScope(),
+      profile,
+    });
+    expect(enrollment.puk).toHaveLength(32);
+    enrollment.dispose();
+  });
+
+  it("disposes a fresh-key enrollment if its owner operation becomes stale", async () => {
+    const operation = beginVaultSessionOperation("portable-owner-A");
+    const pending = createPortableVaultBrokerEnrollmentPackageWithSessionCache({
+      vaultKey: await createUserVaultKey(),
+      opaqueScope: generatePortableVaultOpaqueAadScope(),
+      profile,
+      operation,
+    });
+    beginVaultSessionOperation("portable-owner-B");
+    await expect(pending).rejects.toThrow("cancelled");
+  });
+
+  it("clears a mismatched cached key instead of wrapping a different session UVK", async () => {
+    const scope = generatePortableVaultOpaqueAadScope();
+    const cachedVaultKey = await createUserVaultKey();
+    const passwordEnvelope = await createPasswordEnvelope(
+      cachedVaultKey,
+      "portable mismatch test password",
+      scope,
+      profile
+    );
+    const passwordKeys = await deriveVaultPasswordKeyPairFromMetadata(
+      "portable mismatch test password",
+      passwordEnvelope.kdfMetadata
+    );
+    const inner = await extractInnerVaultKeyBlob(
+      passwordEnvelope.envelope.encryptedVaultKey,
+      passwordKeys.encryptionKey
+    );
+    const operation = beginVaultSessionOperation("portable-mismatch-owner");
+    await cacheVaultInnerKeyMaterialFromEnvelopeDecrypt(
+      inner,
+      passwordKeys.wrappingKey,
+      cachedVaultKey,
+      { operation }
+    );
+
+    await expect(
+      createPortableVaultBrokerEnrollmentPackageWithSessionCache({
+        vaultKey: await createUserVaultKey(),
+        opaqueScope: scope,
+        profile,
+        operation,
+      })
+    ).rejects.toThrow("does not match the current session");
+    expect(getCachedVaultInnerKeyMaterial({ operation })).toBeNull();
+  });
+
+  it("repopulates the memory cache after portable unlock for later enrollment", async () => {
+    const first = await fixture();
+    const operation = beginVaultSessionOperation("portable-unlock-owner");
+    const unlocked = await unlockPortableVaultBrokerResponse({
+      response: first.response,
+      session: first.session,
+      expectedOpaqueScope: first.scope,
+      profile,
+      operation,
+      verifyAndConsumeCompletionReceipt: async () => undefined,
+    });
+    first.enrollment.dispose();
+    expect(unlocked.status).toBe("unlocked");
+    if (unlocked.status !== "unlocked") throw new Error("expected unlock");
+
+    const second = await createPortableVaultBrokerEnrollmentPackageWithSessionCache({
+      vaultKey: unlocked.vaultKey,
+      opaqueScope: first.scope,
+      profile,
+      operation,
+    });
+    expect(second.encryptedVaultKey.aad).toEqual(first.enrollment.encryptedVaultKey.aad);
+    second.dispose();
+  });
+
+  it("does not populate the memory cache when completion receipt verification fails", async () => {
+    const first = await fixture();
+    const operation = beginVaultSessionOperation("portable-rejected-receipt-owner");
+    const result = await unlockPortableVaultBrokerResponse({
+      response: first.response,
+      session: first.session,
+      expectedOpaqueScope: first.scope,
+      profile,
+      operation,
+      verifyAndConsumeCompletionReceipt: async () => {
+        expect(getCachedVaultInnerKeyMaterial({ operation })).toBeNull();
+        throw new Error("receipt rejected");
+      },
+    });
+    first.enrollment.dispose();
+
+    expect(result).toMatchObject({ status: "completion_receipt_rejected" });
+    expect(getCachedVaultInnerKeyMaterial({ operation })).toBeNull();
+  });
+
+  it("requires receipt verification before an owner-scoped portable unlock", async () => {
+    const first = await fixture();
+    const operation = beginVaultSessionOperation("portable-missing-receipt-verifier");
+    await expect(
+      unlockPortableVaultBrokerResponse({
+        response: first.response,
+        session: first.session,
+        expectedOpaqueScope: first.scope,
+        profile,
+        operation,
+      } as never)
+    ).rejects.toThrow("completion receipt verifier is required");
+    first.enrollment.dispose();
   });
 
   it("returns typed malformed, seal, and envelope failures", async () => {
