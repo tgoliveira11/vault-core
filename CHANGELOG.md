@@ -8,6 +8,8 @@ major version; compatible corrections should retain explicit deprecation and mig
 
 ## [Unreleased]
 
+## [1.8.0] - 2026-07-29
+
 ### Added
 
 - Portable passkey broker client primitives: random 32-byte PUK generation, pairwise opaque AAD
