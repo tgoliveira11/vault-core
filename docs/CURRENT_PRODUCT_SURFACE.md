@@ -2,7 +2,7 @@
 
 Living inventory of what `@tgoliveira/vault-core` exposes today. Update this file when exports, admin screens, published artifacts, or shipped/planned status changes.
 
-Last reviewed: **2026-07-28** (package version **1.7.0**, server-side PRF salt options helper)
+Last reviewed: **2026-07-29** (package version **1.7.0**, portable passkey broker client pending release)
 
 
 ## Package entry points (shipped)
@@ -10,7 +10,7 @@ Last reviewed: **2026-07-28** (package version **1.7.0**, server-side PRF salt o
 | Export | Status | Purpose |
 | --- | --- | --- |
 | `@tgoliveira/vault-core` | Shipped | Crypto, envelopes, recovery, rotation, admin config helpers, validation |
-| `@tgoliveira/vault-core/browser` | Shipped | Session lifecycle, auto-lock, storage inspection, PRF salt, recovery kit DOM |
+| `@tgoliveira/vault-core/browser` | Shipped | Session lifecycle, portable broker client, auto-lock, storage inspection, legacy PRF helpers, recovery kit DOM |
 | `@tgoliveira/vault-core/react` | Shipped | Session provider/hooks, client status, **vault admin UI pages** |
 | `@tgoliveira/vault-core/testing` | Shipped | Plaintext sentinels and leak-detection helpers |
 | `@tgoliveira/vault-core/vault-admin.css` | Shipped | Styles for vault admin pages and vault status dock |
@@ -19,6 +19,8 @@ Last reviewed: **2026-07-28** (package version **1.7.0**, server-side PRF salt o
 
 - [docs/CONSUMER_SECURITY_REQUIREMENTS.md](./CONSUMER_SECURITY_REQUIREMENTS.md) — mandatory checklist
   for apps and agents (auth/RBAC, rate limits, CSP, plaintext guards, unlock access control)
+- [docs/PORTABLE_PASSKEY_BROKER.md](./PORTABLE_PASSKEY_BROKER.md) — canonical one-enrollment
+  cross-device passkey architecture and explicit trusted-broker boundary
 - [docs/ADOPTING_VAULT_CORE_1_1_0.md](./ADOPTING_VAULT_CORE_1_1_0.md) — 1.0.x → 1.1.0 upgrade:
   package vs consumer matrix, phased duplicate removal, dock/React wiring
 - [docs/ADOPTING_UNIFIED_PASSKEY_UNLOCK_FROM_1_5_1.md](./ADOPTING_UNIFIED_PASSKEY_UNLOCK_FROM_1_5_1.md)
@@ -28,13 +30,17 @@ Last reviewed: **2026-07-28** (package version **1.7.0**, server-side PRF salt o
 
 - AES-256-GCM encrypted payloads with canonical AAD
 - Argon2id password and recovery envelopes (`kdf-v1` legacy, `kdf-v2` recommended)
-- Passkey PRF envelope wrap/unwrap, including bounded local candidate-variant matching (no WebAuthn ceremony)
-- Robust `extractPasskeyPrfOutput` with Safari `evalByCredential` preference and byte coercion
+- Portable broker crypto/browser client: random PUK, opaque AAD, domain-separated UVK envelope,
+  one-use ephemeral P-256 binding, strict response validation, PUK unseal/zeroing, typed results
+- Legacy passkey PRF envelope wrap/unwrap, including bounded local candidate-variant matching (no
+  cross-device key guarantee)
+- Robust `extractPasskeyPrfOutput` with Safari `evalByCredential` compatibility and byte coercion
 - Typed `sanitizeWebAuthnResponseForServer` removal of PRF extension results before server serialization
 - WebAuthn PRF ceremony prep (`buildPasskeyPrfAuthenticationExtensionsJson`,
   `prepareWebAuthnPrfExtensions`, `alignPrfExtensionsForCredential`,
   `applyVaultUnlockTransportPolicy`, `prepareVaultUnlockAuthenticationOptions`,
   `prepareVaultPasskeyPrfAuthenticationOptions`, `prepareVaultPasskeyPrfRegistrationOptions`),
+  including one canonical authentication `prf.eval.first` input with required user verification,
   including mixed server-JSON/native-extension composition for browser libraries
 - Post-registration passkey enrollment resolution through
   `resolvePasskeyPrfEnrollmentAfterRegistration`, with exact server-verified credential matching and

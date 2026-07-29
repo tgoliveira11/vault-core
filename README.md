@@ -7,10 +7,8 @@ Framework-independent vault crypto primitives extracted from LiqSense.
 - User Vault Key (UVK) generation
 - AES-GCM encrypted payloads with canonical AAD
 - Argon2id password and recovery phrase envelopes
-- Passkey PRF envelope wrap/unwrap, synced-credential metadata, and bounded local variant matching
-  (PRF bytes only — no WebAuthn ceremony)
-- Unified passkey unlock planning: explicit synced-passkey reuse without browser binding, with binding
-  reserved for exact quick unlock and auto-start
+- Portable passkey broker client primitives for one-enrollment cross-device unlock
+- Legacy passkey PRF envelope wrap/unwrap and bounded local variant matching for existing records
 - BIP39 12/24-word recovery phrases
 - No-plaintext validation helpers
 
@@ -57,9 +55,11 @@ See [CONTRIBUTING.md](CONTRIBUTING.md) and [docs/contributing.md](docs/contribut
 ## Documentation
 
 - [Complete implementation guide](docs/IMPLEMENTATION_GUIDE.md)
+- [Portable passkey broker architecture](docs/PORTABLE_PASSKEY_BROKER.md) — recommended for new
+  cross-device passkey unlock
 - [Adopting vault-core in an existing app](docs/ADOPTING_VAULT_CORE_IN_EXISTING_APPS.md)
-- [Adopting unified passkey unlock from 1.5.1](docs/ADOPTING_UNIFIED_PASSKEY_UNLOCK_FROM_1_5_1.md)
-  — reuse synced credentials without binding; reserve binding for quick unlock
+- [Legacy PRF unlock from 1.5.1](docs/ADOPTING_UNIFIED_PASSKEY_UNLOCK_FROM_1_5_1.md) — historical
+  compatibility only; it does not guarantee one cross-device key
 - [Passkey account-auth interoperability](docs/PASSKEY_ACCOUNT_AUTH_INTEROPERABILITY.md) — optional
   credential reuse with independent login and vault authorization
 - [Emergency / duress mode](docs/INTEGRATING_EMERGENCY_DURESS_MODE.md) — opt-in and disabled by
@@ -129,7 +129,7 @@ AAD to the user, resource, field, and application context expected by the caller
 | Entry | Purpose |
 | --- | --- |
 | `@tgoliveira/vault-core` | Core crypto, envelopes, payload, validation |
-| `@tgoliveira/vault-core/browser` | In-memory session, countdown auto-lock, storage inspection, PRF salt, recovery kit DOM helpers |
+| `@tgoliveira/vault-core/browser` | In-memory session, portable broker client, auto-lock, storage inspection, legacy PRF helpers, recovery kit DOM helpers |
 | `@tgoliveira/vault-core/testing` | Sentinels and plaintext scan helpers |
 | `@tgoliveira/vault-core/react` | Headless React session/status hooks and vault admin UI pages (optional peer: `react`) |
 | `@tgoliveira/vault-core/vault-admin.css` | Styles for vault admin pages |
@@ -139,7 +139,8 @@ AAD to the user, resource, field, and application context expected by the caller
 - Does **not** include account authentication
 - Does **not** require React, Next.js, or product payload schemas on the default entry
 - `./react` is optional and requires `react >= 18`
-- Vault password, recovery phrase, UVK, PRF output, and decrypted payload must stay client-side
+- Vault password, recovery phrase, UVK, PRF output, and decrypted payload must stay client-side. The
+  trusted portable broker receives only its PUK; see its explicit trust boundary before enabling it.
 - Persisted envelope schemas enforce method-specific KDF metadata at runtime
 
 See `SECURITY.md`, `ARCHITECTURE.md`, `MIGRATION_FROM_LIQSENSE.md`,

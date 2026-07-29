@@ -2,8 +2,14 @@
 
 Use this page as the documentation router for `@tgoliveira/vault-core`.
 
+For new cross-device passkey vault unlock, start with
+[`PORTABLE_PASSKEY_BROKER.md`](PORTABLE_PASSKEY_BROKER.md). PRF migration documents are historical
+compatibility references and do not promise one stable key across devices.
+
 ## Consumers
 
+- [`PORTABLE_PASSKEY_BROKER.md`](PORTABLE_PASSKEY_BROKER.md): canonical one-enrollment
+  cross-device passkey architecture and explicit broker trust boundary.
 - [`IMPLEMENTATION_GUIDE.md`](IMPLEMENTATION_GUIDE.md): complete greenfield implementation from
   setup through password, recovery phrase, passkey PRF, persistence boundaries, and sessions.
 - [`ADOPTING_VAULT_CORE_IN_EXISTING_APPS.md`](ADOPTING_VAULT_CORE_IN_EXISTING_APPS.md): phased

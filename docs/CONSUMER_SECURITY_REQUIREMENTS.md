@@ -23,6 +23,14 @@ Before marking vault integration complete, verify every item below.
 
 ### 2. Client unlock flows
 
+- [ ] For new one-enrollment cross-device passkey unlock, use the trusted portable broker contract;
+  do not represent legacy PRF variants as a portable guarantee. Bind each broker unlock grant to a
+  fresh ephemeral-key thumbprint and verify/consume the broker completion receipt before mutating
+  app state.
+- [ ] Send a PUK directly from browser to the isolated broker only. Never proxy it through the app
+  server, persist it in browser storage, or place it in logs/analytics. Keep broker subjects and AAD
+  pairwise opaque and unrelated to email, direct account IDs, or credential IDs.
+
 - [ ] Wrap **every** code path that calls `unlockWithPasswordEnvelope`, `unlockWithRecoveryEnvelope`,
   `unlockWithPasskeyPrfEnvelope`, `unlockWithPasskeyPrfEnvelopeCandidates`, or
   `createPasskeyPrfEnvelopeAfterIndependentAuthorization` with
@@ -36,7 +44,7 @@ Before marking vault integration complete, verify every item below.
 - [ ] Keep **account login** and **vault unlock** as separate security domains.
 - [ ] Keep each logical WebAuthn credential distinct from opaque browser bindings and PRF envelope
   variants. A binding is routing metadata, not an authentication factor or authorization grant.
-- [ ] Use **`resolvePasskeyUnlockPlan({ intent: "explicit", ... })`** for the full unlock page so a
+- [ ] For legacy PRF records, use **`resolvePasskeyUnlockPlan({ intent: "explicit", ... })`** for the full unlock page so a
   synced credential remains usable without a browser binding. Restrict exact selection and WebAuthn
   auto-start to the `quick` plan. On `VaultUnlockPanel`, pass that plan through `quickPasskeyPlan` and
   use the separate `onQuickUnlockPasskey`; stale/missing bindings must not hide the explicit action.

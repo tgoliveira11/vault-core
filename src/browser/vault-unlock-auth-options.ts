@@ -27,8 +27,9 @@ export type PrepareVaultUnlockAuthenticationOptionsContext = {
 
 /**
  * Prepares WebAuthn authentication options for PRF-gated passkey ceremonies (vault unlock,
- * passkey enable/disable, envelope re-wrap, and other management flows): PRF salt coercion, iOS
- * PRF extension alignment, optional strict single-credential filtering, and explicit transport policy.
+ * passkey enable/disable, envelope re-wrap, and other management flows): PRF salt coercion,
+ * canonical single-input alignment with required user verification, optional strict
+ * single-credential filtering, and explicit transport policy.
  */
 export function prepareVaultUnlockAuthenticationOptions<
   T extends PublicKeyCredentialRequestOptionsInput,
@@ -101,6 +102,20 @@ export function prepareVaultUnlockAuthenticationOptions<
         ? context.credentialSelection.credentialId
         : context.credentialId
   );
+
+  const canonicalPrfFirst = prepared.extensions?.prf?.eval?.first;
+  if (canonicalPrfFirst instanceof ArrayBuffer) {
+    prepared = {
+      ...prepared,
+      userVerification: "required",
+      extensions: {
+        ...prepared.extensions,
+        prf: {
+          eval: { first: canonicalPrfFirst },
+        },
+      },
+    };
+  }
   prepared = applyVaultUnlockTransportPolicy(
     prepared,
     transportPolicy,

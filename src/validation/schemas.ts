@@ -80,6 +80,35 @@ export type PasswordEnvelope = z.infer<typeof passwordEnvelopeSchema>;
 export type RecoveryPhraseEnvelope = z.infer<typeof recoveryPhraseEnvelopeSchema>;
 export type PasskeyPrfEnvelope = z.infer<typeof passkeyPrfEnvelopeSchema>;
 
+export const portableVaultBrokerPublicJwkSchema = z.object({
+  kty: z.literal("EC"),
+  crv: z.literal("P-256"),
+  x: z.string().min(1).max(128),
+  y: z.string().min(1).max(128),
+}).strict();
+
+export const portableVaultBrokerSealedPukSchema = z.object({
+  version: z.literal("v1"),
+  algorithm: z.literal("ECDH-P256-HKDF-SHA256-A256GCM"),
+  brokerPublicJwk: portableVaultBrokerPublicJwkSchema,
+  salt: z.string().min(1).max(128),
+  iv: z.string().min(1).max(128),
+  ciphertext: z.string().min(1).max(128),
+  context: z.string().min(1).max(4096),
+}).strict();
+
+export const portableVaultBrokerUnlockResponseSchema = z.object({
+  encryptedVaultKey: encryptedPayloadSchema,
+  sealedPuk: portableVaultBrokerSealedPukSchema,
+  requestId: z.string().uuid(),
+  completionReceipt: z.string().min(1).max(16_384),
+}).strict();
+
+export type PortableVaultBrokerSealedPuk = z.infer<typeof portableVaultBrokerSealedPukSchema>;
+export type PortableVaultBrokerUnlockResponse = z.infer<
+  typeof portableVaultBrokerUnlockResponseSchema
+>;
+
 export { VAULT_CRYPTO_VERSION } from "../constants.js";
 
 export const vaultDecoyRecordSchema = z.object({

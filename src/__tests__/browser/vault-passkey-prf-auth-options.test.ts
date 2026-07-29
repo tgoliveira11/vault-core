@@ -71,6 +71,42 @@ describe("prepareVaultPasskeyPrfAuthenticationOptions", () => {
     expect(prepared.allowCredentials).toHaveLength(2);
   });
 
+  it("replaces conflicting server PRF inputs with one canonical eval and requires UV", async () => {
+    const prepared = await prepareVaultPasskeyPrfAuthenticationOptions({
+      userId: USER_ID,
+      prfSaltPrefix: PRF_PREFIX,
+      serverOptions: {
+        challenge: new Uint8Array(32),
+        userVerification: "preferred",
+        allowCredentials: [
+          { id: CREDENTIAL_ID, type: "public-key" },
+          { id: "cred-b", type: "public-key" },
+        ],
+        extensions: {
+          appid: "https://legacy.example",
+          prf: {
+            eval: { first: new Uint8Array(32).fill(8), second: new Uint8Array(32).fill(7) },
+            evalByCredential: {
+              [CREDENTIAL_ID]: { first: new Uint8Array(32).fill(9) },
+            },
+          },
+        },
+      },
+      credentialSelection: {
+        mode: "allow-list",
+      },
+    });
+
+    const expectedSalt = await buildPrfSaltBytes(PRF_PREFIX, USER_ID);
+    expect(prepared.userVerification).toBe("required");
+    expect(prepared.extensions?.appid).toBe("https://legacy.example");
+    expect(prepared.extensions?.prf?.evalByCredential).toBeUndefined();
+    expect(prepared.extensions?.prf?.eval?.second).toBeUndefined();
+    expect(new Uint8Array(prepared.extensions?.prf?.eval?.first as ArrayBuffer)).toEqual(
+      new Uint8Array(expectedSalt)
+    );
+  });
+
   it("preserves stored transports by default", async () => {
     const prepared = await prepareVaultPasskeyPrfAuthenticationOptions({
       userId: USER_ID,

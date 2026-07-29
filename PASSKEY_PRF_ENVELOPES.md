@@ -1,10 +1,16 @@
 # Passkey PRF Envelopes
 
+> **Legacy compatibility architecture.** These APIs remain supported for existing records, but PRF
+> output is not a reliable portable cross-device key contract. Do not promise that one PRF envelope
+> works on every device. New one-enrollment cross-device integrations must follow
+> [the trusted portable broker architecture](docs/PORTABLE_PASSKEY_BROKER.md).
+
 - Separate from account passkey login
 - App provides PRF output bytes (≥ 32 bytes) from WebAuthn ceremony
 - Package wraps UVK with PRF-derived AES key
 - API: `createPasskeyPrfEnvelope(vaultKey, prfOutput, scope, profile)` / `unlockWithPasskeyPrfEnvelope(envelope, prfOutput, expectedScope, profile)`
-- One logical credential may be synced across devices and have many opaque browser bindings.
+- One logical credential may be synced across devices, but its PRF output may be missing or differ
+  by provider, platform, or ceremony.
 - One credential normally has one envelope variant; compatibility recovery may add variants without
   replacing a known-good envelope.
 - `unlockWithPasskeyPrfEnvelopeCandidates()` tries at most 5 variants locally and returns the matched

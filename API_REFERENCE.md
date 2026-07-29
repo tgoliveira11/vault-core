@@ -130,7 +130,38 @@ encrypted payloads and unrelated envelopes stay unchanged unless the app chooses
 Word confirmation requires all deterministic default indices unless explicit required indices are
 provided.
 
-### Passkey PRF envelopes
+### Portable passkey broker envelopes (recommended for cross-device unlock)
+
+Core entry:
+
+- `generatePortableVaultUnlockKey()` — random 32-byte PUK
+- `generatePortableVaultOpaqueAadScope()` — pairwise random UUID AAD identifiers with no PII
+- `createPortableVaultBrokerEncryptedVaultKey(vaultKey, puk, opaqueScope, profile, options?)` —
+  HKDF-domain-separated AES-GCM/AES-KW UVK envelope
+- `unlockPortableVaultBrokerEncryptedVaultKey(encryptedVaultKey, puk, expectedOpaqueScope, profile)`
+  — strict AAD/profile validation and non-extractable UVK restoration
+- `portableVaultBrokerPublicJwkSchema`, `portableVaultBrokerSealedPukSchema`, and
+  `portableVaultBrokerUnlockResponseSchema` — bounded broker response contracts
+
+Browser entry:
+
+- `createPortableVaultBrokerEnrollmentPackage(input)` — creates PUK + encrypted UVK package with an
+  explicit zeroing `dispose()` method
+- `serializePortableVaultBrokerEnrollmentPackage(package)` — exact direct-to-broker JSON body
+- `createPortableVaultBrokerUnlockSession()` — non-extractable one-use P-256 key, public JWK, and
+  RFC 7638 thumbprint
+- `unlockPortableVaultBrokerResponse(input)` — validates/unseals/unwraps and returns typed
+  `unlocked`, `malformed_response`, `puk_unseal_failed`, or `vault_key_unwrap_failed` status
+- `isPortableVaultBrokerUnlockResponse(value)` — runtime response guard
+
+The broker is a separate trusted boundary and the app owns WebAuthn, signed grants, completion
+receipt verification, persistence, and network policy. See
+[`docs/PORTABLE_PASSKEY_BROKER.md`](docs/PORTABLE_PASSKEY_BROKER.md).
+
+### Passkey PRF envelopes (legacy compatibility)
+
+These exports remain supported for existing ciphertext. They do not guarantee one stable key for a
+synced credential across devices or providers.
 
 - `createPasskeyPrfEnvelope(vaultKey, prfOutput, scope, profile, publicMetadata?, options?)` — optional `WrapUserVaultKeyOptions` for re-wrap with `innerVaultKeyBlob`
 - `createPasskeyPrfEnvelopeWithSessionCache(...)` — uses in-memory inner-key cache when `innerVaultKeyBlob` is omitted
@@ -181,6 +212,7 @@ Node/tests; the default is `navigator.userAgent` in the browser.
 | `passwordEnvelopeSchema` | Password method plus required Argon2id metadata |
 | `recoveryPhraseEnvelopeSchema` | Recovery method plus required Argon2id metadata |
 | `passkeyPrfEnvelopeSchema` | Passkey PRF method plus null KDF metadata |
+| `portableVaultBrokerUnlockResponseSchema` | Strict encrypted-UVK + ephemeral sealed-PUK response |
 | `vaultPasskeyCredentialMetadataSchema` | Credential ID, stored transports, device/backup metadata |
 | `vaultPasskeyBindingMetadataSchema` | Opaque binding → credential + optional selected variant |
 | `vaultPasskeyEnvelopeVariantSchema` | Opaque variant + credential + PRF envelope |
@@ -385,7 +417,7 @@ boolean aliases that fail closed.
   discoverable, or explicit Apple-mobile workaround
 - `prepareVaultUnlockAuthenticationOptions(options, { credentialSelection?, transportPolicy?, ... })`
   — composed PRF ceremony prep with fail-closed explicit selection
-- `prepareVaultPasskeyPrfAuthenticationOptions({ userId, prfSaltPrefix, serverOptions, prepareJson?, credentialSelection?, transportPolicy?, ... })`
+- `prepareVaultPasskeyPrfAuthenticationOptions({ userId, prfSaltPrefix, serverOptions, prepareJson?, credentialSelection?, transportPolicy?, ... })` — replaces server PRF input with the canonical user-scoped `prf.eval.first` salt and requires user verification for every vault PRF authentication ceremony
   — full pipeline for unlock, enrollment fallback, disable, and re-wrap
 - `sanitizeWebAuthnResponseForServer(response)` — returns a non-mutating response copy without
   `clientExtensionResults.prf`; call before JSON serialization to a server

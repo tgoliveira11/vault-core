@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   assertInnerVaultKeyBlobMatchesVaultKey,
   buildPasskeyPrfAuthenticationExtensionsJson,
+  createPortableVaultBrokerEncryptedVaultKey,
   extractInnerVaultKeyBlob,
   rewrapInnerVaultKeyMaterialForDerivedKeys,
   rewrapInnerVaultKeyMaterialForPrfOutput,
@@ -14,6 +15,9 @@ import {
   unlockWithPasskeyPrfEnvelopeCandidates,
   vaultPasskeyCredentialStateSchema,
   prfBytesForAes256Import,
+  generatePortableVaultOpaqueAadScope,
+  generatePortableVaultUnlockKey,
+  unlockPortableVaultBrokerEncryptedVaultKey,
   type WrapUserVaultKeyOptions,
 } from "../index.js";
 
@@ -21,6 +25,7 @@ describe("public vault-key envelope exports", () => {
   it("exports vault-key envelope helpers from the package root", () => {
     expect(typeof assertInnerVaultKeyBlobMatchesVaultKey).toBe("function");
     expect(typeof buildPasskeyPrfAuthenticationExtensionsJson).toBe("function");
+    expect(typeof createPortableVaultBrokerEncryptedVaultKey).toBe("function");
     expect(typeof extractInnerVaultKeyBlob).toBe("function");
     expect(typeof rewrapInnerVaultKeyMaterialForDerivedKeys).toBe("function");
     expect(typeof rewrapInnerVaultKeyMaterialForPrfOutput).toBe("function");
@@ -33,6 +38,9 @@ describe("public vault-key envelope exports", () => {
     expect(typeof unlockWithPasskeyPrfEnvelopeCandidates).toBe("function");
     expect(typeof vaultPasskeyCredentialStateSchema.parse).toBe("function");
     expect(typeof prfBytesForAes256Import).toBe("function");
+    expect(typeof generatePortableVaultOpaqueAadScope).toBe("function");
+    expect(typeof generatePortableVaultUnlockKey).toBe("function");
+    expect(typeof unlockPortableVaultBrokerEncryptedVaultKey).toBe("function");
   });
 
   it("exports WebAuthn response sanitization from the browser entry", async () => {
@@ -41,6 +49,9 @@ describe("public vault-key envelope exports", () => {
     expect(typeof browserEntry.buildPasskeyPrfAuthenticationExtensionsJson).toBe("function");
     expect(typeof browserEntry.prepareVaultPasskeyPrfRegistrationOptions).toBe("function");
     expect(typeof browserEntry.resolvePasskeyPrfEnrollmentAfterRegistration).toBe("function");
+    expect(typeof browserEntry.createPortableVaultBrokerEnrollmentPackage).toBe("function");
+    expect(typeof browserEntry.createPortableVaultBrokerUnlockSession).toBe("function");
+    expect(typeof browserEntry.unlockPortableVaultBrokerResponse).toBe("function");
   });
 
   it("exports WrapUserVaultKeyOptions as a type", () => {

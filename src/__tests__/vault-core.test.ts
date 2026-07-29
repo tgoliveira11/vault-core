@@ -377,6 +377,8 @@ describe("validation", () => {
     expect(() => assertNoVaultPlaintextFields({ vaultPassword: "x" })).toThrow();
     expect(() => assertNoVaultPlaintextFields({ recoveryPhrase: "words" })).toThrow();
     expect(() => assertNoVaultPlaintextFields({ mnemonic: "words" })).toThrow();
+    expect(() => assertNoVaultPlaintextFields({ puk: "broker-secret" })).toThrow();
+    expect(() => assertNoVaultPlaintextFields({ portableUnlockKey: "broker-secret" })).toThrow();
     expect(() => assertNoVaultPlaintextFields({ VaultPassword: "x" })).toThrow();
     expect(validateNoPlaintextLeak({ encryptedBlob: { iv: "x" } }).ok).toBe(true);
   });

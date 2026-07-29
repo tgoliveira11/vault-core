@@ -8,6 +8,37 @@ major version; compatible corrections should retain explicit deprecation and mig
 
 ## [Unreleased]
 
+### Added
+
+- Portable passkey broker client primitives: random 32-byte PUK generation, pairwise opaque AAD
+  scope, HKDF-domain-separated AES-GCM/AES-KW UVK envelopes, non-extractable one-use P-256 browser
+  sessions with RFC 7638 thumbprints, strict broker response schemas, authenticated PUK unsealing,
+  zeroing, and typed client unlock results.
+
+### Deprecated
+
+- Passkey PRF envelopes remain fully supported for existing records but are no longer documented as
+  a reliable cross-device portability architecture. Synced WebAuthn credentials do not guarantee
+  stable PRF output across providers, platforms, devices, or ceremonies. New portable integrations
+  should use the explicitly trusted broker contract.
+
+### Security
+
+- Documented the portable broker's explicit trust boundary: the application server never receives
+  PUK/UVK material, unlock grants bind a fresh ephemeral key, and apps must verify a signed broker
+  completion receipt before changing local state. The broker is not zero-knowledge against combined
+  runtime, KEK, and database compromise.
+- `assertNoVaultPlaintextFields()` now rejects `puk` and `portableUnlockKey` fields on application
+  routes; direct browser-to-broker enrollment is the only permitted PUK transport.
+
+### Fixed
+
+- Passkey PRF authentication preparation, including the server-salt hydration helper used during
+  account login, now replaces conflicting PRF inputs with one canonical `prf.eval.first` salt on
+  every browser and requires user verification. This prevents
+  `evalByCredential`, secondary salts, or weaker server defaults from changing vault-key derivation
+  between enrollment confirmation, login-assisted unlock, dedicated unlock, and synced devices.
+
 ## [1.7.0] - 2026-07-29
 
 ### Added

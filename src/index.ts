@@ -13,6 +13,15 @@ export * from "./crypto/policy.js";
 export * from "./crypto/encoding.js";
 export * from "./crypto/random.js";
 export * from "./crypto/serialization.js";
+export {
+  PORTABLE_VAULT_UNLOCK_KEY_BYTES,
+  createPortableVaultBrokerEncryptedVaultKey,
+  generatePortableVaultOpaqueAadScope,
+  generatePortableVaultUnlockKey,
+  unlockPortableVaultBrokerEncryptedVaultKey,
+  type CreatePortableVaultBrokerEnvelopeOptions,
+  type PortableVaultOpaqueAadScope,
+} from "./crypto/portable-vault-broker-envelope.js";
 
 export * from "./kdf/argon2id.js";
 export * from "./kdf/params.js";

@@ -1,5 +1,9 @@
 # Migrating passkeys from vault-core 1.2.0
 
+> **Historical PRF migration guide.** It preserves legacy ciphertext but does not establish a
+> cross-device PRF guarantee. New portable unlock must follow
+> [the trusted broker architecture](./PORTABLE_PASSKEY_BROKER.md).
+
 This guide corrects the 1.2.0 model that treated a passkey too much like a physical-device
 enrollment. It preserves existing ciphertext, PRF salt prefixes, AAD profiles, credential IDs, and
 the `passkey_prf` envelope method.
@@ -18,9 +22,9 @@ Do not create a new credential merely because a user opens another device. First
 existing passkey**. A separate registration is appropriate for a single-device credential, another
 provider/security key, or an explicitly independent credential.
 
-## Portable metadata
+## Logical credential metadata (not a portable key guarantee)
 
-The package validates portable state but does not persist it:
+The package validates logical credential state but does not persist it:
 
 ```ts
 import { vaultPasskeyCredentialStateSchema } from "@tgoliveira/vault-core";
@@ -345,7 +349,8 @@ revalidate the current account/session operation before the append.
 
 ## Validation matrix
 
-- same synced credential: device A → device B and B → A;
+- synced credential authentication from device A → B and B → A, including the explicit case where
+  PRF differs and the legacy envelope does not unwrap;
 - two bindings reference one credential without eviction;
 - cleared cookie can discover and rebind an existing credential;
 - single-device credential requires separate enrollment on another device;

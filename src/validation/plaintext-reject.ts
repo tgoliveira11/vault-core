@@ -14,6 +14,8 @@ export const PLAINTEXT_FORBIDDEN_VAULT_FIELDS = [
   "secret",
   "userVaultKey",
   "prfOutput",
+  "puk",
+  "portableUnlockKey",
   "decryptedPayload",
   "displayName",
   "walletLabel",
