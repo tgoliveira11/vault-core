@@ -8,6 +8,8 @@ major version; compatible corrections should retain explicit deprecation and mig
 
 ## [Unreleased]
 
+## [1.8.1] - 2026-07-29
+
 ### Fixed
 
 - Portable broker enrollment can now re-wrap the owner-scoped, memory-only inner vault-key
