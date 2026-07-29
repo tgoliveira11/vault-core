@@ -8,6 +8,8 @@ major version; compatible corrections should retain explicit deprecation and mig
 
 ## [Unreleased]
 
+## [1.7.0] - 2026-07-29
+
 ### Added
 
 - `buildPasskeyPrfAuthenticationExtensionsJson()` lets an account-auth server compose the public,
