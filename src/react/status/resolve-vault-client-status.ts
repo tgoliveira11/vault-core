@@ -14,6 +14,12 @@ export type VaultServerStatusSnapshot = {
   passkeyUnlockAvailableOnThisBrowser?: boolean;
   /** @deprecated Use passkeyUnlockAvailableOnThisBrowser. */
   passkeyUnlockAvailableOnThisDevice?: boolean;
+  /**
+   * Set false when passkey unlock does not run a local WebAuthn PRF ceremony (for example a
+   * broker-based portable passkey). Defaults to true, where the browser PRF heuristic gates
+   * quick-unlock availability. Envelope and bound-browser gates always apply.
+   */
+  passkeyUnlockRequiresBrowserPrf?: boolean;
   /** Explicit feature gate. Emergency state is ignored unless this is true. */
   emergencyModeEnabled?: boolean;
   emergencyModeActive?: boolean;

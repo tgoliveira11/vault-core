@@ -196,11 +196,17 @@ Exported from `@tgoliveira/vault-core/react` (styles: `vc-status-dock-*` in `vau
 | `tryConsumePasskeyAutoStart` / `resetPasskeyAutoStartDedupe` | Short-TTL sessionStorage dedupe for dock passkey auto-start |
 | `requestVaultDockExpand` / `subscribeVaultDockExpand` | Programmatic expand from locked-content gates |
 | `useVaultAutoLockCountdown` / `useVaultAutoLockFraction` | Live auto-lock countdown and ring fraction |
-| `resolveVaultDockPasskeyAvailability` | Passkey PRF quick-unlock eligibility (envelope + PRF + bound-browser flag) |
+| `resolveVaultDockPasskeyAvailability` | Passkey quick-unlock eligibility (envelope + bound-browser flag + browser PRF heuristic) |
 | Copy/preference helpers | `getVaultStatusDockExpandedCopy`, collapse `localStorage` preference |
 
 Apps inject routes (`unlockPath`, `buildUnlockHref`, `LinkComponent`), server status snapshot,
 `renderQuickUnlock`, and unlock handlers — no product auth or note payloads in the package.
+
+Set `serverStatus.passkeyUnlockRequiresBrowserPrf: false` when dock passkey unlock runs no local
+WebAuthn PRF ceremony (broker-based portable passkey). The dock then skips the browser PRF
+heuristic for the passkey button, the "unavailable in this browser" note, and the footer link
+label, while still requiring a passkey envelope and an active bound-browser flag. Omitting the
+field keeps PRF gating.
 
 ## Vault protected gate (shipped)
 

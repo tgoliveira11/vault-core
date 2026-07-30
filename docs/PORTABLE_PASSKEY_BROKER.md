@@ -162,6 +162,32 @@ operations cannot read or mutate it.
 Do not retry with the same ephemeral session. Create a new key and obtain a new grant for every
 attempt. A malformed response, PUK unseal failure, or UVK unwrap failure must leave the vault locked.
 
+## Vault status dock
+
+Portable broker unlock runs no local WebAuthn PRF ceremony, so the dock's browser PRF heuristic
+must not gate it. When the active passkey unlock method is the broker flow, set
+`passkeyUnlockRequiresBrowserPrf: false` on the `VaultServerStatusSnapshot` passed to
+`VaultStatusDock`:
+
+```ts
+import type { VaultServerStatusSnapshot } from "@tgoliveira/vault-core/react";
+
+declare const portablePasskeyActive: boolean;
+
+const serverStatus: VaultServerStatusSnapshot = {
+  configured: true,
+  hasPasskeyPrfEnvelope: true,
+  passkeyUnlockAvailableOnThisBrowser: true,
+  passkeyUnlockRequiresBrowserPrf: !portablePasskeyActive,
+};
+```
+
+The field flows into `VaultDockQuickUnlock` and the dock footer link automatically. Without it,
+browsers that fail the PRF heuristic (notably iOS/iPadOS below 18) hide a working portable unlock
+behind "Passkey unlock is unavailable in this browser." Keep the field omitted or `true` for legacy
+`passkey_prf` unlock, which does depend on browser PRF. The passkey envelope and bound-browser
+gates apply in both cases.
+
 ## Legacy PRF migration
 
 Do not claim that one PRF variant is portable across providers or devices. Existing `passkey_prf`

@@ -8,6 +8,17 @@ major version; compatible corrections should retain explicit deprecation and mig
 
 ## [Unreleased]
 
+### Added
+
+- `VaultServerStatusSnapshot.passkeyUnlockRequiresBrowserPrf` (optional). Set it to `false` when
+  passkey unlock does not run a local WebAuthn PRF ceremony — for example broker-based portable
+  passkey unlock — so `resolveVaultDockPasskeyAvailability`, `VaultDockQuickUnlock`, and the
+  `VaultStatusDock` footer link stop hiding passkey unlock behind the browser PRF heuristic.
+  Browsers without PRF (notably iOS/iPadOS below 18) previously showed "Passkey unlock is
+  unavailable in this browser" for an unlock that works. The passkey envelope and bound-browser
+  gates are unchanged and still apply. Omitting the field, or setting it to `true`, keeps the
+  previous behavior exactly.
+
 ## [1.8.1] - 2026-07-29
 
 ### Fixed
