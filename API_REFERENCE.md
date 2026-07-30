@@ -435,8 +435,8 @@ boolean aliases that fail closed.
 - `useVaultUnlocked()` / `useVaultLockState()`
 - `resolveVaultClientStatus(status, unlocked, prfSupported)`
 - `useVaultClientStatus(serverStatus, prfSupported)`
-- `VaultClientStatus` / `VaultServerStatusSnapshot` (`passkeyUnlockAvailableOnThisBrowser?`;
-  deprecated device field retained)
+- `VaultClientStatus` / `VaultServerStatusSnapshot` (`passkeyUnlockAvailableOnThisBrowser?`,
+  `passkeyUnlockRequiresBrowserPrf?`; deprecated device field retained)
 
 Provider and session hook guard options are `registerActivityGuard` (defaults to `false`) and
 `registerUnloadGuard` (defaults to `true`). Set `registerActivityGuard` when the app should renew the
@@ -496,7 +496,10 @@ Import styles once (includes `vc-status-dock-*` classes).
 - `useVaultAutoLockCountdown(active, autoLockMinutes?)` / `useVaultAutoLockFraction(...)` /
   `useVaultAutoLockMinutes(overrideMinutes?)` / `resolveVaultAutoLockMinutes(overrideMinutes?)`
 - `navigateToVaultFullUnlock(href, onNavigate?)` — SPA or hard redirect to full unlock
-- `resolveVaultDockPasskeyAvailability(serverStatus)`
+- `resolveVaultDockPasskeyAvailability(serverStatus)` — envelope + bound-browser + browser PRF
+  heuristic. Set `serverStatus.passkeyUnlockRequiresBrowserPrf: false` for unlock flows without a
+  local WebAuthn PRF ceremony (broker-based portable passkey) to skip the PRF heuristic only; the
+  envelope and bound-browser gates still apply. Omitted or `true` keeps PRF gating.
 - `readVaultStatusDockCollapsedPreference(key?)` / `writeVaultStatusDockCollapsedPreference(collapsed, key?)`
 - Copy helpers: `getVaultStatusDockExpandedCopy`, `getVaultStatusDockHandleLabel`, `DEFAULT_VAULT_STATUS_DOCK_LABELS`
 - Icons: `VaultStatusIcon`, `VaultStatusDockChevron`, `VaultStatusDockLockIcon`

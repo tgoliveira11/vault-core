@@ -75,4 +75,82 @@ describe("resolveVaultDockPasskeyAvailability", () => {
       prfExplicitlyUnsupported: false,
     });
   });
+
+  it("keeps the PRF gate when passkeyUnlockRequiresBrowserPrf is true", () => {
+    vi.mocked(isPrfExtensionHeuristicallyAvailable).mockReturnValue(false);
+    expect(
+      resolveVaultDockPasskeyAvailability({
+        configured: true,
+        hasPasskeyPrfEnvelope: true,
+        passkeyUnlockAvailableOnThisBrowser: true,
+        passkeyUnlockRequiresBrowserPrf: true,
+      })
+    ).toEqual({
+      hasEnvelope: true,
+      showPasskey: false,
+      prfExplicitlyUnsupported: true,
+    });
+
+    vi.mocked(isPrfExtensionHeuristicallyAvailable).mockReturnValue(true);
+    expect(
+      resolveVaultDockPasskeyAvailability({
+        configured: true,
+        hasPasskeyPrfEnvelope: true,
+        passkeyUnlockAvailableOnThisBrowser: true,
+        passkeyUnlockRequiresBrowserPrf: true,
+      })
+    ).toEqual({
+      hasEnvelope: true,
+      showPasskey: true,
+      prfExplicitlyUnsupported: false,
+    });
+  });
+
+  it("skips the PRF gate when passkeyUnlockRequiresBrowserPrf is false", () => {
+    vi.mocked(isPrfExtensionHeuristicallyAvailable).mockReturnValue(false);
+    vi.mocked(isPrfExtensionHeuristicallyAvailable).mockClear();
+    expect(
+      resolveVaultDockPasskeyAvailability({
+        configured: true,
+        hasPasskeyPrfEnvelope: true,
+        passkeyUnlockAvailableOnThisBrowser: true,
+        passkeyUnlockRequiresBrowserPrf: false,
+      })
+    ).toEqual({
+      hasEnvelope: true,
+      showPasskey: true,
+      prfExplicitlyUnsupported: false,
+    });
+    expect(isPrfExtensionHeuristicallyAvailable).not.toHaveBeenCalled();
+  });
+
+  it("still requires an active binding when the PRF gate is skipped", () => {
+    vi.mocked(isPrfExtensionHeuristicallyAvailable).mockReturnValue(false);
+    expect(
+      resolveVaultDockPasskeyAvailability({
+        configured: true,
+        hasPasskeyPrfEnvelope: true,
+        passkeyUnlockRequiresBrowserPrf: false,
+      })
+    ).toEqual({
+      hasEnvelope: true,
+      showPasskey: false,
+      prfExplicitlyUnsupported: false,
+    });
+  });
+
+  it("still requires an envelope when the PRF gate is skipped", () => {
+    vi.mocked(isPrfExtensionHeuristicallyAvailable).mockReturnValue(false);
+    expect(
+      resolveVaultDockPasskeyAvailability({
+        configured: true,
+        passkeyUnlockAvailableOnThisBrowser: true,
+        passkeyUnlockRequiresBrowserPrf: false,
+      })
+    ).toEqual({
+      hasEnvelope: false,
+      showPasskey: false,
+      prfExplicitlyUnsupported: false,
+    });
+  });
 });

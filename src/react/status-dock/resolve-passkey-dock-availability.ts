@@ -8,7 +8,11 @@ export type VaultDockPasskeyAvailability = {
   prfExplicitlyUnsupported: boolean;
 };
 
-/** Whether passkey PRF quick unlock may appear in the vault status dock. */
+/**
+ * Whether passkey quick unlock may appear in the vault status dock.
+ * Set `serverStatus.passkeyUnlockRequiresBrowserPrf` to false for unlock flows without a local
+ * WebAuthn PRF ceremony; the browser PRF heuristic is then skipped.
+ */
 export function resolveVaultDockPasskeyAvailability(
   serverStatus: VaultServerStatusSnapshot | null
 ): VaultDockPasskeyAvailability {
@@ -24,6 +28,12 @@ export function resolveVaultDockPasskeyAvailability(
     passkeyUnlockAvailableOnThisDevice: serverStatus?.passkeyUnlockAvailableOnThisDevice,
   })) {
     return { hasEnvelope: true, showPasskey: false, prfExplicitlyUnsupported: false };
+  }
+
+  // Broker-based portable passkey unlock runs no local WebAuthn PRF ceremony, so the browser PRF
+  // heuristic must not hide it. Only this gate is skipped; envelope and binding gates still apply.
+  if (serverStatus?.passkeyUnlockRequiresBrowserPrf === false) {
+    return { hasEnvelope: true, showPasskey: true, prfExplicitlyUnsupported: false };
   }
 
   if (!isPrfExtensionHeuristicallyAvailable()) {
